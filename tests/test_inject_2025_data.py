@@ -62,3 +62,131 @@ class TestBuildPlayerNameToId:
         csv_path = self._make_csv(tmp_path)
         result = _build_player_name_to_id(csv_path)
         assert isinstance(result, dict)
+
+
+class TestConvert2025ToConsolidated:
+    """convert_2025_to_consolidated maps XLSX rows to consolidated schema."""
+
+    def _make_raw_df(self):
+        """Minimal 2-row tennis-data XLSX-style DataFrame."""
+        return pd.DataFrame({
+            'Date'       : [pd.Timestamp('2025-01-06'), pd.Timestamp('2025-01-07')],
+            'Tournament' : ['Brisbane',                  'Brisbane'],
+            'Series'     : ['ATP250',                    'ATP250'],
+            'Surface'    : ['Hard',                      'Hard'],
+            'Round'      : ['1st Round',                 '2nd Round'],
+            'Best of'    : [3,                           3],
+            'Winner'     : ['Vukic A.',                  'Michelsen A.'],
+            'Loser'      : ['Djokovic N.',               'Sinner J.'],
+            'WRank'      : [77.0,                        18.0],
+            'LRank'      : [7.0,                         1.0],
+            'WPts'       : [800.0,                       3400.0],
+            'LPts'       : [9960.0,                      10900.0],
+            'Comment'    : ['Completed',                 'Completed'],
+            'year'       : [2025,                        2025],
+        })
+
+    def _make_name_to_id(self):
+        return {
+            "Novak Djokovic": 104925,
+            "Jannik Sinner": 207989,
+        }
+
+    def _make_name_mapping(self):
+        """tennis-data name → Sackmann name."""
+        return {
+            "Djokovic N.": "Novak Djokovic",
+            "Sinner J.": "Jannik Sinner",
+            "Vukic A.": "Vukic A.",
+            "Michelsen A.": "Michelsen A.",
+        }
+
+    def test_required_columns_present(self):
+        from inject_2025_data import convert_2025_to_consolidated
+        df_raw = self._make_raw_df()
+        result = convert_2025_to_consolidated(
+            df_raw, self._make_name_to_id(), self._make_name_mapping(), 'atp'
+        )
+        required = [
+            'tourney_id', 'tourney_name', 'tourney_date', 'tourney_level',
+            'surface', 'draw_size', 'best_of', 'round', 'year',
+            'winner_id', 'winner_name', 'winner_rank', 'winner_rank_points',
+            'loser_id', 'loser_name', 'loser_rank', 'loser_rank_points',
+        ]
+        for col in required:
+            assert col in result.columns, f"Missing column: {col}"
+
+    def test_round_mapping(self):
+        from inject_2025_data import convert_2025_to_consolidated
+        df_raw = self._make_raw_df()
+        result = convert_2025_to_consolidated(
+            df_raw, self._make_name_to_id(), self._make_name_mapping(), 'atp'
+        )
+        assert result.iloc[0]['round'] == 'R64'   # '1st Round'
+        assert result.iloc[1]['round'] == 'R32'   # '2nd Round'
+
+    def test_level_mapping(self):
+        from inject_2025_data import convert_2025_to_consolidated
+        df_raw = self._make_raw_df()
+        result = convert_2025_to_consolidated(
+            df_raw, self._make_name_to_id(), self._make_name_mapping(), 'atp'
+        )
+        assert (result['tourney_level'] == 'A').all()  # ATP250 → A
+
+    def test_known_player_gets_sackmann_id(self):
+        from inject_2025_data import convert_2025_to_consolidated
+        df_raw = self._make_raw_df()
+        result = convert_2025_to_consolidated(
+            df_raw, self._make_name_to_id(), self._make_name_mapping(), 'atp'
+        )
+        assert int(result.iloc[0]['loser_id']) == 104925   # Djokovic
+        assert int(result.iloc[1]['loser_id']) == 207989   # Sinner
+
+    def test_unknown_player_gets_synthetic_id_in_range(self):
+        from inject_2025_data import convert_2025_to_consolidated
+        df_raw = self._make_raw_df()
+        result = convert_2025_to_consolidated(
+            df_raw, self._make_name_to_id(), self._make_name_mapping(), 'atp'
+        )
+        vukic_id = int(result.iloc[0]['winner_id'])
+        assert 1_000_001 <= vukic_id <= 2_900_000
+
+    def test_tourney_id_format(self):
+        """tourney_id must match pattern YYYY-NNNN."""
+        from inject_2025_data import convert_2025_to_consolidated
+        df_raw = self._make_raw_df()
+        result = convert_2025_to_consolidated(
+            df_raw, self._make_name_to_id(), self._make_name_mapping(), 'atp'
+        )
+        for tid in result['tourney_id']:
+            parts = tid.split('-')
+            assert parts[0] == '2025'
+            assert parts[1].isdigit()
+
+    def test_year_column_is_2025(self):
+        from inject_2025_data import convert_2025_to_consolidated
+        df_raw = self._make_raw_df()
+        result = convert_2025_to_consolidated(
+            df_raw, self._make_name_to_id(), self._make_name_mapping(), 'atp'
+        )
+        assert (result['year'] == 2025).all()
+
+    def test_best_of_dtype_is_Int64(self):
+        from inject_2025_data import convert_2025_to_consolidated
+        df_raw = self._make_raw_df()
+        result = convert_2025_to_consolidated(
+            df_raw, self._make_name_to_id(), self._make_name_mapping(), 'atp'
+        )
+        assert str(result['best_of'].dtype) == 'Int64'
+
+    def test_stat_columns_are_nan(self):
+        """Service stats (w_ace etc.) should be NaN — not available from tennis-data."""
+        from inject_2025_data import convert_2025_to_consolidated
+        df_raw = self._make_raw_df()
+        result = convert_2025_to_consolidated(
+            df_raw, self._make_name_to_id(), self._make_name_mapping(), 'atp'
+        )
+        stat_cols = ['w_ace', 'w_df', 'l_ace', 'l_df']
+        for col in stat_cols:
+            if col in result.columns:
+                assert result[col].isna().all(), f"{col} should be all NaN"
