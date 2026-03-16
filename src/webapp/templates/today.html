@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Matchs du jour — TennisPredict{% endblock %}
+{% block page_title %}Matchs du jour{% endblock %}
+{% block page_meta %}{{ match_date }} · {{ match_count }} match(s){% endblock %}
+
+{% block topbar_right %}
+<div style="display:flex;align-items:center;gap:8px">
+  <div class="toggle-group">
+    <button class="toggle-btn {% if tour=='atp' %}active{% endif %}"
+            hx-get="/today/matches?tour=atp&match_date={{ match_date }}"
+            hx-target="#match-list" hx-swap="innerHTML">ATP</button>
+    <button class="toggle-btn {% if tour=='wta' %}active{% endif %}"
+            hx-get="/today/matches?tour=wta&match_date={{ match_date }}"
+            hx-target="#match-list" hx-swap="innerHTML">WTA</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if not matches %}
+<div class="card" style="text-align:center;color:var(--muted);padding:40px">
+  Aucun match trouvé pour le {{ match_date }}.
+  <br><br>
+  <a href="/predictions" style="color:var(--blue)">→ Saisie manuelle</a>
+</div>
+{% endif %}
+<div id="match-list">
+  {% include "partials/match_card.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<div class="bankroll-bar">
+  <span>💰 ATP <strong>{{ bankroll_atp | int }}€</strong></span>
+  <span>💰 WTA <strong>{{ bankroll_wta | int }}€</strong></span>
+  <span style="color:var(--muted);margin-left:auto;font-size:11px">
+    <span id="sync-status"
+          hx-get="/sync/status?tour={{ tour }}"
+          hx-trigger="every 5s"
+          hx-swap="outerHTML">{{ sync_status }}</span>
+  </span>
+  <button class="btn btn-sm" style="background:var(--surface);color:var(--text);border:1px solid var(--border)"
+          hx-post="/sync?tour={{ tour }}"
+          hx-target="#sync-status"
+          hx-swap="innerHTML">↻</button>
+</div>
+{% endblock %}
