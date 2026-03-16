@@ -249,7 +249,9 @@ def main():
     # ── Build name mapping (tennis-data → Sackmann) ──────────────────────────
     print("\n── Building name mapping ─────────────────────────────")
     elo_fake = {name: 0 for name in sackmann_names}
-    name_mapping = build_name_mapping(df_raw, elo_fake)
+    # build_name_mapping expects 'winner_name' / 'loser_name' columns
+    df_raw_mapped = df_raw.rename(columns={'Winner': 'winner_name', 'Loser': 'loser_name'})
+    name_mapping = build_name_mapping(df_raw_mapped, elo_fake)
 
     # ── Convert to consolidated schema ───────────────────────────────────────
     print("\n── Converting to consolidated schema ─────────────────")
