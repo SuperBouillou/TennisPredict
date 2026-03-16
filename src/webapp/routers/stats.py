@@ -22,9 +22,9 @@ def _state():
 def _load_equity(tour: str, strategy: str) -> dict:
     paths = get_paths(tour)
     strat_map = {
-        'Kelly':   'backtest_kelly.parquet',
-        'Flat':    'backtest_flat.parquet',
-        'Percent': 'backtest_percent.parquet',
+        'Kelly':   'backtest_strat_Kelly_1_4_cap2%.parquet',
+        'Flat':    'backtest_strat_Flat_10\u20ac.parquet',
+        'Percent': 'backtest_strat_Pct_2%.parquet',
     }
     fname = strat_map.get(strategy, 'backtest_kelly.parquet')
     fpath = paths['models_dir'] / fname

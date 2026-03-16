@@ -227,11 +227,17 @@ async function loadFeatures(tour) {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+function _initCharts() {
   const tour = '{{ tour }}';
   loadEquity(tour, 'Kelly', document.querySelector('.strategy-btn.active'));
   loadROI(tour);
   loadFeatures(tour);
-});
+}
+// Run when Chart.js is ready — handle both defer timing scenarios
+if (typeof Chart !== 'undefined') {
+  _initCharts();
+} else {
+  window.addEventListener('load', _initCharts);
+}
 </script>
 {% endblock %}
