@@ -17,13 +17,6 @@
 {% endblock %}
 
 {% block content %}
-{% if not matches %}
-<div class="card" style="text-align:center;color:var(--muted);padding:40px">
-  Aucun match trouvé pour le {{ match_date }}.
-  <br><br>
-  <a href="/predictions" style="color:var(--blue)">→ Saisie manuelle</a>
-</div>
-{% endif %}
 <div id="match-list">
   {% include "partials/match_card.html" %}
 </div>
