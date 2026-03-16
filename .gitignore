@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Odds API cache (auto-generated daily)
+data/odds_cache/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Data files (large, not committed)
+data/raw/
+data/processed/
+data/models/
+data/predictions/
+data/odds/
+
+# Jupyter
+.ipynb_checkpoints/
