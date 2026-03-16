@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Joueurs — TennisPredict{% endblock %}
+{% block page_title %}Profils Joueurs{% endblock %}
+{% block page_meta %}Rechercher un joueur{% endblock %}
+
+{% block topbar_right %}
+<div class="toggle-group">
+  <a href="/joueurs?tour=atp"><button class="toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</button></a>
+  <a href="/joueurs?tour=wta"><button class="toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</button></a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="form-group" style="margin-bottom:12px">
+  <input class="form-input" id="search-input" placeholder="Rechercher un joueur (min. 2 lettres)..."
+         autocomplete="off"
+         hx-get="/joueurs/search"
+         hx-trigger="keyup changed delay:200ms"
+         hx-target="#search-results"
+         hx-include="this"
+         name="q"
+         hx-vals='{"tour": "{{ tour }}"}'>
+</div>
+
+<div id="search-results"></div>
+{% endblock %}
