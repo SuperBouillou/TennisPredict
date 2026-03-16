@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Historique — TennisPredict{% endblock %}
+{% block page_title %}Historique des paris{% endblock %}
+{% block page_meta %}ATP · WTA{% endblock %}
+
+{% block topbar_right %}
+<div style="display:flex;align-items:center;gap:8px">
+  <div class="toggle-group">
+    <a href="/history?tour=atp">
+      <button class="toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</button>
+    </a>
+    <a href="/history?tour=wta">
+      <button class="toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</button>
+    </a>
+  </div>
+  <a href="/history/export?tour={{ tour }}" style="text-decoration:none">
+    <button class="btn btn-sm" style="background:var(--surface);color:var(--text);border:1px solid var(--border)">
+      ↓ CSV
+    </button>
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- KPI header -->
+<div class="grid-3" style="margin-bottom:8px">
+  <div class="kpi-card">
+    <div class="kpi-value">{{ bankroll_atp | int }}€</div>
+    <div class="kpi-label">Bankroll ATP</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ bankroll_wta | int }}€</div>
+    <div class="kpi-label">Bankroll WTA</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value {% if pnl_total >= 0 %}text-green{% else %}text-red{% endif %}">
+      {% if pnl_total >= 0 %}+{% endif %}{{ pnl_total | int }}€
+    </div>
+    <div class="kpi-label">P&L Total {{ tour | upper }}</div>
+  </div>
+</div>
+
+<!-- Pending bets -->
+{% if pending %}
+<div class="section-label">En attente ({{ pending | length }})</div>
+<div id="pending-bets">
+  {% for b in pending %}
+  <div class="card" style="margin-bottom:8px" id="bet-{{ b.id }}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div>
+        <div style="font-weight:700;font-size:14px">{{ b.p1_name }} vs {{ b.p2_name }}</div>
+        <div style="font-size:11px;color:var(--muted)">
+          {{ b.tournament }} · {{ b.surface }}{% if b.round %} · {{ b.round }}{% endif %}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:13px">
+          Cote <strong>{{ b.odd }}</strong> · Mise <strong>{{ b.stake | int }}€</strong>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">
+          Gain potentiel: <span style="color:var(--green)">+{{ ((b.stake * (b.odd - 1))) | round(1) }}€</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <form hx-post="/bets/{{ b.id }}/resolve" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="outcome" value="won">
+        <button type="submit" class="btn-won">✅ Gagné</button>
+      </form>
+      <form hx-post="/bets/{{ b.id }}/resolve" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="outcome" value="lost">
+        <button type="submit" class="btn-lost">❌ Perdu</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="color:var(--muted);text-align:center;padding:20px">
+  Aucun pari en attente.
+</div>
+{% endif %}
+
+<!-- Resolved bets -->
+{% if resolved %}
+<div class="section-label" style="margin-top:16px">Résolus ({{ resolved | length }})</div>
+<div class="card" style="padding:0;overflow:hidden">
+  <table>
+    <thead>
+      <tr>
+        <th>Match</th>
+        <th>Tournoi</th>
+        <th>Cote</th>
+        <th>Mise</th>
+        <th>P&L</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in resolved %}
+      <tr>
+        <td>
+          <div style="font-weight:600">{{ b.p1_name }} vs {{ b.p2_name }}</div>
+          <div style="font-size:11px;color:var(--muted)">{{ b.created_at[:10] }}</div>
+        </td>
+        <td style="color:var(--muted);font-size:12px">{{ b.tournament }}<br>{{ b.surface }}</td>
+        <td>{{ b.odd }}</td>
+        <td>{{ b.stake | int }}€</td>
+        <td class="{% if b.pnl >= 0 %}text-green{% else %}text-red{% endif %}">
+          {% if b.pnl >= 0 %}+{% endif %}{{ b.pnl | int }}€
+        </td>
+        <td>
+          {% if b.status == 'won' %}
+            <span class="badge badge-value">GAGNÉ</span>
+          {% else %}
+            <span class="badge" style="background:rgba(239,68,68,.15);color:var(--red)">PERDU</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if not pending and not resolved %}
+<div class="card" style="color:var(--muted);text-align:center;padding:40px">
+  Aucun pari enregistré pour {{ tour | upper }}.<br><br>
+  <a href="/predictions" style="color:var(--blue)">→ Faire une prédiction</a>
+</div>
+{% endif %}
+{% endblock %}
