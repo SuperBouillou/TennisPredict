@@ -1,3 +1,9 @@
+{% if not matches %}
+<div class="card" style="text-align:center;color:var(--muted);padding:40px">
+  Aucun match trouvé pour {{ tour | upper }} aujourd'hui.
+  <br><br><a href="/predictions" style="color:var(--blue)">→ Saisie manuelle</a>
+</div>
+{% endif %}
 {% for m in matches %}
 <div class="card" style="margin-bottom:8px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
