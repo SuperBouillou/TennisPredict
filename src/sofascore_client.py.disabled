@@ -1,0 +1,153 @@
+# src/sofascore_client.py
+"""
+Client HTTP pour l'API non-officielle Sofascore.
+Pure couche réseau — aucune logique métier ici.
+"""
+
+import time
+import requests
+from datetime import date, timedelta
+from typing import Optional
+
+
+BASE_URL = "https://api.sofascore.com/api/v1"
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept":          "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer":         "https://www.sofascore.com/",
+    "Origin":          "https://www.sofascore.com",
+}
+
+# ── Surfaces connues (uniqueTournament.id → surface) ─────────────────────────
+# Évite un appel API supplémentaire pour les tournois majeurs.
+KNOWN_SURFACES: dict[int, str] = {
+    # Grand Slams
+    2230: "Hard",    # Australian Open
+    2316: "Clay",    # Roland Garros
+    2317: "Grass",   # Wimbledon
+    2318: "Hard",    # US Open
+    # ATP Masters 1000
+    2239: "Hard",    # Indian Wells
+    2240: "Hard",    # Miami
+    2243: "Clay",    # Monte Carlo
+    2244: "Clay",    # Madrid
+    2245: "Clay",    # Rome
+    2246: "Hard",    # Canadian Open (Toronto/Montreal)
+    2247: "Hard",    # Cincinnati
+    2251: "Hard",    # Shanghai
+    2254: "Hard",    # Paris
+    # WTA 1000
+    2302: "Hard",    # Indian Wells WTA
+    2303: "Hard",    # Miami WTA
+    2304: "Clay",    # Madrid WTA
+    2305: "Clay",    # Rome WTA
+    2306: "Hard",    # Canadian WTA
+    2307: "Hard",    # Cincinnati WTA
+    2321: "Hard",    # Beijing WTA
+    2322: "Hard",    # Wuhan WTA
+}
+
+_surface_cache: dict[int, str] = {}
+
+
+def _get(url: str, retries: int = 3, delay: float = 1.0) -> Optional[dict]:
+    """GET avec retry exponentiel sur 429/5xx."""
+    for attempt in range(retries):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=10)
+            if resp.status_code == 200:
+                return resp.json()
+            if resp.status_code == 429:
+                wait = delay * (2 ** attempt)
+                time.sleep(wait)
+            elif resp.status_code >= 500:
+                time.sleep(delay)
+        except requests.RequestException:
+            time.sleep(delay)
+    return None
+
+
+def fetch_surface(unique_tournament_id: int) -> str:
+    """
+    Retourne la surface ('Hard','Clay','Grass','Carpet') pour un tournoi.
+    Utilise d'abord le dict statique KNOWN_SURFACES, puis l'API si inconnu.
+    """
+    if unique_tournament_id in KNOWN_SURFACES:
+        return KNOWN_SURFACES[unique_tournament_id]
+    if unique_tournament_id in _surface_cache:
+        return _surface_cache[unique_tournament_id]
+
+    data = _get(f"{BASE_URL}/unique-tournament/{unique_tournament_id}")
+    surface = "Hard"  # défaut raisonnable
+    if data:
+        ground = (data.get("uniqueTournament") or {}).get("groundType", "")
+        surface = {
+            "hard":    "Hard",
+            "clay":    "Clay",
+            "grass":   "Grass",
+            "indoor":  "Hard",
+            "carpet":  "Carpet",
+        }.get(ground.lower(), "Hard")
+
+    _surface_cache[unique_tournament_id] = surface
+    time.sleep(0.3)
+    return surface
+
+
+def fetch_events(date_str: str, tour_filter: str = "atp") -> list[dict]:
+    """
+    Récupère les événements tennis terminés pour `date_str` (YYYY-MM-DD).
+
+    tour_filter : 'atp' | 'wta' | 'both'
+    Retourne une liste de dicts bruts Sofascore.
+    """
+    data = _get(f"{BASE_URL}/sport/tennis/scheduled-events/{date_str}")
+    if not data:
+        return []
+
+    tours = {"atp", "wta"} if tour_filter == "both" else {tour_filter}
+
+    results = []
+    for ev in data.get("events", []):
+        # Uniquement matchs terminés
+        if ev.get("status", {}).get("type") != "finished":
+            continue
+        # Filtrer par circuit
+        cat_slug = ev.get("tournament", {}).get("category", {}).get("slug", "").lower()
+        if not any(t in cat_slug for t in tours):
+            continue
+        # Nécessite un vainqueur identifié
+        if ev.get("winnerCode") not in (1, 2):
+            continue
+        results.append(ev)
+
+    return results
+
+
+def fetch_date_range(
+    start: date,
+    end: date,
+    tour_filter: str = "atp",
+    verbose: bool = False,
+) -> list[dict]:
+    """
+    Récupère tous les événements terminés entre start et end (inclus).
+    Ajoute un délai de 0.5s entre chaque jour pour ne pas surcharger l'API.
+    """
+    events: list[dict] = []
+    current = start
+    while current <= end:
+        day_str = current.strftime("%Y-%m-%d")
+        day_events = fetch_events(day_str, tour_filter)
+        if verbose:
+            print(f"  {day_str}: {len(day_events)} événements")
+        events.extend(day_events)
+        current += timedelta(days=1)
+        time.sleep(0.5)
+    return events
