@@ -1,0 +1,86 @@
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+    <div>
+      <div style="font-weight:700;font-size:16px">{{ p1_name }}</div>
+      <div style="font-size:12px;color:var(--muted)">vs {{ p2_name }}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">{{ tournament }} &middot; {{ surface }} &middot; {{ round }}</div>
+    </div>
+    {% if result.elo_only %}
+      <span class="badge badge-neutral">ELO ONLY</span>
+    {% endif %}
+  </div>
+
+  <!-- Probabilities -->
+  <div class="grid-2" style="margin-bottom:16px">
+    <div style="text-align:center;padding:16px;background:rgba(59,130,246,0.1);border-radius:10px">
+      <div style="font-size:11px;color:var(--muted)">{{ p1_name.split()[0] }}</div>
+      <div style="font-size:32px;font-weight:800;color:var(--blue)">
+        {{ "%.1f"|format(result.prob_p1 * 100) }}%
+      </div>
+      <div style="font-size:11px;color:var(--muted)">probabilit&#233; ML</div>
+    </div>
+    <div style="text-align:center;padding:16px;background:rgba(100,116,139,0.1);border-radius:10px">
+      <div style="font-size:11px;color:var(--muted)">{{ p2_name.split()[0] }}</div>
+      <div style="font-size:32px;font-weight:800;color:var(--muted)">
+        {{ "%.1f"|format(result.prob_p2 * 100) }}%
+      </div>
+      <div style="font-size:11px;color:var(--muted)">probabilit&#233; ML</div>
+    </div>
+  </div>
+
+  <!-- Edge + Kelly -->
+  {% if result.edge is not none %}
+  <div class="grid-3" style="margin-bottom:16px">
+    <div class="kpi-card">
+      <div class="kpi-value {% if result.edge >= 0.05 %}text-green{% elif result.edge >= 0.02 %}text-orange{% else %}text-red{% endif %}">
+        {{ "%.1f"|format(result.edge * 100) }}%
+      </div>
+      <div class="kpi-label">Edge</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value {% if result.ev and result.ev > 0 %}text-green{% else %}text-red{% endif %}">
+        {{ "%.3f"|format(result.ev or 0) }}
+      </div>
+      <div class="kpi-label">EV</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value text-blue">
+        {% if result.kelly_eur %}{{ result.kelly_eur }}&#8364;{% else %}&mdash;{% endif %}
+      </div>
+      <div class="kpi-label">Kelly ({{ "%.1f"|format((result.kelly_frac or 0) * 100) }}%)</div>
+    </div>
+  </div>
+
+  <!-- Save bet form -->
+  {% if result.edge >= 0.02 and result.kelly_eur %}
+  <form hx-post="/bets" hx-swap="outerHTML" style="display:flex;gap:8px;align-items:flex-end">
+    <input type="hidden" name="tour" value="{{ tour }}">
+    <input type="hidden" name="p1_name" value="{{ p1_name }}">
+    <input type="hidden" name="p2_name" value="{{ p2_name }}">
+    <input type="hidden" name="bet_on" value="p1">
+    <input type="hidden" name="tournament" value="{{ tournament }}">
+    <input type="hidden" name="surface" value="{{ surface }}">
+    <input type="hidden" name="round" value="{{ round }}">
+    <input type="hidden" name="prob" value="{{ result.prob_p1 }}">
+    <input type="hidden" name="edge" value="{{ result.edge }}">
+    <input type="hidden" name="odd" value="{{ odd_p1 or '' }}">
+    <input type="hidden" name="kelly_frac" value="{{ result.kelly_frac or '' }}">
+    <div class="form-group" style="flex:1">
+      <label class="form-label">Mise (&#8364;)</label>
+      <input class="form-input" name="stake" type="number" step="1" min="1"
+             value="{{ result.kelly_eur | int }}">
+    </div>
+    <button type="submit" class="btn btn-primary">Enregistrer le pari</button>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  {% if not result.p1_found or not result.p2_found %}
+  <div style="color:var(--orange);font-size:12px;margin-top:8px">
+    &#9888; {% if not result.p1_found %}{{ p1_name }} introuvable{% endif %}
+    {% if not result.p1_found and not result.p2_found %}, {% endif %}
+    {% if not result.p2_found %}{{ p2_name }} introuvable{% endif %}
+    &mdash; pr&#233;diction bas&#233;e sur ELO uniquement
+  </div>
+  {% endif %}
+</div>
