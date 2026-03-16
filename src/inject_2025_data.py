@@ -180,3 +180,115 @@ def convert_2025_to_consolidated(
     out['draw_size'] = out['draw_size'].astype(float)
 
     return out.reset_index(drop=True)
+
+
+def _check_already_injected(consolidated_path: Path) -> bool:
+    """
+    Returns True if matches_consolidated.parquet already contains
+    rows with year == 2025 — in which case injection should be skipped.
+    """
+    df = pd.read_parquet(consolidated_path, columns=['year'])
+    return int((df['year'] == 2025).sum()) > 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Inject 2025 ATP matches into matches_consolidated.parquet"
+    )
+    parser.add_argument('--tour', default='atp', choices=['atp', 'wta'],
+                        help="Tour (default: atp)")
+    args = parser.parse_args()
+
+    tour  = args.tour.lower()
+    cfg   = get_tour_config(tour)
+    paths = get_paths(tour)
+    make_dirs(tour)
+
+    processed_dir = paths['processed_dir']
+    raw_dir       = paths['raw_dir']
+    odds_dir      = paths['odds_dir']
+    consolidated  = processed_dir / "matches_consolidated.parquet"
+    players_csv   = raw_dir / cfg['player_file']
+
+    print("=" * 55)
+    print(f"INJECT 2025 DATA — {tour.upper()}")
+    print("=" * 55)
+
+    # ── Idempotency guard ────────────────────────────────────────────────────
+    if _check_already_injected(consolidated):
+        print("\n  2025 rows already present in matches_consolidated.parquet.")
+        print("  Nothing to do. Exiting.")
+        return
+
+    # ── Load name-to-id mapping from players CSV ─────────────────────────────
+    print("\n── Building player ID lookup ─────────────────────────")
+    name_to_id = _build_player_name_to_id(players_csv)
+    print(f"  {len(name_to_id):,} players found in {players_csv.name}")
+
+    # ── Load existing consolidated parquet for name-building ─────────────────
+    print("\n── Loading consolidated parquet ──────────────────────")
+    df_base = pd.read_parquet(consolidated)
+    print(f"  {len(df_base):,} rows, {df_base['tourney_date'].max().date()} max date")
+
+    sackmann_names = set(
+        df_base['winner_name'].dropna().tolist() +
+        df_base['loser_name'].dropna().tolist()
+    )
+    print(f"  {len(sackmann_names):,} unique Sackmann player names available")
+
+    # ── Load 2025 XLSX via shared loader ────────────────────────────────────
+    print("\n── Loading 2025 tennis-data XLSX ─────────────────────")
+    df_raw = load_new_matches([2025], cfg, odds_dir)
+
+    if df_raw.empty:
+        print("  No 2025 data found. Check data/odds/atp/atp_2025.xlsx exists.")
+        return
+
+    print(f"  {len(df_raw):,} completed 2025 matches loaded")
+
+    # ── Build name mapping (tennis-data → Sackmann) ──────────────────────────
+    print("\n── Building name mapping ─────────────────────────────")
+    elo_fake = {name: 0 for name in sackmann_names}
+    name_mapping = build_name_mapping(df_raw, elo_fake)
+
+    # ── Convert to consolidated schema ───────────────────────────────────────
+    print("\n── Converting to consolidated schema ─────────────────")
+    df_2025 = convert_2025_to_consolidated(df_raw, name_to_id, name_mapping, tour)
+    print(f"  {len(df_2025):,} rows converted")
+    print(f"  Date range: {df_2025['tourney_date'].min().date()} "
+          f"→ {df_2025['tourney_date'].max().date()}")
+
+    # ── Backup ───────────────────────────────────────────────────────────────
+    backup = consolidated.with_suffix('.parquet.bak2024')
+    print(f"\n── Creating backup → {backup.name} ──────────────────")
+    import shutil
+    shutil.copy2(consolidated, backup)
+    print(f"  Backup written ({backup.stat().st_size / 1024 / 1024:.1f} MB)")
+
+    # ── Append and save ───────────────────────────────────────────────────────
+    print("\n── Appending 2025 rows and saving ────────────────────")
+    df_combined = pd.concat([df_base, df_2025], ignore_index=True)
+    df_combined = df_combined.sort_values('tourney_date').reset_index(drop=True)
+
+    df_combined['best_of']   = df_combined['best_of'].astype('Int64')
+    df_combined['winner_id'] = df_combined['winner_id'].astype('Int64')
+    df_combined['loser_id']  = df_combined['loser_id'].astype('Int64')
+    df_combined['year']      = df_combined['year'].astype('int32')
+
+    df_combined.to_parquet(consolidated, index=False)
+
+    n_2025_check = int((df_combined['year'] == 2025).sum())
+    print(f"\n  Saved: {len(df_combined):,} total rows")
+    print(f"  2025 rows: {n_2025_check:,}")
+    print(f"\n  Now run the feature pipeline (--tour {tour}):")
+    print(f"    venv/Scripts/python src/restructure_data.py --tour {tour}")
+    print(f"    venv/Scripts/python src/compute_elo.py --tour {tour}")
+    print(f"    venv/Scripts/python src/compute_rolling_features.py --tour {tour}")
+    print(f"    venv/Scripts/python src/compute_h2h.py --tour {tour}")
+    print(f"    venv/Scripts/python src/compute_contextual_features.py --tour {tour}")
+    print(f"    venv/Scripts/python src/compute_glicko.py --tour {tour}")
+    print(f"    venv/Scripts/python src/prepare_ml_dataset.py --tour {tour}")
+
+
+if __name__ == "__main__":
+    main()

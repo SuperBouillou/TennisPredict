@@ -190,3 +190,28 @@ class TestConvert2025ToConsolidated:
         for col in stat_cols:
             if col in result.columns:
                 assert result[col].isna().all(), f"{col} should be all NaN"
+
+
+class TestIdempotency:
+    """Running inject_2025_data when 2025 data is already present must be a no-op."""
+
+    def test_already_present_returns_true(self, tmp_path):
+        """
+        _check_already_injected returns True when year==2025 rows exist.
+        """
+        from inject_2025_data import _check_already_injected
+
+        df = pd.DataFrame({'year': [2024, 2025], 'tourney_name': ['X', 'Y']})
+        p = tmp_path / "matches_consolidated.parquet"
+        df.to_parquet(p, index=False)
+
+        assert _check_already_injected(p) is True
+
+    def test_not_present_returns_false(self, tmp_path):
+        from inject_2025_data import _check_already_injected
+
+        df = pd.DataFrame({'year': [2023, 2024], 'tourney_name': ['X', 'Y']})
+        p = tmp_path / "matches_consolidated.parquet"
+        df.to_parquet(p, index=False)
+
+        assert _check_already_injected(p) is False
