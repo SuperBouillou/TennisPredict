@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Statistiques — TennisPredict{% endblock %}
+{% block page_title %}Statistiques{% endblock %}
+{% block page_meta %}Backtest out-of-sample · 2025{% endblock %}
+
+{% block topbar_right %}
+<div class="toggle-group">
+  <a href="/stats?tour=atp"><button class="toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</button></a>
+  <a href="/stats?tour=wta"><button class="toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</button></a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPIs -->
+<div class="grid-4" style="margin-bottom:10px">
+  <div class="kpi-card">
+    <div class="kpi-value {% if (kpis.get('roi') or 0) >= 0 %}text-green{% else %}text-red{% endif %}">
+      {% if kpis.get('roi') %}{{ "%.1f"|format(kpis.roi * 100) }}%{% else %}—{% endif %}
+    </div>
+    <div class="kpi-label">ROI</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ kpis.get('n_bets', '—') }}</div>
+    <div class="kpi-label">Paris backtestés</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">
+      {% if kpis.get('win_rate') %}{{ "%.1f"|format(kpis.win_rate * 100) }}%{% else %}—{% endif %}
+    </div>
+    <div class="kpi-label">Win Rate</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value {% if (kpis.get('pnl') or 0) >= 0 %}text-green{% else %}text-red{% endif %}">
+      {% if kpis.get('pnl') is not none %}{{ kpis.pnl | int }}€{% else %}—{% endif %}
+    </div>
+    <div class="kpi-label">P&amp;L Total</div>
+  </div>
+</div>
+
+<!-- Equity Curve -->
+<div class="section-label">Courbe de bankroll</div>
+<div class="chart-container" style="margin-bottom:10px">
+  <div style="display:flex;gap:8px;margin-bottom:12px">
+    <button class="btn btn-sm strategy-btn active" data-strategy="Kelly"
+            onclick="loadEquity('{{ tour }}', 'Kelly', this)">Kelly</button>
+    <button class="btn btn-sm strategy-btn" data-strategy="Flat"
+            onclick="loadEquity('{{ tour }}', 'Flat', this)">Flat</button>
+    <button class="btn btn-sm strategy-btn" data-strategy="Percent"
+            onclick="loadEquity('{{ tour }}', 'Percent', this)">% Bankroll</button>
+  </div>
+  <canvas id="equity-chart"></canvas>
+</div>
+
+<!-- ROI par bookmaker -->
+<div class="section-label">ROI par bookmaker</div>
+<div class="chart-container" style="margin-bottom:10px">
+  <canvas id="roi-chart"></canvas>
+</div>
+
+<!-- Feature importance -->
+<div class="section-label">Feature importance (Top 15)</div>
+<div class="chart-container" style="margin-bottom:10px">
+  <canvas id="feat-chart"></canvas>
+</div>
+
+<!-- Settings -->
+<div class="section-label">Configuration des seuils</div>
+<div class="card">
+  <form hx-post="/settings" hx-target="#settings-result" hx-swap="innerHTML">
+    <div class="grid-3" style="margin-bottom:12px">
+      <div class="form-group">
+        <label class="form-label">Edge minimum (%)</label>
+        <input class="form-input" name="min_edge" type="number" step="0.01" min="0" max="0.2"
+               value="{{ settings.min_edge }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Probabilité minimum</label>
+        <input class="form-input" name="min_prob" type="number" step="0.01" min="0.5" max="0.8"
+               value="{{ settings.min_prob }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kelly fraction</label>
+        <input class="form-input" name="kelly_fraction" type="number" step="0.05" min="0.1" max="0.5"
+               value="{{ settings.kelly_fraction }}">
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">Sauvegarder</button>
+    <span id="settings-result" style="margin-left:8px"></span>
+  </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Chart defaults ──────────────────────────────────────────────────────────
+const CHART_DEFAULTS = {
+  color: '#f1f5f9',
+  font: { family: 'system-ui', size: 11 },
+};
+Chart.defaults.color = CHART_DEFAULTS.color;
+
+function chartScales() {
+  return {
+    x: { ticks: { color: '#64748b', maxTicksLimit: 12 },
+         grid: { color: 'rgba(51,65,85,0.5)' } },
+    y: { ticks: { color: '#64748b' },
+         grid: { color: 'rgba(51,65,85,0.5)' } },
+  };
+}
+
+// ── Equity Curve ───────────────────────────────────────────────────────────
+let _equityChart = null;
+
+async function loadEquity(tour, strategy, btn) {
+  // Update active button style
+  document.querySelectorAll('.strategy-btn').forEach(b => {
+    b.classList.remove('active');
+    b.style.background = 'var(--surface)';
+    b.style.color = 'var(--text)';
+  });
+  if (btn) {
+    btn.classList.add('active');
+    btn.style.background = 'var(--blue)';
+    btn.style.color = 'white';
+  }
+
+  const r = await fetch(`/stats/equity?tour=${tour}&strategy=${strategy}`);
+  const d = await r.json();
+  const ctx = document.getElementById('equity-chart').getContext('2d');
+  if (_equityChart) _equityChart.destroy();
+  _equityChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [{
+        label: `Bankroll (${strategy})`,
+        data: d.values,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2,
+      }, {
+        label: 'Baseline 1000€',
+        data: d.labels.map(() => 1000),
+        borderColor: 'rgba(100,116,139,0.4)',
+        borderDash: [5, 5],
+        pointRadius: 0,
+        fill: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      scales: chartScales(),
+    }
+  });
+}
+
+// ── ROI par bookmaker ──────────────────────────────────────────────────────
+async function loadROI(tour) {
+  const r = await fetch(`/stats/roi-bookmakers?tour=${tour}`);
+  const d = await r.json();
+  const ctx = document.getElementById('roi-chart').getContext('2d');
+  const colors = d.roi.map(v => v === null ? '#334155' : v >= 0 ? '#22c55e' : '#ef4444');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: d.bookmakers,
+      datasets: [{
+        label: 'ROI',
+        data: d.roi.map(v => v === null ? 0 : +(v * 100).toFixed(2)),
+        backgroundColor: colors,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.raw.toFixed(1)}%` } },
+      },
+      scales: {
+        ...chartScales(),
+        y: { ...chartScales().y, ticks: { ...chartScales().y.ticks, callback: v => v + '%' } }
+      },
+    }
+  });
+}
+
+// ── Feature importance ─────────────────────────────────────────────────────
+async function loadFeatures(tour) {
+  const r = await fetch(`/stats/features?tour=${tour}`);
+  const d = await r.json();
+  if (!d.features.length) return;
+  const ctx = document.getElementById('feat-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: d.features,
+      datasets: [{
+        label: 'Importance',
+        data: d.values,
+        backgroundColor: d.groups,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.raw.toFixed(4) } },
+      },
+      scales: {
+        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(51,65,85,0.5)' } },
+        y: { ticks: { color: '#f1f5f9', font: { size: 11 } }, grid: { display: false } },
+      },
+    }
+  });
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const tour = '{{ tour }}';
+  loadEquity(tour, 'Kelly', document.querySelector('.strategy-btn.active'));
+  loadROI(tour);
+  loadFeatures(tour);
+});
+</script>
+{% endblock %}
