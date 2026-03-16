@@ -185,6 +185,13 @@ def load_player_names(tour: str) -> list:
 
 @st.cache_data
 def load_tournament_names(tour: str) -> list:
+    # Parquet en priorité (100x plus rapide qu'openpyxl)
+    processed_dir = ROOT / "data" / "processed" / tour
+    path = processed_dir / "matches_features_final.parquet"
+    if path.exists():
+        df = pd.read_parquet(path, columns=["tourney_name"])
+        return sorted(df["tourney_name"].dropna().unique().tolist())
+    # Fallback : lire les xlsx tennis-data si le parquet est absent
     tourneys = set()
     odds_dir = ROOT / "data" / "odds" / tour
     for f in glob.glob(str(odds_dir / f"{tour}_202*.xlsx")):
@@ -193,12 +200,6 @@ def load_tournament_names(tour: str) -> list:
             tourneys.update(d["Tournament"].dropna().unique().tolist())
         except Exception:
             pass
-    if not tourneys:
-        processed_dir = ROOT / "data" / "processed" / tour
-        path = processed_dir / "matches_features_final.parquet"
-        if path.exists():
-            df = pd.read_parquet(path, columns=["tourney_name"])
-            tourneys.update(df["tourney_name"].dropna().unique().tolist())
     return sorted(tourneys)
 
 @st.cache_data
@@ -1346,6 +1347,7 @@ def render_predictions_tab(tour: str, tour_label: str, cfg: dict):
 # ═════════════════════════════════════════════════════════════════════════════
 # TAB 0 — MATCHS DU JOUR
 # ═════════════════════════════════════════════════════════════════════════════
+@st.cache_data(ttl=300)  # 5 min — évite un appel ESPN à chaque interaction
 def _fetch_today_matches(tour: str) -> list:
     import sys
     sys.path.insert(0, str(ROOT / "src"))
