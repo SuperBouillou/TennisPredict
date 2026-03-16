@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}TennisPredict{% endblock %}</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="sidebar">
+    <div class="logo">🎾</div>
+    <a href="/today"       class="nav-item {% if active=='today' %}active{% endif %}" title="Matchs du jour">📅</a>
+    <a href="/predictions" class="nav-item {% if active=='predictions' %}active{% endif %}" title="Prédictions">⚡</a>
+    <a href="/history"     class="nav-item {% if active=='history' %}active{% endif %}" title="Historique">📋</a>
+    <a href="/joueurs"     class="nav-item {% if active=='joueurs' %}active{% endif %}" title="Joueurs">👤</a>
+    <a href="/stats"       class="nav-item {% if active=='stats' %}active{% endif %}" title="Statistiques">📊</a>
+  </nav>
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">{% block page_title %}TennisPredict{% endblock %}</div>
+        <div class="topbar-meta">{% block page_meta %}{% endblock %}</div>
+      </div>
+      <div>{% block topbar_right %}{% endblock %}</div>
+    </div>
+    <div class="content">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
