@@ -50,8 +50,8 @@ def get_profile(profiles: pd.DataFrame, players: pd.DataFrame,
 
 def _best_surface(r) -> str:
     surfaces = {
-        'Hard':  float(r.get('elo_hard', 0) or 0),
-        'Clay':  float(r.get('elo_clay', 0) or 0),
-        'Grass': float(r.get('elo_grass', 0) or 0),
+        'Hard':  float(r.get('elo_Hard', 0) or 0),
+        'Clay':  float(r.get('elo_Clay', 0) or 0),
+        'Grass': float(r.get('elo_Grass', 0) or 0),
     }
     return max(surfaces, key=surfaces.get)

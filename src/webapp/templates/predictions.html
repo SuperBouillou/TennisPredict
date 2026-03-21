@@ -26,6 +26,7 @@
       <label class="form-label">Joueur 1</label>
       <input class="form-input" id="p1_input" name="p1_name"
              placeholder="Ex: Jannik Sinner"
+             value="{{ prefill.p1_name if prefill else '' }}"
              autocomplete="off"
              hx-get="/predictions/autocomplete"
              hx-trigger="keyup changed delay:200ms"
@@ -42,6 +43,7 @@
       <label class="form-label">Joueur 2</label>
       <input class="form-input" id="p2_input" name="p2_name"
              placeholder="Ex: Carlos Alcaraz"
+             value="{{ prefill.p2_name if prefill else '' }}"
              autocomplete="off"
              hx-get="/predictions/autocomplete"
              hx-trigger="keyup changed delay:200ms"
@@ -57,13 +59,15 @@
   <div class="grid-3" style="margin-bottom:10px">
     <div class="form-group">
       <label class="form-label">Tournoi</label>
-      <input class="form-input" name="tournament" placeholder="Ex: Australian Open" value="Australian Open">
+      <input class="form-input" name="tournament"
+             placeholder="Ex: Australian Open"
+             value="{{ prefill.tournament if prefill else 'Australian Open' }}">
     </div>
     <div class="form-group">
       <label class="form-label">Surface</label>
       <select class="form-select" name="surface">
         {% for s in surfaces %}
-          <option value="{{ s }}">{{ s }}</option>
+          <option value="{{ s }}" {% if prefill and prefill.surface == s %}selected{% endif %}>{{ s }}</option>
         {% endfor %}
       </select>
     </div>
@@ -71,7 +75,7 @@
       <label class="form-label">Tour</label>
       <select class="form-select" name="round">
         {% for r in rounds %}
-          <option value="{{ r }}">{{ r }}</option>
+          <option value="{{ r }}" {% if prefill and prefill.round == r %}selected{% endif %}>{{ r }}</option>
         {% endfor %}
       </select>
     </div>
@@ -81,17 +85,31 @@
     <div class="form-group">
       <label class="form-label">Best of</label>
       <select class="form-select" name="best_of">
-        <option value="3">3 sets</option>
-        <option value="5">5 sets</option>
+        <option value="3" {% if not prefill or prefill.best_of == 3 %}selected{% endif %}>3 sets</option>
+        <option value="5" {% if prefill and prefill.best_of == 5 %}selected{% endif %}>5 sets</option>
       </select>
     </div>
     <div class="form-group">
       <label class="form-label">Cote Joueur 1 (optionnel)</label>
-      <input class="form-input" name="odd_p1" type="number" step="0.01" min="1.01" placeholder="Ex: 1.75">
+      <input class="form-input" name="odd_p1" type="number" step="0.01" min="1.01"
+             placeholder="Ex: 1.75"
+             value="{{ prefill.odd_p1 if prefill and prefill.odd_p1 else '' }}"
+             hx-post="/predictions/run"
+             hx-target="#result-card"
+             hx-swap="innerHTML"
+             hx-include="closest form"
+             hx-trigger="change">
     </div>
     <div class="form-group">
       <label class="form-label">Cote Joueur 2 (optionnel)</label>
-      <input class="form-input" name="odd_p2" type="number" step="0.01" min="1.01" placeholder="Ex: 2.10">
+      <input class="form-input" name="odd_p2" type="number" step="0.01" min="1.01"
+             placeholder="Ex: 2.10"
+             value="{{ prefill.odd_p2 if prefill and prefill.odd_p2 else '' }}"
+             hx-post="/predictions/run"
+             hx-target="#result-card"
+             hx-swap="innerHTML"
+             hx-include="closest form"
+             hx-trigger="change">
     </div>
   </div>
 
@@ -108,6 +126,20 @@ function selectPlayer(name, fieldName, inputId, listId) {
   var list = document.getElementById(listId);
   if (list) list.textContent = '';
 }
+
+// Auto-run prediction if pre-filled from match card
+{% if auto_run %}
+document.addEventListener('DOMContentLoaded', function() {
+  var p1 = document.getElementById('p1_input');
+  var p2 = document.getElementById('p2_input');
+  if (p1) p1.setAttribute('name', 'p1_name');
+  if (p2) p2.setAttribute('name', 'p2_name');
+  setTimeout(function() {
+    var btn = document.querySelector('button[type="submit"]');
+    if (btn) btn.click();
+  }, 50);
+});
+{% endif %}
 
 // Ensure p1/p2 input names are correct before form submission
 document.addEventListener('htmx:configRequest', function(e) {

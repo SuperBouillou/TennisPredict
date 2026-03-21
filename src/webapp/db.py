@@ -18,11 +18,10 @@ def get_connection(path: Path = _DEFAULT_DB) -> sqlite3.Connection:
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA.read_text())
     conn.commit()
-    for tour in ('atp', 'wta'):
-        conn.execute(
-            "INSERT OR IGNORE INTO bankroll (tour, amount, updated_at) VALUES (?, 1000.0, ?)",
-            (tour, _now()),
-        )
+    conn.execute(
+        "INSERT OR IGNORE INTO bankroll (tour, amount, updated_at) VALUES ('global', 1000.0, ?)",
+        (_now(),),
+    )
     defaults = {'min_edge': '0.03', 'min_prob': '0.55', 'kelly_fraction': '0.25'}
     for k, v in defaults.items():
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
@@ -31,12 +30,12 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 # ── Bankroll ──────────────────────────────────────────────────────────────────
 
-def get_bankroll(conn: sqlite3.Connection, tour: str) -> float:
+def get_bankroll(conn: sqlite3.Connection, tour: str = 'global') -> float:
     row = conn.execute("SELECT amount FROM bankroll WHERE tour = ?", (tour,)).fetchone()
     return row['amount'] if row else 1000.0
 
 
-def set_bankroll(conn: sqlite3.Connection, tour: str, amount: float) -> None:
+def set_bankroll(conn: sqlite3.Connection, tour: str = 'global', amount: float = 1000.0) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO bankroll (tour, amount, updated_at) VALUES (?, ?, ?)",
         (tour, round(amount, 2), _now()),
@@ -89,6 +88,29 @@ def resolve_bet(conn: sqlite3.Connection, bet_id: int, outcome: str) -> None:
         (outcome, pnl, _now(), bet_id),
     )
     conn.commit()
+
+
+def delete_bet(conn: sqlite3.Connection, bet_id: int) -> None:
+    """Delete a pending bet and refund its stake to bankroll."""
+    bet = get_bet(conn, bet_id)
+    if bet is None:
+        raise ValueError(f"Bet {bet_id} not found")
+    if bet['status'] != 'pending':
+        raise ValueError(f"Bet {bet_id} is already resolved — cannot delete")
+    current = get_bankroll(conn)
+    set_bankroll(conn, amount=current + bet['stake'])
+    conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
+    conn.commit()
+
+
+def clear_bets(conn: sqlite3.Connection, tour: str | None = None) -> int:
+    """Delete all bets (optionally filtered by tour). Returns number deleted."""
+    if tour:
+        cur = conn.execute("DELETE FROM bets WHERE tour = ?", (tour,))
+    else:
+        cur = conn.execute("DELETE FROM bets")
+    conn.commit()
+    return cur.rowcount
 
 
 def list_bets(

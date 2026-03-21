@@ -5,40 +5,188 @@
 </div>
 {% endif %}
 {% for m in matches %}
-<div class="card" style="margin-bottom:8px">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-    <div style="font-size:11px;color:var(--muted)">
+{% set ep1 = m.get('edge_p1') or 0 %}
+{% set ep2 = m.get('edge_p2') or 0 %}
+{% set badge = m.get('badge','neutral') %}
+{% set dq = m.get('data_quality','low') %}
+<div class="card match-card" style="margin-bottom:8px"
+     data-badge="{{ badge }}"
+     data-tour="{{ tour }}"
+     data-p1="{{ m.get('p1_name','') }}"
+     data-p2="{{ m.get('p2_name','') }}"
+     data-tournament="{{ m.get('tournament','') }}"
+     data-surface="{{ m.get('surface','Hard') }}"
+     data-round="{{ m.get('round','') }}"
+     data-best-of="{{ m.get('best_of', 3) }}"
+     data-odd-p1="{{ m.odd_p1 if m.get('odd_p1') is not none else '' }}"
+     data-odd-p2="{{ m.odd_p2 if m.get('odd_p2') is not none else '' }}"
+     data-prob-p1="{{ m.get('prob_p1','') }}"
+     data-prob-p2="{{ m.get('prob_p2','') }}"
+     data-edge-p1="{{ m.get('edge_p1','') }}"
+     data-edge-p2="{{ m.get('edge_p2','') }}"
+     data-kelly-p1="{{ m.get('kelly_eur_p1','') }}"
+     data-kelly-p2="{{ m.get('kelly_eur_p2','') }}"
+     data-kelly-frac-p1="{{ m.get('kelly_frac_p1','') }}"
+     data-kelly-frac-p2="{{ m.get('kelly_frac_p2','') }}">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"
+       onclick="openModal(this.closest('.match-card'))" style="cursor:pointer">
+    <div style="font-size:11px;color:var(--muted);cursor:pointer" onclick="openModal(this.closest('.match-card'))">
       {{ m.get('tournament','') }}{% if m.get('round') %} · {{ m.get('round') }}{% endif %}
       {% if m.get('surface') %} · {{ m.get('surface') }}{% endif %}
+      {% if m.get('time') %} · {{ m.get('time') }}{% endif %}
+      {% if m.get('h2h_total') %} · <span style="color:var(--blue)">H2H {{ m.h2h_p1_wins }}-{{ m.h2h_p2_wins }}</span>{% endif %}
     </div>
-    {% if m.get('badge') == 'value' %}
-      <span class="badge badge-value">VALUE BET</span>
-    {% elif m.get('badge') == 'edge' %}
-      <span class="badge badge-edge">EDGE MODÉRÉ</span>
-    {% else %}
-      <span class="badge badge-neutral">NEUTRE</span>
-    {% endif %}
+    <div style="display:flex;align-items:center;gap:4px">
+      {% if badge == 'value' %}
+        <span class="badge badge-value">VALUE BET</span>
+      {% elif badge == 'edge' %}
+        <span class="badge badge-edge">EDGE MODÉRÉ</span>
+      {% else %}
+        <span class="badge badge-neutral">NEUTRE</span>
+      {% endif %}
+      {% if dq == 'high' %}
+        <span class="badge" style="background:rgba(59,130,246,.15);color:var(--blue)">● élevée</span>
+      {% elif dq == 'medium' %}
+        <span class="badge" style="background:rgba(249,115,22,.12);color:var(--orange)">● moyenne</span>
+      {% else %}
+        <span class="badge" style="background:rgba(100,116,139,.12);color:var(--muted)">● faible</span>
+      {% endif %}
+    </div>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between">
-    <div>
-      <div style="font-weight:700;font-size:15px">{{ m.get('p1_name','?') }}</div>
-      <div style="font-size:12px;color:var(--muted)">vs {{ m.get('p2_name','?') }}</div>
-    </div>
-    <div style="text-align:right">
+  <!-- Players: symmetric layout -->
+  <div style="display:grid;grid-template-columns:1fr 28px 1fr;align-items:start;gap:4px">
+    <!-- P1 -->
+    <div style="padding:8px;border-radius:6px;{% if ep1 >= 0.02 %}border:1px solid var(--green);background:rgba(0,200,100,.06){% else %}border:1px solid transparent{% endif %}">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px;cursor:pointer" onclick="openModal(this.closest('.match-card'))">{{ m.get('p1_name','?') }}</div>
+      {# Tuile infos joueur P1 #}
+      <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:4px">
+        {% if m.get('p1_rank') %}<span class="player-chip player-chip-rank">#{{ m.p1_rank }}</span>{% endif %}
+        {% if m.get('p1_surf_pct') is not none %}<span class="player-chip">{{ m.p1_surf_pct }}% surf</span>{% endif %}
+        {% if m.get('p1_days_since') is not none and m.p1_days_since > 10 %}<span class="player-chip player-chip-rest">{{ m.p1_days_since }}j repos</span>{% endif %}
+      </div>
+      {# Série de forme — 5 carrés #}
+      {% if m.get('p1_form') %}
+      <div style="display:flex;gap:2px;margin-bottom:4px">
+        {% for dot in m.p1_form %}
+        <span style="width:9px;height:9px;border-radius:2px;display:inline-block;background:{% if dot=='W' %}var(--green){% else %}var(--red){% endif %};opacity:0.85"></span>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% if m.get('prob_p1') %}
-        <div style="font-size:22px;font-weight:800;color:var(--blue)">
+        <div style="font-size:20px;font-weight:800;color:{% if ep1 >= 0.02 %}var(--green){% else %}var(--blue){% endif %}">
           {{ "%.1f"|format(m.prob_p1 * 100) }}%
         </div>
-        {% if m.get('kelly_eur') %}
-          <div style="font-size:11px;color:var(--green)">Kelly: {{ m.kelly_eur }}€</div>
+      {% endif %}
+      {% if m.get('odd_p1') %}
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">@{{ "%.2f"|format(m.odd_p1) }}</div>
+      {% endif %}
+      {% if ep1 > 0 %}
+        <div style="font-size:11px;color:var(--green);margin-top:2px">Edge +{{ "%.1f"|format(ep1 * 100) }}%</div>
+        {% if m.get('kelly_eur_p1') %}
+          <div style="font-size:11px;color:var(--green)">Kelly {{ m.kelly_eur_p1 }}€</div>
         {% endif %}
-        {% if m.get('edge') %}
-          <div style="font-size:11px;color:{% if m.edge >= 0.05 %}var(--green){% elif m.edge >= 0.02 %}var(--orange){% else %}var(--muted){% endif %}">
-            Edge: {{ "%.1f"|format(m.edge * 100) }}%
-          </div>
+      {% endif %}
+      {# Bouton Parier P1 #}
+      {% if m.get('odd_p1') %}
+      <div style="margin-top:8px">
+        <button class="btn-bet" onclick="event.stopPropagation();toggleBetForm(this,'p1')"
+                data-player="p1">Parier →</button>
+        <div class="bet-form" style="display:none;margin-top:6px">
+          <form hx-post="/bets/quick" hx-target="closest .bet-form" hx-swap="innerHTML"
+                style="display:flex;flex-direction:column;gap:4px" onclick="event.stopPropagation()">
+            <input type="hidden" name="tour"        value="{{ tour }}">
+            <input type="hidden" name="p1_name"     value="{{ m.get('p1_name','') }}">
+            <input type="hidden" name="p2_name"     value="{{ m.get('p2_name','') }}">
+            <input type="hidden" name="tournament"  value="{{ m.get('tournament','') }}">
+            <input type="hidden" name="surface"     value="{{ m.get('surface','Hard') }}">
+            <input type="hidden" name="round"       value="{{ m.get('round','') }}">
+            <input type="hidden" name="bet_on"      value="{{ m.get('p1_name','') }}">
+            <input type="hidden" name="odd"         value="{{ m.odd_p1 }}">
+            <input type="hidden" name="prob"        value="{{ m.get('prob_p1','0.5') }}">
+            <input type="hidden" name="edge"        value="{{ m.get('edge_p1','') }}">
+            <input type="hidden" name="kelly_frac"  value="{{ m.get('kelly_frac_p1','') }}">
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" name="stake" class="form-input"
+                     value="{{ m.kelly_eur_p1 if m.get('kelly_eur_p1') else 1 }}"
+                     min="0.01" step="0.01"
+                     style="width:80px;padding:4px 8px;font-size:12px">
+              <span style="font-size:11px;color:var(--muted)">€ @{{ "%.2f"|format(m.odd_p1) }}</span>
+              <button type="submit" class="btn btn-sm" style="background:var(--green);color:#000;border:none">✓</button>
+              <button type="button" class="btn btn-sm" style="background:transparent;color:var(--muted);border:1px solid var(--border)"
+                      onclick="event.stopPropagation();this.closest('.bet-form').style.display='none'">✗</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    <!-- VS -->
+    <div style="text-align:center;font-size:10px;font-weight:600;color:var(--muted);padding-top:10px;cursor:pointer"
+         onclick="openModal(this.closest('.match-card'))">vs</div>
+    <!-- P2 -->
+    <div style="padding:8px;border-radius:6px;text-align:right;{% if ep2 >= 0.02 %}border:1px solid var(--green);background:rgba(0,200,100,.06){% else %}border:1px solid transparent{% endif %}">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px;cursor:pointer" onclick="openModal(this.closest('.match-card'))">{{ m.get('p2_name','?') }}</div>
+      {# Tuile infos joueur P2 #}
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap;margin-bottom:4px">
+        {% if m.get('p2_days_since') is not none and m.p2_days_since > 10 %}<span class="player-chip player-chip-rest">{{ m.p2_days_since }}j repos</span>{% endif %}
+        {% if m.get('p2_surf_pct') is not none %}<span class="player-chip">{{ m.p2_surf_pct }}% surf</span>{% endif %}
+        {% if m.get('p2_rank') %}<span class="player-chip player-chip-rank">#{{ m.p2_rank }}</span>{% endif %}
+      </div>
+      {# Série de forme — 5 carrés (alignés à droite) #}
+      {% if m.get('p2_form') %}
+      <div style="display:flex;justify-content:flex-end;gap:2px;margin-bottom:4px">
+        {% for dot in m.p2_form %}
+        <span style="width:9px;height:9px;border-radius:2px;display:inline-block;background:{% if dot=='W' %}var(--green){% else %}var(--red){% endif %};opacity:0.85"></span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if m.get('prob_p2') %}
+        <div style="font-size:20px;font-weight:800;color:{% if ep2 >= 0.02 %}var(--green){% else %}var(--blue){% endif %}">
+          {{ "%.1f"|format(m.prob_p2 * 100) }}%
+        </div>
+      {% endif %}
+      {% if m.get('odd_p2') %}
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">@{{ "%.2f"|format(m.odd_p2) }}</div>
+      {% endif %}
+      {% if ep2 > 0 %}
+        <div style="font-size:11px;color:var(--green);margin-top:2px">Edge +{{ "%.1f"|format(ep2 * 100) }}%</div>
+        {% if m.get('kelly_eur_p2') %}
+          <div style="font-size:11px;color:var(--green)">Kelly {{ m.kelly_eur_p2 }}€</div>
         {% endif %}
-      {% else %}
-        <div style="color:var(--muted);font-size:12px">Prédiction indisponible</div>
+      {% endif %}
+      {# Bouton Parier P2 #}
+      {% if m.get('odd_p2') %}
+      <div style="margin-top:8px;display:flex;flex-direction:column;align-items:flex-end">
+        <button class="btn-bet" onclick="event.stopPropagation();toggleBetForm(this,'p2')"
+                data-player="p2">← Parier</button>
+        <div class="bet-form" style="display:none;margin-top:6px">
+          <form hx-post="/bets/quick" hx-target="closest .bet-form" hx-swap="innerHTML"
+                style="display:flex;flex-direction:column;gap:4px;align-items:flex-end" onclick="event.stopPropagation()">
+            <input type="hidden" name="tour"        value="{{ tour }}">
+            <input type="hidden" name="p1_name"     value="{{ m.get('p1_name','') }}">
+            <input type="hidden" name="p2_name"     value="{{ m.get('p2_name','') }}">
+            <input type="hidden" name="tournament"  value="{{ m.get('tournament','') }}">
+            <input type="hidden" name="surface"     value="{{ m.get('surface','Hard') }}">
+            <input type="hidden" name="round"       value="{{ m.get('round','') }}">
+            <input type="hidden" name="bet_on"      value="{{ m.get('p2_name','') }}">
+            <input type="hidden" name="odd"         value="{{ m.odd_p2 }}">
+            <input type="hidden" name="prob"        value="{{ m.get('prob_p2','0.5') }}">
+            <input type="hidden" name="edge"        value="{{ m.get('edge_p2','') }}">
+            <input type="hidden" name="kelly_frac"  value="{{ m.get('kelly_frac_p2','') }}">
+            <div style="display:flex;align-items:center;gap:4px">
+              <button type="button" class="btn btn-sm" style="background:transparent;color:var(--muted);border:1px solid var(--border)"
+                      onclick="event.stopPropagation();this.closest('.bet-form').style.display='none'">✗</button>
+              <button type="submit" class="btn btn-sm" style="background:var(--green);color:#000;border:none">✓</button>
+              <span style="font-size:11px;color:var(--muted)">€ @{{ "%.2f"|format(m.odd_p2) }}</span>
+              <input type="number" name="stake" class="form-input"
+                     value="{{ m.kelly_eur_p2 if m.get('kelly_eur_p2') else 1 }}"
+                     min="0.01" step="0.01"
+                     style="width:80px;padding:4px 8px;font-size:12px">
+            </div>
+          </form>
+        </div>
+      </div>
       {% endif %}
     </div>
   </div>

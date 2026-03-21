@@ -12,7 +12,14 @@
 
 {% block content %}
 
-<!-- KPIs -->
+<!-- Live performance -->
+<div class="section-label">Performance réelle (paris enregistrés)</div>
+<div id="live-perf-card" class="card" style="margin-bottom:10px;padding:14px">
+  <div style="color:var(--muted);font-size:12px">Chargement…</div>
+</div>
+
+<!-- KPIs backtest -->
+<div class="section-label">Backtest out-of-sample (2025)</div>
 <div class="grid-4" style="margin-bottom:10px">
   <div class="kpi-card">
     <div class="kpi-value {% if (kpis.get('roi') or 0) >= 0 %}text-green{% else %}text-red{% endif %}">
@@ -62,6 +69,30 @@
 <div class="section-label">Feature importance (Top 15)</div>
 <div class="chart-container" style="margin-bottom:10px">
   <canvas id="feat-chart"></canvas>
+</div>
+
+<!-- Win rate by edge bucket -->
+<div class="section-label">Win rate par tranche d'edge</div>
+<div class="chart-container" style="margin-bottom:10px">
+  <canvas id="edge-chart"></canvas>
+</div>
+
+<!-- Performance by surface -->
+<div class="section-label">Performance par surface</div>
+<div class="card" style="padding:12px;margin-bottom:10px">
+  <table id="surface-table">
+    <thead>
+      <tr>
+        <th>Surface</th>
+        <th>Paris</th>
+        <th>Win %</th>
+        <th>ROI</th>
+      </tr>
+    </thead>
+    <tbody id="surface-tbody">
+      <tr><td colspan="4" style="color:var(--muted);text-align:center">Chargement...</td></tr>
+    </tbody>
+  </table>
 </div>
 
 <!-- Settings -->
@@ -226,12 +257,147 @@ async function loadFeatures(tour) {
   });
 }
 
+// ── Win rate by edge bucket ────────────────────────────────────────────────
+async function loadEdgePerf(tour) {
+  const r = await fetch(`/stats/perf-by-edge?tour=${tour}`);
+  const d = await r.json();
+  if (!d.buckets.length) return;
+  const ctx = document.getElementById('edge-chart').getContext('2d');
+  const winColors = d.win_rates.map(v =>
+    v === null ? '#334155' : v >= 0.55 ? '#22c55e' : v >= 0.50 ? '#f97316' : '#ef4444'
+  );
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: d.buckets.map((b, i) => b + ' (n=' + d.counts[i] + ')'),
+      datasets: [{
+        label: 'Win Rate',
+        data: d.win_rates.map(v => v === null ? null : +(v * 100).toFixed(1)),
+        backgroundColor: winColors,
+        borderRadius: 6,
+      }, {
+        label: 'Ligne 50%',
+        type: 'line',
+        data: d.buckets.map(() => 50),
+        borderColor: 'rgba(100,116,139,0.5)',
+        borderDash: [5, 5],
+        pointRadius: 0,
+        fill: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
+        tooltip: { callbacks: {
+          label: function(c) { return c.datasetIndex === 0 ? c.raw + '%' : '50%'; }
+        }},
+      },
+      scales: {
+        ...chartScales(),
+        y: { ...chartScales().y, min: 40, max: 75,
+             ticks: { ...chartScales().y.ticks, callback: function(v) { return v + '%'; } } },
+      },
+    }
+  });
+}
+
+// ── Performance par surface ────────────────────────────────────────────────
+async function loadSurfacePerf(tour) {
+  const r = await fetch(`/stats/perf-by-surface?tour=${tour}`);
+  const d = await r.json();
+  const tbody = document.getElementById('surface-tbody');
+  tbody.replaceChildren();
+  if (!d.surfaces.length) {
+    const tr = tbody.insertRow();
+    const td = tr.insertCell();
+    td.colSpan = 4;
+    td.style.cssText = 'color:var(--muted);text-align:center';
+    td.textContent = 'Aucune donnée';
+    return;
+  }
+  const surfColors = { Hard: '#3b82f6', Clay: '#f97316', Grass: '#22c55e' };
+  d.surfaces.forEach(function(surf, i) {
+    const wr = d.win_rates[i], roi = d.rois[i], n = d.counts[i];
+    const tr = tbody.insertRow();
+
+    const tdSurf = tr.insertCell();
+    const dot = document.createElement('span');
+    dot.style.cssText = 'display:inline-block;width:8px;height:8px;border-radius:50%;background:' +
+      (surfColors[surf] || '#64748b') + ';margin-right:5px';
+    tdSurf.appendChild(dot);
+    tdSurf.appendChild(document.createTextNode(surf));
+
+    const tdN = tr.insertCell();
+    tdN.style.color = 'var(--muted)';
+    tdN.textContent = n;
+
+    const tdWr = tr.insertCell();
+    tdWr.className = wr === null ? '' : wr >= 0.55 ? 'text-green' : wr >= 0.50 ? 'text-orange' : 'text-red';
+    tdWr.textContent = wr === null ? '\u2014' : (wr * 100).toFixed(1) + '%';
+
+    const tdRoi = tr.insertCell();
+    tdRoi.className = roi === null ? '' : roi >= 0 ? 'text-green' : 'text-red';
+    tdRoi.textContent = roi === null ? '\u2014' : (roi >= 0 ? '+' : '') + (roi * 100).toFixed(1) + '%';
+  });
+}
+
+// ── Live performance ────────────────────────────────────────────────────────
+async function loadLivePerf() {
+  const r = await fetch('/stats/live-perf');
+  const d = await r.json();
+  const card = document.getElementById('live-perf-card');
+  if (!d.n) {
+    card.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center">Aucun pari résolu pour l\'instant — les stats apparaîtront ici.</div>';
+    return;
+  }
+  const roiColor = d.roi >= 0 ? 'var(--green)' : 'var(--red)';
+  const pnlColor = d.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  const roiSign  = d.roi >= 0 ? '+' : '';
+  const pnlSign  = d.pnl >= 0 ? '+' : '';
+
+  let tourHtml = '';
+  for (const [t, v] of Object.entries(d.by_tour || {})) {
+    const tc = t === 'atp' ? 'var(--blue)' : '#a855f7';
+    const rc = v.roi >= 0 ? 'var(--green)' : 'var(--red)';
+    const rs = v.roi >= 0 ? '+' : '';
+    tourHtml += `<span class="badge" style="background:rgba(100,116,139,.12);color:var(--text);font-size:11px;font-weight:400">
+      <span style="color:${tc};font-weight:700">${t.toUpperCase()}</span>
+      &nbsp;${v.n} paris · ${v.won}W/${v.n-v.won}L · ROI <span style="color:${rc}">${rs}${(v.roi*100).toFixed(1)}%</span>
+    </span> `;
+  }
+
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:22px;font-weight:800;color:${roiColor}">${roiSign}${(d.roi*100).toFixed(1)}%</div>
+        <div style="font-size:11px;color:var(--muted)">ROI réel</div>
+      </div>
+      <div>
+        <div style="font-size:22px;font-weight:800">${d.n}</div>
+        <div style="font-size:11px;color:var(--muted)">Paris résolus</div>
+      </div>
+      <div>
+        <div style="font-size:22px;font-weight:800">${(d.win_rate*100).toFixed(1)}%</div>
+        <div style="font-size:11px;color:var(--muted)">Win Rate</div>
+      </div>
+      <div>
+        <div style="font-size:22px;font-weight:800;color:${pnlColor}">${pnlSign}${d.pnl.toFixed(0)}€</div>
+        <div style="font-size:11px;color:var(--muted)">P&L</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">${tourHtml}</div>
+    </div>`;
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 function _initCharts() {
   const tour = '{{ tour }}';
+  loadLivePerf();
   loadEquity(tour, 'Kelly', document.querySelector('.strategy-btn.active'));
   loadROI(tour);
   loadFeatures(tour);
+  loadEdgePerf(tour);
+  loadSurfacePerf(tour);
 }
 // Run when Chart.js is ready — handle both defer timing scenarios
 if (typeof Chart !== 'undefined') {

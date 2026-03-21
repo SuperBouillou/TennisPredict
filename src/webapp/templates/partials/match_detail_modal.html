@@ -1,0 +1,143 @@
+<div class="card" style="position:relative">
+  <!-- Close button -->
+  <button onclick="closeModal()" style="position:absolute;top:10px;right:10px;background:transparent;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">✕</button>
+
+  <!-- Match title -->
+  <div style="margin-bottom:14px;padding-right:24px">
+    <div style="font-weight:700;font-size:15px">{{ p1_name }} vs {{ p2_name }}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:3px">
+      {{ tournament }} · {{ surface }} · {{ round }}
+      {% if h2h %} · <span style="color:var(--blue)">H2H {{ h2h.p1_wins }}-{{ h2h.p2_wins }}</span>{% endif %}
+    </div>
+  </div>
+
+  {% if result %}
+  {% set ep1 = result.get('edge_p1') or 0 %}
+  {% set ep2 = result.get('edge_p2') or 0 %}
+
+  <!-- Two-column comparison -->
+  <div class="grid-2" style="gap:10px;margin-bottom:14px">
+    <!-- P1 -->
+    <div style="padding:12px;border-radius:8px;
+         border:1px solid {% if ep1 >= 0.05 %}var(--green){% elif ep1 > 0 %}var(--orange){% else %}var(--border){% endif %};
+         background:{% if ep1 > 0 %}rgba(0,200,100,.05){% else %}rgba(100,116,139,.05){% endif %}">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px">{{ p1_name }}</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:11px;color:var(--muted)">Proba ML</span>
+        <span style="font-size:15px;font-weight:800;color:{% if ep1 > 0 %}var(--green){% else %}var(--blue){% endif %}">
+          {{ "%.1f"|format(result.prob_p1 * 100) }}%
+        </span>
+      </div>
+      {% if odd_p1 %}
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--muted)">Cote</span>
+        <span style="font-size:13px;font-weight:600">@{{ "%.2f"|format(odd_p1) }}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--muted)">Edge</span>
+        <span style="font-size:13px;font-weight:700;color:{% if ep1 >= 0.05 %}var(--green){% elif ep1 > 0 %}var(--orange){% else %}var(--red){% endif %}">
+          {% if ep1 > 0 %}+{% endif %}{{ "%.1f"|format(ep1 * 100) }}%
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:{% if result.get('kelly_eur_p1') %}10px{% else %}0{% endif %}">
+        <span style="font-size:11px;color:var(--muted)">EV</span>
+        <span style="font-size:12px;color:{% if (result.get('ev_p1') or 0) > 0 %}var(--green){% else %}var(--red){% endif %}">
+          {{ "%.3f"|format(result.get('ev_p1') or 0) }}
+        </span>
+      </div>
+      {% if result.get('kelly_eur_p1') %}
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:11px;color:var(--muted)">Kelly</span>
+        <span style="font-size:13px;font-weight:700;color:var(--green)">{{ result.kelly_eur_p1 }}€</span>
+      </div>
+      <form hx-post="/bets/quick" hx-target="this" hx-swap="outerHTML" style="display:flex;gap:6px" onclick="event.stopPropagation()">
+        <input type="hidden" name="tour"        value="{{ tour }}">
+        <input type="hidden" name="p1_name"     value="{{ p1_name }}">
+        <input type="hidden" name="p2_name"     value="{{ p2_name }}">
+        <input type="hidden" name="tournament"  value="{{ tournament }}">
+        <input type="hidden" name="surface"     value="{{ surface }}">
+        <input type="hidden" name="round"       value="{{ round }}">
+        <input type="hidden" name="bet_on"      value="{{ p1_name }}">
+        <input type="hidden" name="odd"         value="{{ odd_p1 }}">
+        <input type="hidden" name="prob"        value="{{ result.get('prob_p1', 0.5) }}">
+        <input type="hidden" name="edge"        value="{{ result.get('edge_p1', '') }}">
+        <input type="hidden" name="kelly_frac"  value="{{ result.get('kelly_frac_p1', '') }}">
+        <input class="form-input" name="stake" type="number" step="0.01" min="0.01"
+               value="{{ result.kelly_eur_p1 | round(2) }}" style="width:70px;padding:4px 8px">
+        <button type="submit" class="btn btn-primary" style="flex:1;font-size:12px;padding:4px 8px">Parier</button>
+      </form>
+      {% endif %}
+      {% endif %}
+    </div>
+
+    <!-- P2 -->
+    <div style="padding:12px;border-radius:8px;
+         border:1px solid {% if ep2 >= 0.05 %}var(--green){% elif ep2 > 0 %}var(--orange){% else %}var(--border){% endif %};
+         background:{% if ep2 > 0 %}rgba(0,200,100,.05){% else %}rgba(100,116,139,.05){% endif %}">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px">{{ p2_name }}</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:11px;color:var(--muted)">Proba ML</span>
+        <span style="font-size:15px;font-weight:800;color:{% if ep2 > 0 %}var(--green){% else %}var(--blue){% endif %}">
+          {{ "%.1f"|format(result.prob_p2 * 100) }}%
+        </span>
+      </div>
+      {% if odd_p2 %}
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--muted)">Cote</span>
+        <span style="font-size:13px;font-weight:600">@{{ "%.2f"|format(odd_p2) }}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--muted)">Edge</span>
+        <span style="font-size:13px;font-weight:700;color:{% if ep2 >= 0.05 %}var(--green){% elif ep2 > 0 %}var(--orange){% else %}var(--red){% endif %}">
+          {% if ep2 > 0 %}+{% endif %}{{ "%.1f"|format(ep2 * 100) }}%
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:{% if result.get('kelly_eur_p2') %}10px{% else %}0{% endif %}">
+        <span style="font-size:11px;color:var(--muted)">EV</span>
+        <span style="font-size:12px;color:{% if (result.get('ev_p2') or 0) > 0 %}var(--green){% else %}var(--red){% endif %}">
+          {{ "%.3f"|format(result.get('ev_p2') or 0) }}
+        </span>
+      </div>
+      {% if result.get('kelly_eur_p2') %}
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:11px;color:var(--muted)">Kelly</span>
+        <span style="font-size:13px;font-weight:700;color:var(--green)">{{ result.kelly_eur_p2 }}€</span>
+      </div>
+      <form hx-post="/bets/quick" hx-target="this" hx-swap="outerHTML" style="display:flex;gap:6px" onclick="event.stopPropagation()">
+        <input type="hidden" name="tour"        value="{{ tour }}">
+        <input type="hidden" name="p1_name"     value="{{ p1_name }}">
+        <input type="hidden" name="p2_name"     value="{{ p2_name }}">
+        <input type="hidden" name="tournament"  value="{{ tournament }}">
+        <input type="hidden" name="surface"     value="{{ surface }}">
+        <input type="hidden" name="round"       value="{{ round }}">
+        <input type="hidden" name="bet_on"      value="{{ p2_name }}">
+        <input type="hidden" name="odd"         value="{{ odd_p2 }}">
+        <input type="hidden" name="prob"        value="{{ result.get('prob_p2', 0.5) }}">
+        <input type="hidden" name="edge"        value="{{ result.get('edge_p2', '') }}">
+        <input type="hidden" name="kelly_frac"  value="{{ result.get('kelly_frac_p2', '') }}">
+        <input class="form-input" name="stake" type="number" step="0.01" min="0.01"
+               value="{{ result.kelly_eur_p2 | round(2) }}" style="width:70px;padding:4px 8px">
+        <button type="submit" class="btn btn-primary" style="flex:1;font-size:12px;padding:4px 8px">Parier</button>
+      </form>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ELO info + data quality -->
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:11px;color:var(--muted)">ELO prob: {{ "%.1f"|format(result.elo_prob * 100) }}%</span>
+    {% set dq = result.get('data_quality','low') %}
+    {% if dq == 'high' %}
+      <span class="badge" style="background:rgba(59,130,246,.15);color:var(--blue)">● Qualité élevée</span>
+    {% elif dq == 'medium' %}
+      <span class="badge" style="background:rgba(249,115,22,.12);color:var(--orange)">● Qualité moyenne</span>
+    {% else %}
+      <span class="badge" style="background:rgba(100,116,139,.12);color:var(--muted)">● Qualité faible</span>
+    {% endif %}
+    {% if result.get('elo_only') %}
+      <span class="badge badge-neutral">ELO ONLY</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>

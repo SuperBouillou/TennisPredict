@@ -15,6 +15,31 @@ templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates"
 _ROUNDS   = ['R128', 'R64', 'R32', 'R16', 'QF', 'SF', 'F', 'RR']
 _SURFACES = ['Hard', 'Clay', 'Grass']
 
+def _map_round(espn_round: str) -> str:
+    """Map ESPN round string → model round key. Passes through if already valid."""
+    if espn_round in _ROUNDS:
+        return espn_round
+    r = espn_round.lower()
+    if 'qualifying' in r:
+        return 'R64'
+    if 'round robin' in r:
+        return 'RR'
+    if 'quarterfinal' in r:
+        return 'QF'
+    if 'semifinal' in r:
+        return 'SF'
+    if r.strip() in ('final', 'the final'):
+        return 'F'
+    if 'round of 16' in r or 'round 4' in r:
+        return 'R16'
+    if 'round of 32' in r or 'round 3' in r:
+        return 'R32'
+    if 'round of 128' in r:
+        return 'R128'
+    if 'round of 64' in r or 'round 1' in r or 'round 2' in r:
+        return 'R64'
+    return 'R64'
+
 
 def _state():
     from src.webapp.main import APP_STATE
@@ -22,12 +47,35 @@ def _state():
 
 
 @router.get("/predictions", response_class=HTMLResponse)
-async def predictions_page(request: Request, tour: str = "atp"):
+async def predictions_page(
+    request: Request,
+    tour: str = "atp",
+    p1_name: str = "",
+    p2_name: str = "",
+    tournament: str = "",
+    surface: str = "Hard",
+    round_: str = Query(default="", alias="round"),
+    best_of: int = 3,
+    odd_p1: float | None = None,
+    odd_p2: float | None = None,
+):
     db = _state()['db']
-    return templates.TemplateResponse("predictions.html", {
-        "request": request, "active": "predictions",
+    prefill = {
+        "p1_name": p1_name,
+        "p2_name": p2_name,
+        "tournament": tournament,
+        "surface": surface if surface in _SURFACES else "Hard",
+        "round": _map_round(round_) if round_ else "R64",
+        "best_of": best_of,
+        "odd_p1": odd_p1,
+        "odd_p2": odd_p2,
+    }
+    return templates.TemplateResponse(request, "predictions.html", {
+        "active": "predictions",
         "tour": tour, "rounds": _ROUNDS, "surfaces": _SURFACES,
         "bankroll": get_bankroll(db, tour),
+        "prefill": prefill,
+        "auto_run": bool(p1_name and p2_name),
     })
 
 
@@ -103,12 +151,54 @@ async def run_prediction(
         odd_p1=odd_p1, odd_p2=odd_p2,
         bankroll=bankroll,
     )
-    return templates.TemplateResponse("partials/prediction_result.html", {
-        "request": request, "result": result,
+    return templates.TemplateResponse(request, "partials/prediction_result.html", {
+        "result": result,
         "p1_name": p1_name, "p2_name": p2_name,
         "tour": tour, "tournament": tournament, "surface": surface,
-        "round": round_, "best_of": best_of, "odd_p1": odd_p1,
+        "round": round_, "best_of": best_of,
+        "odd_p1": odd_p1, "odd_p2": odd_p2,
     })
+
+
+@router.post("/bets/quick", response_class=HTMLResponse)
+async def quick_bet(
+    tour: str = Form(...),
+    p1_name: str = Form(...),
+    p2_name: str = Form(...),
+    bet_on: str = Form(...),
+    tournament: str = Form(...),
+    surface: str = Form(...),
+    round_: str = Form("", alias="round"),
+    prob: float = Form(0.5),
+    edge: float | None = Form(None),
+    odd: float = Form(...),
+    stake: float = Form(...),
+    kelly_frac: float | None = Form(None),
+):
+    db = _state()['db']
+    bankroll = get_bankroll(db, tour)
+    if stake <= 0 or stake > bankroll:
+        return HTMLResponse(
+            f'<span style="color:var(--red);font-size:12px">Mise invalide (bankroll: {bankroll:.2f}€)</span>'
+        )
+    add_bet(db, {
+        'tour': tour, 'tournament': tournament, 'surface': surface,
+        'round': round_, 'p1_name': p1_name, 'p2_name': p2_name,
+        'bet_on': bet_on, 'prob': prob, 'edge': edge,
+        'odd': odd, 'stake': round(stake, 2), 'kelly_frac': kelly_frac,
+    })
+    new_bankroll = get_bankroll(db, tour)
+    # OOB swap updates bankroll bar without page reload
+    oob = (
+        f'<span id="bankroll-global" hx-swap-oob="true" '
+        f'title="Cliquer pour modifier" class="bankroll-amount" '
+        f'hx-get="/bankroll/edit" hx-target="#bankroll-global" hx-swap="outerHTML">'
+        f'💰 <strong>{new_bankroll:.2f}€</strong></span>'
+    )
+    return HTMLResponse(
+        f'<span style="color:var(--green);font-size:12px">✓ Pari enregistré · Bankroll {new_bankroll:.2f}€</span>'
+        + oob
+    )
 
 
 @router.post("/bets", response_class=HTMLResponse)
@@ -128,14 +218,19 @@ async def save_bet(
     kelly_frac: float | None = Form(None),
 ):
     db = _state()['db']
+    bankroll = get_bankroll(db, tour)
+    if stake <= 0 or stake > bankroll:
+        return HTMLResponse(
+            f'<div class="card" style="color:var(--red)">Mise invalide (bankroll: {bankroll:.2f}€)</div>'
+        )
     add_bet(db, {
         'tour': tour, 'tournament': tournament, 'surface': surface,
         'round': round_, 'p1_name': p1_name, 'p2_name': p2_name,
         'bet_on': bet_on, 'prob': prob, 'edge': edge,
         'odd': odd, 'stake': stake, 'kelly_frac': kelly_frac,
     })
-    bankroll = get_bankroll(db, tour)
+    new_bankroll = get_bankroll(db, tour)
     return HTMLResponse(
         f'<div class="card" style="color:var(--green)">✅ Pari enregistré. '
-        f'Bankroll {tour.upper()}: <strong>{bankroll:.0f}€</strong></div>'
+        f'Bankroll: <strong>{new_bankroll:.0f}€</strong></div>'
     )

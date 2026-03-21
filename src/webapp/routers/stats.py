@@ -8,7 +8,6 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from src.webapp.db import get_bankroll, get_setting, set_setting
-from src.config import get_paths
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -20,17 +19,15 @@ def _state():
 
 
 def _load_equity(tour: str, strategy: str) -> dict:
-    paths = get_paths(tour)
     strat_map = {
         'Kelly':   'backtest_strat_Kelly_1_4_cap2%.parquet',
         'Flat':    'backtest_strat_Flat_10\u20ac.parquet',
         'Percent': 'backtest_strat_Pct_2%.parquet',
     }
     fname = strat_map.get(strategy, 'backtest_kelly.parquet')
-    fpath = paths['models_dir'] / fname
-    if not fpath.exists():
+    df = _state().get('backtest', {}).get(tour, {}).get(fname)
+    if df is None:
         return {'labels': [], 'values': []}
-    df = pd.read_parquet(fpath)
     # Find date and bankroll columns
     date_col = next((c for c in df.columns if 'date' in c.lower()), None)
     bank_col = next(
@@ -53,15 +50,14 @@ def _load_equity(tour: str, strategy: str) -> dict:
 
 
 def _load_roi_bookmakers(tour: str) -> dict:
-    paths = get_paths(tour)
     bookmakers = ['Bet365', 'Pinnacle', 'Best', 'Avg']
     roi_list = []
+    bt_cache = _state().get('backtest', {}).get(tour, {})
     for bk in bookmakers:
-        fpath = paths['models_dir'] / f'backtest_real_{bk}.parquet'
-        if not fpath.exists():
+        df = bt_cache.get(f'backtest_real_{bk}.parquet')
+        if df is None:
             roi_list.append(None)
             continue
-        df = pd.read_parquet(fpath)
         if 'roi' in df.columns:
             roi_list.append(round(float(df['roi'].iloc[-1]), 4))
         elif 'pnl' in df.columns and 'stake' in df.columns:
@@ -107,13 +103,12 @@ def _load_feature_importance(tour: str) -> dict:
 
 def _kpis(tour: str) -> dict:
     """Compute summary KPIs from backtest_real_Pinnacle if available."""
-    paths = get_paths(tour)
-    fpath = paths['models_dir'] / 'backtest_real_Pinnacle.parquet'
-    if not fpath.exists():
-        fpath = paths['models_dir'] / 'backtest_kelly.parquet'
-    if not fpath.exists():
+    bt_cache = _state().get('backtest', {}).get(tour, {})
+    df = bt_cache.get('backtest_real_Pinnacle.parquet')
+    if df is None:
+        df = bt_cache.get('backtest_kelly.parquet')
+    if df is None:
         return {}
-    df = pd.read_parquet(fpath)
     n_bets = len(df)
     if 'pnl' not in df.columns:
         return {'n_bets': n_bets}
@@ -135,11 +130,11 @@ async def stats_page(request: Request, tour: str = "atp"):
     kpis     = _kpis(tour)
     roi_bk   = _load_roi_bookmakers(tour)
     features = _load_feature_importance(tour)
-    return templates.TemplateResponse("stats.html", {
-        "request": request, "active": "stats", "tour": tour,
+    return templates.TemplateResponse(request, "stats.html", {
+        "active": "stats", "tour": tour,
         "settings": settings, "kpis": kpis,
         "roi_bk": roi_bk, "features": features,
-        "bankroll": get_bankroll(db, tour),
+        "bankroll": get_bankroll(db),
     })
 
 
@@ -156,6 +151,124 @@ async def roi_bookmakers_data(tour: str = "atp"):
 @router.get("/stats/features")
 async def features_data(tour: str = "atp"):
     return JSONResponse(_load_feature_importance(tour))
+
+
+@router.get("/stats/perf-by-edge")
+async def perf_by_edge(tour: str = "atp"):
+    """Win rate + ROI bucketed by edge size (from backtest_real_Pinnacle)."""
+    bt_cache = _state().get('backtest', {}).get(tour, {})
+    df = bt_cache.get('backtest_real_Pinnacle.parquet')
+    if df is None:
+        df = bt_cache.get('backtest_all_candidates.parquet')
+    if df is None:
+        return JSONResponse({'buckets': [], 'win_rates': [], 'rois': [], 'counts': []})
+    prob_col = 'our_prob' if 'our_prob' in df.columns else 'prob'
+    if 'edge' not in df.columns or 'won' not in df.columns:
+        return JSONResponse({'buckets': [], 'win_rates': [], 'rois': [], 'counts': []})
+
+    bins = [0.0, 0.05, 0.10, 0.15, 0.20, 1.0]
+    labels = ['<5%', '5–10%', '10–15%', '15–20%', '>20%']
+    df['edge_bucket'] = pd.cut(df['edge'], bins=bins, labels=labels, right=False)
+    grp = df.groupby('edge_bucket', observed=True)
+
+    win_rates, rois, counts = [], [], []
+    for lbl in labels:
+        g = grp.get_group(lbl) if lbl in grp.groups else pd.DataFrame()
+        if len(g) == 0:
+            win_rates.append(None)
+            rois.append(None)
+            counts.append(0)
+            continue
+        wr = round(float(g['won'].mean()), 4)
+        if 'stake' in g.columns and g['stake'].sum() > 0:
+            roi = round(float(g['pnl'].sum() / g['stake'].sum()), 4)
+        elif 'pnl' in g.columns:
+            roi = round(float(g['pnl'].mean()), 4)
+        else:
+            roi = None
+        win_rates.append(wr)
+        rois.append(roi)
+        counts.append(len(g))
+
+    return JSONResponse({'buckets': labels, 'win_rates': win_rates, 'rois': rois, 'counts': counts})
+
+
+@router.get("/stats/perf-by-surface")
+async def perf_by_surface(tour: str = "atp"):
+    """Win rate + ROI broken down by surface (from backtest_real_Pinnacle)."""
+    bt_cache = _state().get('backtest', {}).get(tour, {})
+    df = bt_cache.get('backtest_real_Pinnacle.parquet')
+    if df is None:
+        df = bt_cache.get('backtest_all_candidates.parquet')
+    if df is None:
+        return JSONResponse({'surfaces': [], 'win_rates': [], 'rois': [], 'counts': []})
+    if 'surface' not in df.columns or 'won' not in df.columns:
+        return JSONResponse({'surfaces': [], 'win_rates': [], 'rois': [], 'counts': []})
+
+    surfaces = ['Hard', 'Clay', 'Grass']
+    win_rates, rois, counts = [], [], []
+    for surf in surfaces:
+        g = df[df['surface'] == surf]
+        if len(g) == 0:
+            win_rates.append(None)
+            rois.append(None)
+            counts.append(0)
+            continue
+        wr = round(float(g['won'].mean()), 4)
+        if 'stake' in g.columns and g['stake'].sum() > 0:
+            roi = round(float(g['pnl'].sum() / g['stake'].sum()), 4)
+        else:
+            roi = None
+        win_rates.append(wr)
+        rois.append(roi)
+        counts.append(len(g))
+
+    return JSONResponse({'surfaces': surfaces, 'win_rates': win_rates, 'rois': rois, 'counts': counts})
+
+
+@router.get("/stats/live-perf")
+async def live_perf(tour: str | None = None):
+    """Real-bet performance stats from the bets SQLite table."""
+    db = _state()['db']
+    q = "SELECT tour, odd, stake, pnl, status FROM bets WHERE status != 'pending'"
+    rows = db.execute(q).fetchall()
+    if not rows:
+        return JSONResponse({'n': 0})
+
+    import pandas as pd
+    df = pd.DataFrame([dict(r) for r in rows])
+    if tour:
+        df = df[df['tour'] == tour]
+    if df.empty:
+        return JSONResponse({'n': 0})
+
+    total_stake = df['stake'].sum()
+    total_pnl   = df['pnl'].sum()
+    n_won       = int((df['pnl'] > 0).sum())
+    n           = len(df)
+    roi         = round(float(total_pnl / total_stake), 4) if total_stake > 0 else 0.0
+    win_rate    = round(n_won / n, 4) if n > 0 else 0.0
+
+    # Per-tour breakdown
+    by_tour = {}
+    for t in ('atp', 'wta'):
+        g = df[df['tour'] == t]
+        if g.empty:
+            continue
+        gs = g['stake'].sum()
+        by_tour[t] = {
+            'n': len(g),
+            'won': int((g['pnl'] > 0).sum()),
+            'roi': round(float(g['pnl'].sum() / gs), 4) if gs > 0 else 0.0,
+            'pnl': round(float(g['pnl'].sum()), 2),
+        }
+
+    return JSONResponse({
+        'n': n, 'won': n_won,
+        'roi': roi, 'win_rate': win_rate,
+        'pnl': round(float(total_pnl), 2),
+        'by_tour': by_tour,
+    })
 
 
 @router.post("/settings", response_class=HTMLResponse)

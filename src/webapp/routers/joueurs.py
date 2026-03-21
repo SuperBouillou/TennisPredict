@@ -19,8 +19,8 @@ def _state():
 
 @router.get("/joueurs", response_class=HTMLResponse)
 async def joueurs_page(request: Request, tour: str = "atp"):
-    return templates.TemplateResponse("joueurs.html", {
-        "request": request, "active": "joueurs", "tour": tour,
+    return templates.TemplateResponse(request, "joueurs.html", {
+        "active": "joueurs", "tour": tour,
     })
 
 
@@ -59,6 +59,6 @@ async def joueur_profile(request: Request, player_name: str, tour: str = "atp"):
             f'Joueur "{player_name}" non trouvé.</div></div>',
             status_code=404,
         )
-    return templates.TemplateResponse("joueurs_profile.html", {
-        "request": request, "active": "joueurs", "tour": tour, "p": profile,
+    return templates.TemplateResponse(request, "joueurs_profile.html", {
+        "active": "joueurs", "tour": tour, "p": profile,
     })

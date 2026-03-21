@@ -211,12 +211,71 @@ body {
 .bankroll-bar {
   background: var(--surface);
   border-top: 1px solid var(--border);
-  padding: 10px 20px;
+  padding: 8px 16px;
   display: flex;
-  gap: 24px;
+  gap: 16px;
   align-items: center;
   flex-shrink: 0;
   font-size: 12px;
+  flex-wrap: wrap;
+}
+.bankroll-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.bankroll-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bankroll-amount {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+}
+.bankroll-sep {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.bankroll-btn {
+  background: var(--bg) !important;
+  color: var(--muted) !important;
+  border: 1px solid var(--border) !important;
+  padding: 2px 7px !important;
+  font-size: 11px !important;
+}
+.bankroll-btn:hover {
+  color: var(--text) !important;
+  border-color: var(--blue) !important;
+}
+@media (max-width: 480px) {
+  .bankroll-bar { gap: 10px; padding: 8px 12px; }
+  .bankroll-sep { display: none; }
+}
+
+/* Player chips (rank, surface %, rest) */
+.player-chip {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(148,163,184,.12);
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.player-chip-rank {
+  background: rgba(96,165,250,.15);
+  color: var(--blue);
+  font-weight: 700;
+}
+.player-chip-rest {
+  background: rgba(251,191,36,.12);
+  color: #f59e0b;
 }
 
 /* Section label */
@@ -281,6 +340,49 @@ tr:hover td { background: rgba(30,41,59,0.5); }
 .text-orange { color: var(--orange); }
 .text-muted  { color: var(--muted); }
 .text-blue   { color: var(--blue); }
+
+/* Bet button on match card */
+.btn-bet {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--green);
+  background: rgba(34,197,94,.12);
+  color: var(--green);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-bet:hover { background: rgba(34,197,94,.25); }
+
+/* Match filter bar */
+.filter-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.filter-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-chip.active {
+  background: var(--blue);
+  color: white;
+  border-color: var(--blue);
+}
+.filter-chip.value-active {
+  background: rgba(34,197,94,.2);
+  color: var(--green);
+  border-color: var(--green);
+}
 
 /* Responsive */
 @media (max-width: 640px) {

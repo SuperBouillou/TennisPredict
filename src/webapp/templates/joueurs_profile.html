@@ -38,8 +38,8 @@
 <div class="section-label">ELO par surface</div>
 <div class="card" style="margin-bottom:10px">
   <div style="display:flex;flex-direction:column;gap:10px">
-    {% set surfaces = [('Hard', p.get('elo_hard', 0) or 0), ('Clay', p.get('elo_clay', 0) or 0), ('Grass', p.get('elo_grass', 0) or 0)] %}
-    {% set max_elo = [p.get('elo_hard', 1) or 1, p.get('elo_clay', 1) or 1, p.get('elo_grass', 1) or 1] | max %}
+    {% set surfaces = [('Hard', p.get('elo_Hard', 0) or 0), ('Clay', p.get('elo_Clay', 0) or 0), ('Grass', p.get('elo_Grass', 0) or 0)] %}
+    {% set max_elo = [p.get('elo_Hard', 1) or 1, p.get('elo_Clay', 1) or 1, p.get('elo_Grass', 1) or 1] | max %}
     {% for surf, val in surfaces %}
     <div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
@@ -57,7 +57,7 @@
 <!-- Forme récente -->
 <div class="section-label">Forme récente (win rate)</div>
 <div class="grid-3" style="margin-bottom:10px">
-  {% for label, key in [('5 matchs', 'form_win_rate_5'), ('10 matchs', 'form_win_rate_10'), ('20 matchs', 'form_win_rate_20')] %}
+  {% for label, key in [('5 matchs', 'winrate_5'), ('10 matchs', 'winrate_10'), ('20 matchs', 'winrate_20')] %}
   <div class="kpi-card">
     <div class="kpi-value {% if (p.get(key) or 0) >= 0.6 %}text-green{% elif (p.get(key) or 0) >= 0.4 %}text-orange{% else %}text-red{% endif %}">
       {{ ((p.get(key) or 0) * 100) | int }}%
@@ -67,15 +67,21 @@
   {% endfor %}
 </div>
 
-<!-- H2H & fatigue -->
-<div class="grid-2">
-  <div class="kpi-card">
-    <div class="kpi-value">{{ ((p.get('h2h_win_rate') or 0.5) * 100) | int }}%</div>
-    <div class="kpi-label">H2H Win Rate</div>
-  </div>
+<!-- Fatigue & points -->
+<div class="grid-3">
   <div class="kpi-card">
     <div class="kpi-value">{{ p.get('rank_points', 0) | int }}</div>
     <div class="kpi-label">Points ATP/WTA</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ p.get('matches_7d', 0) | int }}</div>
+    <div class="kpi-label">Matchs (7j)</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value {% if (p.get('streak', 0) or 0) > 0 %}text-green{% elif (p.get('streak', 0) or 0) < 0 %}text-red{% endif %}">
+      {% if (p.get('streak', 0) or 0) > 0 %}+{% endif %}{{ p.get('streak', 0) | int }}
+    </div>
+    <div class="kpi-label">Série en cours</div>
   </div>
 </div>
 
