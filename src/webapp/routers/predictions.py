@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.webapp import ml as ml_module
-from src.webapp.db import get_bankroll, add_bet
+from src.webapp.db import get_bankroll, get_setting, add_bet
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -73,7 +73,7 @@ async def predictions_page(
     return templates.TemplateResponse(request, "predictions.html", {
         "active": "predictions",
         "tour": tour, "rounds": _ROUNDS, "surfaces": _SURFACES,
-        "bankroll": get_bankroll(db, tour),
+        "bankroll": get_bankroll(db),
         "prefill": prefill,
         "auto_run": bool(p1_name and p2_name),
     })
@@ -136,7 +136,8 @@ async def run_prediction(
 ):
     artifacts = _state().get('models', {}).get(tour)
     db = _state()['db']
-    bankroll = get_bankroll(db, tour)
+    bankroll = get_bankroll(db)
+    kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
 
     if not artifacts:
         return HTMLResponse(
@@ -150,6 +151,7 @@ async def run_prediction(
         round_=round_, best_of=best_of,
         odd_p1=odd_p1, odd_p2=odd_p2,
         bankroll=bankroll,
+        kelly_fraction=kelly_fraction,
     )
     return templates.TemplateResponse(request, "partials/prediction_result.html", {
         "result": result,
@@ -176,7 +178,7 @@ async def quick_bet(
     kelly_frac: float | None = Form(None),
 ):
     db = _state()['db']
-    bankroll = get_bankroll(db, tour)
+    bankroll = get_bankroll(db)
     if stake <= 0 or stake > bankroll:
         return HTMLResponse(
             f'<span style="color:var(--red);font-size:12px">Mise invalide (bankroll: {bankroll:.2f}€)</span>'
@@ -187,7 +189,7 @@ async def quick_bet(
         'bet_on': bet_on, 'prob': prob, 'edge': edge,
         'odd': odd, 'stake': round(stake, 2), 'kelly_frac': kelly_frac,
     })
-    new_bankroll = get_bankroll(db, tour)
+    new_bankroll = get_bankroll(db)
     # OOB swap updates bankroll bar without page reload
     oob = (
         f'<span id="bankroll-global" hx-swap-oob="true" '
@@ -218,7 +220,7 @@ async def save_bet(
     kelly_frac: float | None = Form(None),
 ):
     db = _state()['db']
-    bankroll = get_bankroll(db, tour)
+    bankroll = get_bankroll(db)
     if stake <= 0 or stake > bankroll:
         return HTMLResponse(
             f'<div class="card" style="color:var(--red)">Mise invalide (bankroll: {bankroll:.2f}€)</div>'
@@ -229,7 +231,7 @@ async def save_bet(
         'bet_on': bet_on, 'prob': prob, 'edge': edge,
         'odd': odd, 'stake': stake, 'kelly_frac': kelly_frac,
     })
-    new_bankroll = get_bankroll(db, tour)
+    new_bankroll = get_bankroll(db)
     return HTMLResponse(
         f'<div class="card" style="color:var(--green)">✅ Pari enregistré. '
         f'Bankroll: <strong>{new_bankroll:.0f}€</strong></div>'
