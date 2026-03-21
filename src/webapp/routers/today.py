@@ -210,11 +210,11 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         # low=70% ELO weighting (sparse/stale data): suppress ALL recommendations.
         # Prevents false VALUE BET and EDGE MODÉRÉ when player history is insufficient.
         if dq == 'high':
-            value_thr, edge_thr = 0.12, 0.06
+            value_thr, edge_thr = 0.12, 0.06   # ≥3 matchs récents — signaux fiables
         elif dq == 'medium':
-            value_thr, edge_thr = 0.18, 0.09
-        else:                        # low — ELO only, too unreliable for any bet signal
-            value_thr, edge_thr = float('inf'), float('inf')  # suppress all badges
+            value_thr, edge_thr = 0.15, 0.09   # 1-2 matchs récents — seuils relevés
+        else:                        # low — aucun match récent, ELO pur non fiable
+            value_thr, edge_thr = float('inf'), float('inf')
 
         if best_edge >= value_thr:
             m['badge'] = 'value'

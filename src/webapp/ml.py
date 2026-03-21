@@ -317,9 +317,9 @@ def predict(
         m14_p1 = _v(p1, 'matches_14d', 10.0)
         m14_p2 = _v(p2, 'matches_14d', 10.0)
         min_matches = min(m14_p1, m14_p2)
-        if min_matches >= 5:
+        if min_matches >= 3:
             elo_w = 0.30   # Good data: 70% XGBoost, 30% ELO
-        elif min_matches >= 3:
+        elif min_matches >= 1:
             elo_w = 0.50   # Medium data: 50/50
         else:
             elo_w = 0.70   # Sparse data: 70% ELO, 30% XGBoost
@@ -381,12 +381,12 @@ def predict(
         _v(p1, 'matches_14d', 0.0) if p1_found else 0.0,
         _v(p2, 'matches_14d', 0.0) if p2_found else 0.0,
     ) if not elo_only else 0.0
-    if min_m14 >= 5:
+    if min_m14 >= 3:
         data_quality = 'high'    # 70% XGBoost → edge estimates are reliable
-    elif min_m14 >= 3:
+    elif min_m14 >= 1:
         data_quality = 'medium'  # 50/50 blend → moderate reliability
     else:
-        data_quality = 'low'     # 70% ELO → diverges most from Pinnacle
+        data_quality = 'low'     # 70% ELO → no recent data, suppress signals
 
     return {
         'prob_p1':      round(cal_prob, 4),
