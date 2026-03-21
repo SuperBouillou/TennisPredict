@@ -68,6 +68,22 @@ def _elo_win_prob(elo_a: float, elo_b: float) -> float:
     return 1.0 / (1.0 + 10 ** ((elo_b - elo_a) / 400.0))
 
 
+def _rank_adjusted_elo(elo: float, rank: float | None) -> float:
+    """Blend profile ELO with rank-implied ELO when they diverge (stale ELO).
+
+    Uses a simple linear rank→ELO mapping calibrated for ATP/WTA:
+    rank 1 ≈ 2100, rank 100 ≈ 1700, rank 300 ≈ 900.
+    When gap > 100 points, blend 50/50 to reduce systematic bias.
+    """
+    if rank is None or (isinstance(rank, float) and np.isnan(rank)):
+        return elo
+    elo_from_rank = max(1200.0, 2100.0 - 4.0 * float(rank))
+    gap = elo - elo_from_rank
+    if abs(gap) > 100:
+        return 0.5 * elo + 0.5 * elo_from_rank
+    return elo
+
+
 def _v(d: dict, key: str, default: float) -> float:
     """Safe numeric get with fallback."""
     v = d.get(key)
@@ -85,11 +101,18 @@ def _build_features(p1: dict, p2: dict, tournament: str, surface: str,
                     h2h: dict | None = None) -> np.ndarray:
     """Build feature vector matching feature_list order. Missing → NaN."""
     # ELO — profile columns: elo, elo_Hard, elo_Clay, elo_Grass
-    elo1 = _v(p1, 'elo', 1500.0)
-    elo2 = _v(p2, 'elo', 1500.0)
+    # Apply rank-based ELO correction to reduce stale-ELO bias (e.g. player who
+    # peaked years ago still has high ELO but current rank has dropped significantly).
+    r1_raw = p1.get('rank')
+    r2_raw = p2.get('rank')
+    r1_rank = float(r1_raw) if r1_raw is not None and not (isinstance(r1_raw, float) and np.isnan(r1_raw)) else None
+    r2_rank = float(r2_raw) if r2_raw is not None and not (isinstance(r2_raw, float) and np.isnan(r2_raw)) else None
+
+    elo1 = _rank_adjusted_elo(_v(p1, 'elo', 1500.0), r1_rank)
+    elo2 = _rank_adjusted_elo(_v(p2, 'elo', 1500.0), r2_rank)
     elo_surf_key = f'elo_{surface}'  # e.g. 'elo_Hard'
-    elo_s1 = _v(p1, elo_surf_key, elo1)
-    elo_s2 = _v(p2, elo_surf_key, elo2)
+    elo_s1 = _rank_adjusted_elo(_v(p1, elo_surf_key, elo1), r1_rank)
+    elo_s2 = _rank_adjusted_elo(_v(p2, elo_surf_key, elo2), r2_rank)
 
     # Win rates — clamped to [0.1, 0.9] and neutralised when sample too small (<3 matches)
     def _wr(d: dict, key: str) -> float:
@@ -266,8 +289,12 @@ def predict(
 
     elo_only = not p1_found or not p2_found
 
-    elo1 = _v(p1, 'elo', 1500.0)
-    elo2 = _v(p2, 'elo', 1500.0)
+    r1_blend = p1.get('rank')
+    r2_blend = p2.get('rank')
+    r1_rank = float(r1_blend) if r1_blend is not None and not (isinstance(r1_blend, float) and np.isnan(r1_blend)) else None
+    r2_rank = float(r2_blend) if r2_blend is not None and not (isinstance(r2_blend, float) and np.isnan(r2_blend)) else None
+    elo1 = _rank_adjusted_elo(_v(p1, 'elo', 1500.0), r1_rank)
+    elo2 = _rank_adjusted_elo(_v(p2, 'elo', 1500.0), r2_rank)
     elo_prob = _elo_win_prob(elo1, elo2)
 
     if elo_only:

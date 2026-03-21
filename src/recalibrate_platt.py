@@ -158,12 +158,74 @@ def recalibrate(tour: str, years: list[int]) -> None:
     print("→ Restart webapp to use new scaler (main.py auto-detects platt_pinnacle.pkl)")
 
 
+def recalibrate_from_outcomes(tour: str) -> None:
+    """Calibrate using actual match outcomes instead of Pinnacle odds (for WTA)."""
+    paths = get_paths(tour)
+    models_dir = paths['models_dir']
+
+    print(f"\n=== Recalibrating Platt scaler from outcomes: {tour.upper()} ===\n")
+
+    splits_path = models_dir / "splits.pkl"
+    if not splits_path.exists():
+        print(f"[ERROR] splits.pkl not found: {splits_path}")
+        return
+
+    splits    = joblib.load(splits_path)
+    X_valid   = splits.get('X_valid')
+    y_valid   = splits.get('y_valid')
+
+    if X_valid is None or y_valid is None:
+        print("[ERROR] splits.pkl missing X_valid/y_valid")
+        return
+
+    print(f"Validation set: {len(X_valid)} rows")
+
+    model        = joblib.load(models_dir / "xgb_tuned.pkl")
+    imputer      = joblib.load(models_dir / "imputer.pkl")
+    feature_list = joblib.load(models_dir / "feature_list.pkl")
+
+    X_df      = pd.DataFrame(X_valid, columns=feature_list) if not isinstance(X_valid, pd.DataFrame) else X_valid
+    X_imp     = imputer.transform(X_df)
+    raw_probs = model.predict_proba(X_imp)[:, 1]
+
+    print(f"Raw prob range: [{raw_probs.min():.3f}, {raw_probs.max():.3f}]")
+
+    y_arr = y_valid.values if hasattr(y_valid, 'values') else np.array(y_valid)
+
+    lr = LinearRegression()
+    lr.fit(raw_probs.reshape(-1, 1), y_arr)
+
+    y_pred = lr.predict(raw_probs.reshape(-1, 1))
+    mae = mean_absolute_error(y_arr, y_pred)
+    r2  = r2_score(y_arr, y_pred)
+    print(f"\nLinearRegression fit (vs outcomes):")
+    print(f"  Coef:      {lr.coef_[0]:.4f}")
+    print(f"  Intercept: {lr.intercept_:.4f}")
+    print(f"  R²:        {r2:.4f}")
+    print(f"  MAE:       {mae:.4f}")
+
+    cal_probs = np.clip(lr.predict(raw_probs.reshape(-1, 1)), 0.01, 0.99)
+    print(f"\nAll-match cal_prob distribution:")
+    print(f"  mean={cal_probs.mean():.3f}  std={cal_probs.std():.3f}  "
+          f"min={cal_probs.min():.3f}  max={cal_probs.max():.3f}")
+
+    out_path = models_dir / "platt_pinnacle.pkl"
+    joblib.dump(lr, out_path)
+    print(f"\nSaved: {out_path}")
+    print("→ Restart webapp to use new scaler")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Recalibrate Platt scaler against Pinnacle")
-    parser.add_argument("--tour",  default="atp", choices=["atp", "wta"])
-    parser.add_argument("--years", nargs="+", type=int, default=[2023, 2024])
+    parser = argparse.ArgumentParser(description="Recalibrate Platt scaler")
+    parser.add_argument("--tour",         default="atp", choices=["atp", "wta"])
+    parser.add_argument("--years",        nargs="+", type=int, default=[2023, 2024])
+    parser.add_argument("--use-outcomes", action="store_true",
+                        help="Calibrate against actual outcomes instead of Pinnacle odds (use for WTA)")
     args = parser.parse_args()
-    recalibrate(args.tour, args.years)
+    if args.use_outcomes:
+        recalibrate_from_outcomes(args.tour)
+    else:
+        recalibrate(args.tour, args.years)
 
 
 if __name__ == "__main__":
