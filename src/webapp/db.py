@@ -56,8 +56,8 @@ def add_bet(conn: sqlite3.Connection, bet: dict) -> int:
          bet['p1_name'], bet['p2_name'], bet['bet_on'], bet['prob'],
          bet.get('edge'), bet['odd'], bet['stake'], bet.get('kelly_frac')),
     )
-    current = get_bankroll(conn, bet['tour'])
-    set_bankroll(conn, bet['tour'], current - bet['stake'])
+    current = get_bankroll(conn)
+    set_bankroll(conn, amount=current - bet['stake'])
     conn.commit()
     return cur.lastrowid
 
@@ -78,8 +78,8 @@ def resolve_bet(conn: sqlite3.Connection, bet_id: int, outcome: str) -> None:
     if outcome == 'won':
         profit = round(bet['stake'] * (bet['odd'] - 1), 2)
         pnl = profit
-        current = get_bankroll(conn, bet['tour'])
-        set_bankroll(conn, bet['tour'], current + bet['stake'] + profit)
+        current = get_bankroll(conn)
+        set_bankroll(conn, amount=current + bet['stake'] + profit)
     else:
         pnl = -bet['stake']
 
