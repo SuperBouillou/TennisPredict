@@ -48,6 +48,24 @@
 
 {% block scripts %}
 <script>
+// Recalculate Kelly stakes when bankroll is updated
+document.body.addEventListener('htmx:afterSwap', function(e) {
+  if (e.detail.target && e.detail.target.id === 'bankroll-global') {
+    const bkEl = document.querySelector('#bankroll-global strong');
+    if (!bkEl) return;
+    const bk = parseFloat(bkEl.textContent.replace('€', '').trim());
+    if (!bk || isNaN(bk)) return;
+    document.querySelectorAll('.kelly-eur').forEach(function(el) {
+      var frac = parseFloat(el.dataset.frac) || 0;
+      if (frac > 0) el.textContent = (frac * bk).toFixed(2);
+    });
+    document.querySelectorAll('input.kelly-stake').forEach(function(el) {
+      var frac = parseFloat(el.dataset.frac) || 0;
+      if (frac > 0) el.value = (frac * bk).toFixed(2);
+    });
+  }
+});
+
 function setActiveTour(btn) {
   document.querySelectorAll('#tour-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');

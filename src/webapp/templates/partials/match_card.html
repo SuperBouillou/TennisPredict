@@ -84,7 +84,7 @@
       {% if ep1 > 0 %}
         <div style="font-size:11px;color:var(--green);margin-top:2px">Edge +{{ "%.1f"|format(ep1 * 100) }}%</div>
         {% if m.get('kelly_eur_p1') %}
-          <div style="font-size:11px;color:var(--green)">Kelly {{ m.kelly_eur_p1 }}€</div>
+          <div style="font-size:11px;color:var(--green)">Kelly <span class="kelly-eur" data-frac="{{ m.get('kelly_frac_p1', 0) }}">{{ m.kelly_eur_p1 }}</span>€</div>
         {% endif %}
       {% endif %}
       {# Bouton Parier P1 #}
@@ -107,7 +107,8 @@
             <input type="hidden" name="edge"        value="{{ m.get('edge_p1','') }}">
             <input type="hidden" name="kelly_frac"  value="{{ m.get('kelly_frac_p1','') }}">
             <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" name="stake" class="form-input"
+              <input type="number" name="stake" class="form-input kelly-stake"
+                     data-frac="{{ m.get('kelly_frac_p1', 0) }}"
                      value="{{ m.kelly_eur_p1 if m.get('kelly_eur_p1') else 1 }}"
                      min="0.01" step="0.01"
                      style="width:80px;padding:4px 8px;font-size:12px">
@@ -152,7 +153,7 @@
       {% if ep2 > 0 %}
         <div style="font-size:11px;color:var(--green);margin-top:2px">Edge +{{ "%.1f"|format(ep2 * 100) }}%</div>
         {% if m.get('kelly_eur_p2') %}
-          <div style="font-size:11px;color:var(--green)">Kelly {{ m.kelly_eur_p2 }}€</div>
+          <div style="font-size:11px;color:var(--green)">Kelly <span class="kelly-eur" data-frac="{{ m.get('kelly_frac_p2', 0) }}">{{ m.kelly_eur_p2 }}</span>€</div>
         {% endif %}
       {% endif %}
       {# Bouton Parier P2 #}
@@ -179,7 +180,8 @@
                       onclick="event.stopPropagation();this.closest('.bet-form').style.display='none'">✗</button>
               <button type="submit" class="btn btn-sm" style="background:var(--green);color:#000;border:none">✓</button>
               <span style="font-size:11px;color:var(--muted)">€ @{{ "%.2f"|format(m.odd_p2) }}</span>
-              <input type="number" name="stake" class="form-input"
+              <input type="number" name="stake" class="form-input kelly-stake"
+                     data-frac="{{ m.get('kelly_frac_p2', 0) }}"
                      value="{{ m.kelly_eur_p2 if m.get('kelly_eur_p2') else 1 }}"
                      min="0.01" step="0.01"
                      style="width:80px;padding:4px 8px;font-size:12px">

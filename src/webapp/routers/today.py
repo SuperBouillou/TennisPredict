@@ -409,7 +409,8 @@ async def today_matches_partial(request: Request, tour: str = "atp",
         match_date = date.today().isoformat()
     db = _app_state()['db']
     bankroll = get_bankroll(db)
-    matches, _ = _build_matches(tour, match_date, bankroll)
+    kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
+    matches, _ = _build_matches(tour, match_date, bankroll, kelly_fraction)
     return templates.TemplateResponse(request, "partials/match_card.html", {
         "matches": matches, "tour": tour,
     })
@@ -421,8 +422,9 @@ async def refresh_odds(request: Request, tour: str = "atp"):
     _delete_odds_cache(tour)
     db = _app_state()['db']
     bankroll = get_bankroll(db)
+    kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
     match_date = date.today().isoformat()
-    matches, fetched_at = _build_matches(tour, match_date, bankroll)
+    matches, fetched_at = _build_matches(tour, match_date, bankroll, kelly_fraction)
     # Return the partial + updated odds badge via OOB swap
     time_str = fetched_at[11:16] if fetched_at else "—"
     n_with_odds = sum(1 for m in matches if m.get('odd_p1') is not None)
