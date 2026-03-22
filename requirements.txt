@@ -17,3 +17,6 @@ fastapi>=0.135.1
 uvicorn[standard]>=0.42.0
 python-multipart>=0.0.22
 httpx>=0.28.1
+itsdangerous>=2.2.0
+bcrypt>=4.2.0
+slowapi>=0.1.9
