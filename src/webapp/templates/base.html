@@ -58,7 +58,14 @@
         <div class="topbar-title">{% block page_title %}TennisML{% endblock %}</div>
         <div class="topbar-meta">{% block page_meta %}{% endblock %}</div>
       </div>
-      <div class="topbar-right">{% block topbar_right %}{% endblock %}</div>
+      <div class="topbar-right" style="display:flex;align-items:center;gap:8px;">
+        {% block topbar_right %}{% endblock %}
+        <form method="post" action="/logout" style="margin:0">
+          <button type="submit" style="background:none;border:1px solid var(--border);color:var(--muted);font-size:11px;cursor:pointer;padding:4px 10px;border-radius:6px;">
+            Déconnexion
+          </button>
+        </form>
+      </div>
     </div>
     <div class="content">
       {% block content %}{% endblock %}

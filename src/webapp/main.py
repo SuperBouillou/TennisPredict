@@ -191,6 +191,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TennisPredict", lifespan=lifespan)
 
+# Auth middleware + rate limiter
+from slowapi import _rate_limit_exceeded_handler  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
+from src.webapp.limiter import limiter  # noqa: E402
+from src.webapp.middleware import AuthMiddleware  # noqa: E402
+from src.webapp.routers.auth import router as auth_router  # noqa: E402
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(AuthMiddleware)
+app.include_router(auth_router)
+
 _HERE = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=_HERE / "static"), name="static")
 templates = Jinja2Templates(directory=_HERE / "templates")
