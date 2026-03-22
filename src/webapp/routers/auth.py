@@ -19,11 +19,11 @@ templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates"
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    # Create the response first, then pass it to get_flash so the deletion
-    # Set-Cookie header is included in the response actually sent to the browser.
-    resp = templates.TemplateResponse("login.html", {"request": request, "flash": None})
-    flash = get_flash(request, resp)
-    resp.context["flash"] = flash
+    # Read flash from cookie, then build response, then delete the flash cookie.
+    flash = request.cookies.get("tp_flash")
+    resp = templates.TemplateResponse(request, "login.html", {"flash": flash})
+    if flash:
+        resp.delete_cookie(key="tp_flash", samesite="lax")
     return resp
 
 
