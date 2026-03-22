@@ -40,13 +40,30 @@ def _get_today_matches(tour: str, match_date: str) -> list[dict]:
         return []
 
 
+def _get_results(tour: str, match_date: str) -> list[dict]:
+    """Fetch completed match results from ESPN for given tour+date."""
+    try:
+        if str(_SRC) not in sys.path:
+            sys.path.insert(0, _SRC)
+        from espn_client import fetch_results
+        target = date.fromisoformat(match_date)
+        matches = fetch_results(tour, target)
+        return matches if matches else []
+    except Exception as e:
+        print(f"[today] ESPN results fetch error ({tour} {match_date}): {e}")
+        return []
+
+
 def _get_odds(tour: str, match_date: str) -> tuple[dict, str | None]:
     """
     Return (odds_dict, fetched_at_str).
-    Only fetches for today — no odds for past/future dates.
+    Fetches odds for today AND tomorrow — l'API retourne tous les matchs à venir.
+    Pas de cotes pour les dates passées (hier).
     Uses file cache: data/odds_cache/{tour}/odds_YYYY-MM-DD.json
     """
-    if match_date != date.today().isoformat():
+    today = date.today()
+    tomorrow = (today + timedelta(days=1)).isoformat()
+    if match_date not in (today.isoformat(), tomorrow):
         return {}, None
     try:
         if str(_SRC) not in sys.path:
@@ -284,12 +301,12 @@ def _fmt(amount: float) -> str:
     return f'{amount:.2f}' if amount != int(amount) else str(int(amount))
 
 
-def _bankroll_bar_html(amount: float) -> str:
-    """Inline span for the bankroll-bar (today.html)."""
+def _bankroll_sidebar_html(amount: float) -> str:
+    """Sidebar widget span (base.html)."""
     return (
-        f'<span id="bankroll-global" title="Cliquer pour modifier" style="cursor:pointer" '
-        f'hx-get="/bankroll/edit" hx-target="#bankroll-global" hx-swap="outerHTML">'
-        f'💰 <strong>{_fmt(amount)}€</strong></span>'
+        f'<span id="bankroll-global" class="bw-amount" title="Cliquer pour modifier" '
+        f'hx-get="/bankroll/edit?sidebar=1" hx-target="#bankroll-global" hx-swap="outerHTML">'
+        f'{_fmt(amount)}€</span>'
     )
 
 
@@ -304,16 +321,36 @@ def _bankroll_card_html(amount: float) -> str:
 
 
 @router.get("/bankroll/display", response_class=HTMLResponse)
-async def bankroll_display(card: int = 0):
+async def bankroll_display(card: int = 0, sidebar: int = 0):
     db = _app_state()['db']
     amount = get_bankroll(db)
-    return HTMLResponse(_bankroll_card_html(amount) if card else _bankroll_bar_html(amount))
+    if sidebar:
+        return HTMLResponse(_bankroll_sidebar_html(amount))
+    return HTMLResponse(_bankroll_card_html(amount) if card else _bankroll_sidebar_html(amount))
 
 
 @router.get("/bankroll/edit", response_class=HTMLResponse)
-async def bankroll_edit(card: int = 0):
+async def bankroll_edit(card: int = 0, sidebar: int = 0):
     db = _app_state()['db']
     amount = get_bankroll(db)
+    if sidebar:
+        cancel_url = "/bankroll/display?sidebar=1"
+        html = (
+            f'<span id="bankroll-global" class="bw-amount" style="display:inline-flex;align-items:center;gap:4px">'
+            f'<form hx-post="/bankroll/set" hx-target="#bankroll-global" hx-swap="outerHTML" '
+            f'style="display:inline-flex;align-items:center;gap:4px;margin:0">'
+            f'<input type="hidden" name="sidebar" value="1">'
+            f'<input type="number" name="amount" value="{round(amount, 2)}" min="0" step="0.01" '
+            f'style="width:80px;padding:2px 6px;font-size:13px;border-radius:4px;'
+            f'border:1px solid var(--border);background:var(--surface2);color:var(--text)" autofocus>'
+            f'<button type="submit" class="btn btn-sm" '
+            f'style="background:var(--green);color:#000;border:none;padding:2px 6px">✓</button>'
+            f'<button type="button" class="btn btn-sm" '
+            f'style="background:transparent;color:var(--muted);border:1px solid var(--border);padding:2px 6px" '
+            f'hx-get="{cancel_url}" hx-target="#bankroll-global" hx-swap="outerHTML">✗</button>'
+            f'</form></span>'
+        )
+        return HTMLResponse(html)
     cancel_url = "/bankroll/display" + ("?card=1" if card else "")
     input_style = (
         f'width:80px;padding:2px 6px;font-size:{"14" if card else "12"}px;border-radius:4px;'
@@ -341,17 +378,19 @@ async def bankroll_edit(card: int = 0):
     else:
         html = (
             f'<span id="bankroll-global" style="display:inline-flex;align-items:center;gap:4px">'
-            f'💰 {form}</span>'
+            f'{form}</span>'
         )
     return HTMLResponse(html)
 
 
 @router.post("/bankroll/set", response_class=HTMLResponse)
-async def bankroll_set(amount: float = Form(...), card: int = Form(0)):
+async def bankroll_set(amount: float = Form(...), card: int = Form(0), sidebar: int = Form(0)):
     db = _app_state()['db']
     set_bankroll(db, amount=max(0.0, amount))
     new_amount = get_bankroll(db)
-    html = _bankroll_card_html(new_amount) if card else _bankroll_bar_html(new_amount)
+    if sidebar:
+        return HTMLResponse(_bankroll_sidebar_html(new_amount))
+    html = _bankroll_card_html(new_amount) if card else _bankroll_sidebar_html(new_amount)
     return HTMLResponse(html)
 
 
@@ -373,26 +412,49 @@ def _get_ranking_updated_at(tour: str) -> str | None:
 @router.get("/today", response_class=HTMLResponse)
 async def today_page(request: Request, tour: str = "atp",
                      match_date: str = Query(default=None)):
-    today_date = date.today().isoformat()
+    today = date.today()
+    today_str = today.isoformat()
+    yesterday_str = (today - timedelta(days=1)).isoformat()
+    tomorrow_str = (today + timedelta(days=1)).isoformat()
+
+    # Restrict navigation to ±1 day
     if not match_date:
-        match_date = today_date
-    d = date.fromisoformat(match_date)
-    prev_date = (d - timedelta(days=1)).isoformat()
-    next_date = (d + timedelta(days=1)).isoformat()
+        match_date = today_str
+    if match_date < yesterday_str:
+        match_date = yesterday_str
+    elif match_date > tomorrow_str:
+        match_date = tomorrow_str
+
+    # Determine page mode
+    if match_date == yesterday_str:
+        page_mode = "hier"
+    elif match_date == tomorrow_str:
+        page_mode = "demain"
+    else:
+        page_mode = "today"
 
     state = _app_state()
     db = state['db']
     bankroll = get_bankroll(db)
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
-    matches, odds_fetched_at = _build_matches(tour, match_date, bankroll, kelly_fraction)
+
+    if page_mode == "hier":
+        matches = _get_results(tour, match_date)
+        odds_fetched_at = None
+    else:
+        matches, odds_fetched_at = _build_matches(tour, match_date, bankroll, kelly_fraction)
 
     # Read ranking freshness timestamp
     ranking_updated_at = _get_ranking_updated_at(tour)
 
     return templates.TemplateResponse(request, "today.html", {
         "active": "today",
-        "tour": tour, "match_date": match_date,
-        "prev_date": prev_date, "next_date": next_date, "today_date": today_date,
+        "tour": tour,
+        "match_date": match_date,
+        "page_mode": page_mode,
+        "today_date": today_str,
+        "yesterday": yesterday_str,
+        "tomorrow": tomorrow_str,
         "matches": matches, "match_count": len(matches),
         "bankroll": bankroll,
         "sync_status": state.get('sync_status', {}).get(tour, 'idle'),
@@ -405,14 +467,27 @@ async def today_page(request: Request, tour: str = "atp",
 async def today_matches_partial(request: Request, tour: str = "atp",
                                 match_date: str = Query(default=None)):
     """HTMX partial — swap #match-list."""
+    today = date.today()
+    today_str = today.isoformat()
+    yesterday_str = (today - timedelta(days=1)).isoformat()
     if not match_date:
-        match_date = date.today().isoformat()
+        match_date = today_str
+
+    page_mode = "hier" if match_date == yesterday_str else (
+        "demain" if match_date > today_str else "today"
+    )
+
     db = _app_state()['db']
     bankroll = get_bankroll(db)
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
-    matches, _ = _build_matches(tour, match_date, bankroll, kelly_fraction)
+
+    if page_mode == "hier":
+        matches = _get_results(tour, match_date)
+    else:
+        matches, _ = _build_matches(tour, match_date, bankroll, kelly_fraction)
+
     return templates.TemplateResponse(request, "partials/match_card.html", {
-        "matches": matches, "tour": tour,
+        "matches": matches, "tour": tour, "page_mode": page_mode,
     })
 
 

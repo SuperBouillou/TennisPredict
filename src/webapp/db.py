@@ -103,6 +103,58 @@ def delete_bet(conn: sqlite3.Connection, bet_id: int) -> None:
     conn.commit()
 
 
+def delete_resolved_bet(conn: sqlite3.Connection, bet_id: int) -> None:
+    """Delete a resolved bet and reverse its P&L impact on bankroll."""
+    bet = get_bet(conn, bet_id)
+    if bet is None:
+        raise ValueError(f"Bet {bet_id} not found")
+    if bet['status'] == 'pending':
+        raise ValueError(f"Bet {bet_id} is pending — use delete_bet instead")
+    current = get_bankroll(conn)
+    if bet['status'] == 'won':
+        # At resolution: bankroll += stake + profit → reverse
+        set_bankroll(conn, amount=current - bet['stake'] - bet['pnl'])
+    else:
+        # At placement: bankroll -= stake (lost resolution didn't credit anything) → refund
+        set_bankroll(conn, amount=current + bet['stake'])
+    conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
+    conn.commit()
+
+
+def auto_resolve_pending(conn: sqlite3.Connection, tour: str, results: list[dict]) -> int:
+    """
+    Auto-resolve pending bets using ESPN results.
+    results: list of dicts with p1_name (winner), p2_name (loser) from fetch_results().
+    Returns number of bets resolved.
+    """
+    pending = list_bets(conn, tour=tour, status='pending', limit=1000)
+    if not pending or not results:
+        return 0
+
+    # Build lookup: (winner_lower, loser_lower) present in results
+    result_pairs: set[tuple[str, str]] = set()
+    for r in results:
+        w = r.get('p1_name', '').lower().strip()  # p1_name = winner in fetch_results
+        l = r.get('p2_name', '').lower().strip()  # p2_name = loser
+        if w and l:
+            result_pairs.add((w, l))
+
+    resolved = 0
+    for bet in pending:
+        bet_on   = bet['bet_on'].lower().strip()
+        p1_lower = bet['p1_name'].lower().strip()
+        opponent = bet['p2_name'].lower().strip() if p1_lower == bet_on else p1_lower
+
+        if (bet_on, opponent) in result_pairs:
+            resolve_bet(conn, bet['id'], 'won')
+            resolved += 1
+        elif (opponent, bet_on) in result_pairs:
+            resolve_bet(conn, bet['id'], 'lost')
+            resolved += 1
+
+    return resolved
+
+
 def clear_bets(conn: sqlite3.Connection, tour: str | None = None) -> int:
     """Delete all bets (optionally filtered by tour). Returns number deleted."""
     if tour:

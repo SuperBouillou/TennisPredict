@@ -1,52 +1,59 @@
 {% extends "base.html" %}
 {% block title %}Matchs du jour — TennisPredict{% endblock %}
-{% block page_title %}Matchs du jour{% endblock %}
-{% block page_meta %}{{ match_date }} · {{ match_count }} match(s){% endblock %}
+{% block page_title %}
+  {% if page_mode == 'hier' %}Résultats d'hier{% elif page_mode == 'demain' %}Matchs de demain{% else %}Matchs du jour{% endif %}
+{% endblock %}
+{% block page_meta %}{{ match_date }} · {% if page_mode == 'hier' %}{{ match_count }} résultat(s){% elif page_mode == 'demain' %}{{ match_count }} match(s) prévu(s){% else %}{{ match_count }} match(s){% endif %}{% endblock %}
 
 {% block topbar_right %}
 <div style="display:flex;align-items:center;gap:8px">
-  <!-- Date navigation -->
-  <div style="display:flex;align-items:center;gap:4px">
-    <a href="/today?tour={{ tour }}&match_date={{ prev_date }}" style="text-decoration:none">
-      <button class="btn btn-sm" style="background:var(--surface);color:var(--text);border:1px solid var(--border)">←</button>
+  <!-- Hier / Aujourd'hui / Demain -->
+  <div class="toggle-group">
+    <a href="/today?tour={{ tour }}&match_date={{ yesterday }}" style="text-decoration:none">
+      <button class="toggle-btn {% if page_mode=='hier' %}active{% endif %}">Hier</button>
     </a>
-    <span style="font-size:12px;color:var(--muted);min-width:80px;text-align:center">{{ match_date }}</span>
-    <a href="/today?tour={{ tour }}&match_date={{ next_date }}" style="text-decoration:none">
-      <button class="btn btn-sm" style="background:var(--surface);color:var(--text);border:1px solid var(--border)">→</button>
-    </a>
-    {% if match_date != today_date %}
     <a href="/today?tour={{ tour }}" style="text-decoration:none">
-      <button class="btn btn-sm" style="background:var(--surface);color:var(--blue);border:1px solid var(--blue)">Aujourd'hui</button>
+      <button class="toggle-btn {% if page_mode=='today' %}active{% endif %}">Aujourd'hui</button>
     </a>
-    {% endif %}
+    <a href="/today?tour={{ tour }}&match_date={{ tomorrow }}" style="text-decoration:none">
+      <button class="toggle-btn {% if page_mode=='demain' %}active{% endif %}">Demain</button>
+    </a>
   </div>
   <!-- ATP/WTA toggle -->
-  <div class="toggle-group" id="tour-toggle">
-    <button class="toggle-btn {% if tour=='atp' %}active{% endif %}"
-            hx-get="/today/matches?tour=atp&match_date={{ match_date }}"
-            hx-target="#match-list" hx-swap="innerHTML"
-            onclick="setActiveTour(this)">ATP</button>
-    <button class="toggle-btn {% if tour=='wta' %}active{% endif %}"
-            hx-get="/today/matches?tour=wta&match_date={{ match_date }}"
-            hx-target="#match-list" hx-swap="innerHTML"
-            onclick="setActiveTour(this)">WTA</button>
+  <div class="toggle-group">
+    <a href="/today?tour=atp&match_date={{ match_date }}" style="text-decoration:none">
+      <button class="toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</button>
+    </a>
+    <a href="/today?tour=wta&match_date={{ match_date }}" style="text-decoration:none">
+      <button class="toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</button>
+    </a>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
+{% if page_mode != 'hier' %}
 <div class="filter-bar">
   <button class="filter-chip active" onclick="setFilter('all',this)">Tous</button>
   <button class="filter-chip" onclick="setFilter('value',this)" style="border-color:rgba(34,197,94,.4);color:var(--green)">VALUE BET</button>
   <button class="filter-chip" onclick="setFilter('edge',this)">Edge modéré</button>
   <button class="filter-chip" onclick="setFilter('neutral',this)">Neutres</button>
 </div>
+{% endif %}
 <div id="match-list">
   {% include "partials/match_card.html" %}
 </div>
 {% endblock %}
 
 {% block scripts %}
+{% if page_mode == 'hier' %}
+<div class="bankroll-bar">
+  <div class="bankroll-group">
+    <div class="bankroll-label">Résultats ESPN</div>
+    <span style="font-size:11px;color:var(--muted)">{{ match_date }}</span>
+  </div>
+</div>
+{% endif %}
 <script>
 // Recalculate Kelly stakes when bankroll is updated
 document.body.addEventListener('htmx:afterSwap', function(e) {
@@ -65,11 +72,6 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
     });
   }
 });
-
-function setActiveTour(btn) {
-  document.querySelectorAll('#tour-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-}
 
 let _activeFilter = 'all';
 function setFilter(f, btn) {
@@ -112,38 +114,28 @@ function openPrediction(el) {
   });
 }
 </script>
+{% if page_mode != 'hier' %}
 <div class="bankroll-bar">
-  <!-- Groupe gauche : bankroll -->
-  <div class="bankroll-group">
-    <div class="bankroll-label">Bankroll</div>
-    <span id="bankroll-global" title="Cliquer pour modifier" class="bankroll-amount"
-          hx-get="/bankroll/edit" hx-target="#bankroll-global" hx-swap="outerHTML">
-      💰 <strong>{{ bankroll | round(2) }}€</strong>
-    </span>
-  </div>
-  <!-- Séparateur -->
-  <div class="bankroll-sep"></div>
-  <!-- Groupe centre : cotes -->
+  <!-- Cotes Pinnacle -->
   <div class="bankroll-group">
     <div class="bankroll-label">Cotes</div>
     <div style="display:flex;align-items:center;gap:6px">
       <span id="odds-status" style="font-size:11px;{% if odds_fetched_at %}color:var(--green){% else %}color:var(--muted){% endif %}">
-        {% if odds_fetched_at %}🎰 Pinnacle · {{ odds_fetched_at[11:16] }}{% else %}🎰 Indisponible{% endif %}
+        {% if odds_fetched_at %}Pinnacle · {{ odds_fetched_at[11:16] }}{% else %}Indisponible{% endif %}
       </span>
       <button class="btn btn-sm bankroll-btn"
               hx-post="/today/refresh-odds?tour={{ tour }}"
               hx-target="#match-list" hx-swap="innerHTML">↻</button>
     </div>
   </div>
-  <!-- Séparateur -->
   <div class="bankroll-sep"></div>
-  <!-- Groupe droite : sync -->
+  <!-- Sync données -->
   <div class="bankroll-group" style="margin-left:auto">
     <div class="bankroll-label">Données</div>
     <div style="display:flex;align-items:center;gap:6px">
       {% if ranking_updated_at %}
       <span style="font-size:11px;color:var(--muted)" title="Classements mis à jour le {{ ranking_updated_at }}">
-        📋 {{ ranking_updated_at[5:10] | replace('-', '/') }}
+        {{ ranking_updated_at[5:10] | replace('-', '/') }}
       </span>
       {% endif %}
       <span id="sync-status"
@@ -157,4 +149,5 @@ function openPrediction(el) {
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}

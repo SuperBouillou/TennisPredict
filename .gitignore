@@ -20,3 +20,15 @@ data/odds/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Databases (données perso — ne pas committer)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# IDE / local tools
+.claude/settings.local.json
+.playwright-mcp/
+.superpowers/
+logswebapp.log
+*.log

@@ -288,12 +288,13 @@ def update_player_profiles(df_new: pd.DataFrame,
         last_match = df_p['tourney_date'].max()
         days_since = (today - last_match).days
 
-        # Winrates glissants
+        # Winrates glissants + forme réelle
         results = df_p['won'].values
         n = len(results)
         wr5  = results[-5:].mean()  if n >= 1 else 0.5
         wr10 = results[-10:].mean() if n >= 1 else 0.5
         wr20 = results[-20:].mean() if n >= 1 else 0.5
+        form_last5 = ','.join(['W' if r == 1 else 'L' for r in results[-5:]])
 
         # Streak courant
         streak = 0
@@ -353,6 +354,7 @@ def update_player_profiles(df_new: pd.DataFrame,
             'elo_Hard'            : elo_surface.get(elo_key, {}).get('Hard', 1500),
             'elo_Clay'            : elo_surface.get(elo_key, {}).get('Clay', 1500),
             'elo_Grass'           : elo_surface.get(elo_key, {}).get('Grass', 1500),
+            'form_last5'          : form_last5,
         })
 
     df_profiles = pd.DataFrame(list(profiles.values()))

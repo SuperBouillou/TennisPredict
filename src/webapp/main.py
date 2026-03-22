@@ -7,7 +7,7 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -207,5 +207,5 @@ app.include_router(sync.router)
 
 
 @app.get("/")
-async def root():
-    return RedirectResponse("/today")
+async def root(request: Request):
+    return templates.TemplateResponse(request, "landing.html", {})

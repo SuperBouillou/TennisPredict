@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TennisPredict — Design Proposal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700&family=Barlow:wght@300;400;500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Root ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #07090E;
+  --surface:   #0D1117;
+  --surface2:  #131920;
+  --border:    #1C2330;
+  --border2:   #253040;
+  --text:      #E8EDF2;
+  --muted:     #5A6A7E;
+  --muted2:    #3D4F61;
+
+  --value:     #C8F243;   /* phosphore — profit */
+  --value-bg:  rgba(200,242,67,.07);
+  --edge:      #4FA8FF;   /* bleu froid */
+  --edge-bg:   rgba(79,168,255,.07);
+  --red:       #F06A6A;
+  --green:     #3DDC84;
+  --orange:    #FFAA33;
+
+  --mono: 'JetBrains Mono', monospace;
+  --cond: 'Barlow Condensed', sans-serif;
+  --sans: 'Barlow', sans-serif;
+
+  --sidebar-w: 200px;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+}
+
+.sidebar-logo {
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.logo-mark {
+  font-family: var(--cond);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: .04em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-mark .dot {
+  width: 8px; height: 8px;
+  background: var(--value);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--value);
+}
+.logo-sub {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 0;
+}
+
+.nav-section {
+  padding: 8px 16px 4px;
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  font-family: var(--mono);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--cond);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: .03em;
+  transition: all .15s;
+  border-left: 2px solid transparent;
+  text-decoration: none;
+}
+.nav-item:hover { color: var(--text); background: rgba(255,255,255,.03); }
+.nav-item.active {
+  color: var(--value);
+  border-left-color: var(--value);
+  background: rgba(200,242,67,.05);
+}
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.bankroll-widget {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+.bw-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--muted);
+  font-family: var(--mono);
+  margin-bottom: 4px;
+}
+.bw-amount {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--green);
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.bw-amount:hover { opacity: .8; }
+.bw-change {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.bw-change.up { color: var(--green); }
+.bw-change.down { color: var(--red); }
+
+/* ── Main ── */
+.main {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ── Topbar ── */
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.topbar-title {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: .04em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Tour toggle */
+.tour-toggle {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tour-btn {
+  padding: 5px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  cursor: pointer;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  transition: all .15s;
+}
+.tour-btn.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+/* Date nav */
+.date-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.date-nav button {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 24px; height: 24px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.date-nav button:hover { color: var(--text); border-color: var(--border2); }
+
+/* Sync status */
+.sync-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.sync-chip:hover { border-color: var(--border2); color: var(--text); }
+.sync-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+
+/* ── Filter bar ── */
+.filter-bar {
+  padding: 12px 24px 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.filter-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.filter-chip:hover { border-color: var(--border2); color: var(--text); }
+.filter-chip.active { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+.filter-chip.value-active { background: var(--value-bg); color: var(--value); border-color: rgba(200,242,67,.3); }
+
+.filter-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.filter-count strong { color: var(--text); }
+
+/* ── Match list ── */
+.match-list {
+  padding: 12px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Match Card ── */
+.match-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  border-left: 3px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  overflow: hidden;
+  position: relative;
+}
+.match-card:hover { border-color: var(--border2); background: var(--surface2); }
+
+.match-card.value {
+  border-left-color: var(--value);
+  background: linear-gradient(90deg, rgba(200,242,67,.04) 0%, transparent 40%);
+}
+.match-card.value:hover { background: linear-gradient(90deg, rgba(200,242,67,.07) 0%, var(--surface2) 40%); }
+
+.match-card.edge {
+  border-left-color: var(--edge);
+  background: linear-gradient(90deg, rgba(79,168,255,.04) 0%, transparent 40%);
+}
+.match-card.edge:hover { background: linear-gradient(90deg, rgba(79,168,255,.07) 0%, var(--surface2) 40%); }
+
+/* Card header strip */
+.card-header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 5px 12px 5px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,.2);
+}
+.card-meta {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.card-badges {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+/* Badges */
+.badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+}
+.badge-value { color: var(--value); border-color: rgba(200,242,67,.35); background: var(--value-bg); }
+.badge-edge  { color: var(--edge);  border-color: rgba(79,168,255,.35); background: var(--edge-bg); }
+.badge-neutral { color: var(--muted); border-color: var(--border); }
+.badge-quality-high   { color: #3DDC84; border-color: rgba(61,220,132,.25); background: rgba(61,220,132,.06); }
+.badge-quality-med    { color: var(--orange); border-color: rgba(255,170,51,.25); background: rgba(255,170,51,.06); }
+.badge-quality-low    { color: var(--muted2); border-color: var(--border); }
+
+/* Player sides */
+.player-side {
+  padding: 32px 16px 14px;
+}
+.player-side.right { text-align: right; }
+
+.player-name {
+  font-family: var(--cond);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: .03em;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.player-side.right .player-chips { justify-content: flex-end; }
+
+.chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.chip.rank { color: var(--text); }
+
+/* Form dots */
+.form-dots {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.player-side.right .form-dots { justify-content: flex-end; }
+.dot-w, .dot-l {
+  width: 7px; height: 7px;
+  border-radius: 1px;
+}
+.dot-w { background: var(--green); }
+.dot-l { background: var(--red); opacity: .5; }
+
+/* Probability */
+.prob-block { margin-top: 2px; }
+.prob-number {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+.prob-number.value-color { color: var(--value); }
+.prob-number.edge-color  { color: var(--edge); }
+
+.prob-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 4px;
+}
+.player-side.right .prob-detail { align-items: flex-end; }
+.prob-odd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.prob-edge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+.prob-edge.positive { color: var(--value); }
+.prob-kelly {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.prob-kelly strong { color: var(--text); }
+
+/* VS center */
+.card-vs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 8px 8px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  min-width: 64px;
+}
+.vs-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted2);
+  letter-spacing: .1em;
+}
+.vs-h2h {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--edge);
+}
+.vs-surf {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  text-align: center;
+}
+.vs-time {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+/* ── Bet button / form ── */
+.bet-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all .15s;
+}
+.bet-btn:hover { background: var(--surface2); color: var(--text); }
+.bet-btn.value { border-color: rgba(200,242,67,.4); color: var(--value); }
+.bet-btn.value:hover { background: var(--value-bg); }
+
+/* ── Stats bar at bottom ── */
+.stats-bar {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 8px 24px;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin-top: auto;
+}
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.stat-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted2);
+}
+.stat-value {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.stat-value.up { color: var(--green); }
+.stat-value.down { color: var(--red); }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── Annotations ── */
+.annotation {
+  position: absolute;
+  background: rgba(200,242,67,.9);
+  color: #000;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 2px;
+  white-space: nowrap;
+  z-index: 200;
+}
+.annotation::before {
+  content: '◄ ';
+}
+.annotation-line {
+  position: absolute;
+  border: 1px dashed rgba(200,242,67,.4);
+  border-right: none;
+  border-bottom: none;
+  pointer-events: none;
+}
+
+/* ── Page header ── */
+.page-header {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--muted2);
+  padding: 12px 24px 0;
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <span class="dot"></span>
+      TennisPredict
+    </div>
+    <div class="logo-sub">Betting Intelligence</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section">Signal</div>
+    <a class="nav-item active" href="#">
+      <span class="nav-icon">◈</span> Aujourd'hui
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">◎</span> Prédictions
+    </a>
+
+    <div class="nav-section" style="margin-top:8px">Suivi</div>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">≡</span> Historique
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">⬡</span> Stats
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">◉</span> Joueurs
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="bankroll-widget">
+      <div class="bw-label">Bankroll</div>
+      <div class="bw-amount">97.49€</div>
+      <div class="bw-change down">▼ −5.20€ cette semaine</div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-title">
+      Matchs du jour
+      <span class="topbar-meta">/ 21 mars 2026 · Miami Open</span>
+    </div>
+    <div class="topbar-right">
+      <!-- Date nav -->
+      <div class="date-nav">
+        <button>←</button>
+        <span>21/03</span>
+        <button>→</button>
+      </div>
+      <!-- Tour toggle -->
+      <div class="tour-toggle">
+        <button class="tour-btn active">ATP</button>
+        <button class="tour-btn">WTA</button>
+      </div>
+      <!-- Sync -->
+      <div class="sync-chip">
+        <span class="sync-dot"></span>
+        Pinnacle · 08:47
+        <span style="opacity:.5">↻</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <button class="filter-chip active">Tous</button>
+    <button class="filter-chip value-active">VALUE BET</button>
+    <button class="filter-chip">Edge modéré</button>
+    <button class="filter-chip">Neutres</button>
+    <span class="filter-count"><strong>13</strong> matchs · <strong>4</strong> signaux</span>
+  </div>
+
+  <!-- MATCH LIST -->
+  <div class="match-list">
+
+    <!-- ═══ CARD 1 — VALUE BET ═══ -->
+    <div class="match-card value">
+      <div class="card-header">
+        <span class="card-meta">Miami Open · R16 · Hard · 14:00</span>
+        <div class="card-badges">
+          <span class="badge badge-quality-high">● élevée</span>
+          <span class="badge badge-value">VALUE BET</span>
+        </div>
+      </div>
+
+      <!-- P1 -->
+      <div class="player-side">
+        <div class="player-name">Jakub Mensik</div>
+        <div class="player-chips">
+          <span class="chip rank">#28</span>
+          <span class="chip">78% hard</span>
+        </div>
+        <div class="form-dots">
+          <span class="dot-w"></span><span class="dot-w"></span>
+          <span class="dot-l"></span><span class="dot-w"></span><span class="dot-w"></span>
+        </div>
+        <div class="prob-block">
+          <div class="prob-number value-color">64.2%</div>
+          <div class="prob-detail">
+            <span class="prob-odd">@1.82 Pinnacle</span>
+            <span class="prob-edge positive">Edge +13.9%</span>
+            <span class="prob-kelly">Kelly <strong>3.48€</strong></span>
+          </div>
+        </div>
+        <button class="bet-btn value">Parier →</button>
+      </div>
+
+      <!-- VS -->
+      <div class="card-vs">
+        <span class="vs-label">vs</span>
+        <span class="vs-h2h">2–1</span>
+        <span class="vs-surf">H2H Hard</span>
+        <span class="vs-time"></span>
+      </div>
+
+      <!-- P2 -->
+      <div class="player-side right">
+        <div class="player-name">Adam Walton</div>
+        <div class="player-chips" style="justify-content:flex-end">
+          <span class="chip">61% hard</span>
+          <span class="chip rank">#74</span>
+        </div>
+        <div class="form-dots" style="justify-content:flex-end">
+          <span class="dot-l"></span><span class="dot-w"></span>
+          <span class="dot-l"></span><span class="dot-l"></span><span class="dot-w"></span>
+        </div>
+        <div class="prob-block" style="text-align:right">
+          <div class="prob-number" style="color:var(--muted)">35.8%</div>
+          <div class="prob-detail" style="align-items:flex-end">
+            <span class="prob-odd">@2.20</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="bet-btn" style="margin-top:8px">← Parier</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CARD 2 — EDGE ═══ -->
+    <div class="match-card edge">
+      <div class="card-header">
+        <span class="card-meta">Miami Open · R16 · Hard · 16:30</span>
+        <div class="card-badges">
+          <span class="badge badge-quality-med">● moyenne</span>
+          <span class="badge badge-edge">EDGE MODÉRÉ</span>
+        </div>
+      </div>
+
+      <div class="player-side">
+        <div class="player-name">Tirante</div>
+        <div class="player-chips">
+          <span class="chip rank">#52</span>
+          <span class="chip">12j repos</span>
+        </div>
+        <div class="form-dots">
+          <span class="dot-w"></span><span class="dot-l"></span>
+          <span class="dot-w"></span><span class="dot-w"></span><span class="dot-w"></span>
+        </div>
+        <div class="prob-block">
+          <div class="prob-number edge-color">57.8%</div>
+          <div class="prob-detail">
+            <span class="prob-odd">@2.05</span>
+            <span class="prob-edge positive" style="color:var(--edge)">Edge +9.5%</span>
+            <span class="prob-kelly">Kelly <strong>2.14€</strong></span>
+          </div>
+        </div>
+        <button class="bet-btn" style="border-color:rgba(79,168,255,.4);color:var(--edge)">Parier →</button>
+      </div>
+
+      <div class="card-vs">
+        <span class="vs-label">vs</span>
+        <span class="vs-h2h" style="color:var(--muted)">—</span>
+        <span class="vs-surf">0 H2H</span>
+      </div>
+
+      <div class="player-side right">
+        <div class="player-name">Cerundolo</div>
+        <div class="player-chips" style="justify-content:flex-end">
+          <span class="chip">69% clay</span>
+          <span class="chip rank">#38</span>
+        </div>
+        <div class="form-dots" style="justify-content:flex-end">
+          <span class="dot-w"></span><span class="dot-w"></span>
+          <span class="dot-l"></span><span class="dot-w"></span><span class="dot-l"></span>
+        </div>
+        <div class="prob-block" style="text-align:right">
+          <div class="prob-number" style="color:var(--muted)">42.2%</div>
+          <div class="prob-detail" style="align-items:flex-end">
+            <span class="prob-odd">@1.95</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="bet-btn">← Parier</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CARD 3 — NEUTRE ═══ -->
+    <div class="match-card">
+      <div class="card-header">
+        <span class="card-meta">Miami Open · R16 · Hard · 19:00</span>
+        <div class="card-badges">
+          <span class="badge badge-quality-high">● élevée</span>
+          <span class="badge badge-neutral">NEUTRE</span>
+        </div>
+      </div>
+
+      <div class="player-side">
+        <div class="player-name">Sinner</div>
+        <div class="player-chips">
+          <span class="chip rank">#1</span>
+          <span class="chip">91% hard</span>
+        </div>
+        <div class="form-dots">
+          <span class="dot-w"></span><span class="dot-w"></span>
+          <span class="dot-w"></span><span class="dot-w"></span><span class="dot-w"></span>
+        </div>
+        <div class="prob-block">
+          <div class="prob-number">82.1%</div>
+          <div class="prob-detail">
+            <span class="prob-odd">@1.08</span>
+            <span class="prob-edge" style="color:var(--muted)">Edge −3.1%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-vs">
+        <span class="vs-label">vs</span>
+        <span class="vs-h2h" style="color:var(--muted)">3–0</span>
+        <span class="vs-surf">H2H</span>
+      </div>
+
+      <div class="player-side right">
+        <div class="player-name">Dzumhur</div>
+        <div class="player-chips" style="justify-content:flex-end">
+          <span class="chip rank">#124</span>
+        </div>
+        <div class="form-dots" style="justify-content:flex-end">
+          <span class="dot-l"></span><span class="dot-w"></span>
+          <span class="dot-l"></span><span class="dot-l"></span><span class="dot-l"></span>
+        </div>
+        <div class="prob-block" style="text-align:right">
+          <div class="prob-number" style="color:var(--muted)">17.9%</div>
+          <div class="prob-detail" style="align-items:flex-end">
+            <span class="prob-odd">@9.50</span>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--muted2)">cote trop haute</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /match-list -->
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat-item">
+      <span class="stat-label">Paris en cours</span>
+      <span class="stat-value">3</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Misé</span>
+      <span class="stat-value">8.62€</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">ROI (backtest)</span>
+      <span class="stat-value up">+7.4%</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Win rate</span>
+      <span class="stat-value">61.2%</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Cotes fraîches</span>
+      <span class="stat-value" style="color:var(--green);font-size:11px">Pinnacle · 08:47</span>
+    </div>
+    <div style="margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted2)">
+      Données ESPN · mis à jour il y a 12 min
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+</body>
+</html>

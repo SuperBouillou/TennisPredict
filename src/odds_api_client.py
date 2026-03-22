@@ -94,9 +94,6 @@ def fetch_odds_today(tour: str) -> OddsResult:
     NOT decorated with @st.cache_data — file cache is the only cache layer.
     Deleting the cache file (Rafraîchir button) forces a real API call.
     """
-    if tour != "atp":
-        return OddsResult()
-
     api_key = os.environ.get("ODDS_API_KEY", "").strip()
     if not api_key:
         return OddsResult()
@@ -144,14 +141,15 @@ def fetch_odds_today(tour: str) -> OddsResult:
             continue
 
         for event in events:
-            bks  = event.get("bookmakers", [])
-            pair = _extract_pinnacle_odds(bks) or _extract_avg_odds(bks)
-            if pair is None:
-                continue
             home = normalize_player_name(event.get("home_team", ""))
             away = normalize_player_name(event.get("away_team", ""))
-            if home and away:
-                odds_dict[f"{home} vs {away}"] = pair
+            if not home or not away:
+                continue
+            bks  = event.get("bookmakers", [])
+            pair = _extract_pinnacle_odds(bks, home, away) or _extract_avg_odds(bks, home, away)
+            if pair is None:
+                continue
+            odds_dict[f"{home} vs {away}"] = pair
 
     result = OddsResult(
         odds=odds_dict,
@@ -237,28 +235,68 @@ def _save_cache(tour: str, today: date, result: OddsResult) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def _extract_pinnacle_odds(bookmakers: list) -> tuple | None:
-    """Find Pinnacle h2h odds. Returns (odd_p1, odd_p2) or None if absent."""
+def _match_outcome_to_player(outcome_name: str, player_key: str) -> bool:
+    """
+    Flexible player name matching between Pinnacle outcome names and event player keys.
+    Handles: full name, last name only, abbreviated "F. Lastname".
+    Both inputs are already normalized (lowercase, no accents).
+    """
+    on = normalize_player_name(outcome_name)
+    # Exact match
+    if on == player_key:
+        return True
+    # Last name match (e.g. outcome "lehecka" vs key "jiri lehecka")
+    player_last = player_key.split()[-1]
+    if on == player_last:
+        return True
+    # Abbreviated first name "j. lehecka" vs "jiri lehecka"
+    if on.endswith(player_last) and len(on) > len(player_last):
+        return True
+    # Key ends with outcome last name
+    outcome_last = on.split()[-1] if on else ""
+    if outcome_last and player_key.endswith(outcome_last):
+        return True
+    return False
+
+
+def _pair_outcomes(outcomes: list, home_key: str, away_key: str) -> tuple | None:
+    """Match two outcomes to home/away player and return (home_price, away_price)."""
+    if len(outcomes) < 2:
+        return None
+    prices = [(normalize_player_name(o["name"]), float(o["price"])) for o in outcomes]
+    home_price = away_price = None
+    for name, price in prices:
+        if _match_outcome_to_player(name, home_key):
+            home_price = price
+        elif _match_outcome_to_player(name, away_key):
+            away_price = price
+    if home_price is not None and away_price is not None:
+        return (home_price, away_price)
+    # Last resort: positional but log a warning
+    log.debug("Outcome name mismatch for %s / %s — using positional", home_key, away_key)
+    return (float(outcomes[0]["price"]), float(outcomes[1]["price"]))
+
+
+def _extract_pinnacle_odds(bookmakers: list, home_key: str, away_key: str) -> tuple | None:
+    """Find Pinnacle h2h odds. Returns (home_odd, away_odd) matched by player name."""
     for bk in bookmakers:
         if bk.get("key") == "pinnacle":
             for market in bk.get("markets", []):
                 if market.get("key") == "h2h":
-                    outcomes = market.get("outcomes", [])
-                    if len(outcomes) >= 2:
-                        return (float(outcomes[0]["price"]), float(outcomes[1]["price"]))
+                    return _pair_outcomes(market.get("outcomes", []), home_key, away_key)
     return None
 
 
-def _extract_avg_odds(bookmakers: list) -> tuple | None:
-    """Average h2h odds across all bookmakers. Returns None if no data."""
-    p1_prices, p2_prices = [], []
+def _extract_avg_odds(bookmakers: list, home_key: str, away_key: str) -> tuple | None:
+    """Average h2h odds across all bookmakers, matched by player name."""
+    home_prices, away_prices = [], []
     for bk in bookmakers:
         for market in bk.get("markets", []):
             if market.get("key") == "h2h":
-                outcomes = market.get("outcomes", [])
-                if len(outcomes) >= 2:
-                    p1_prices.append(float(outcomes[0]["price"]))
-                    p2_prices.append(float(outcomes[1]["price"]))
-    if not p1_prices:
+                pair = _pair_outcomes(market.get("outcomes", []), home_key, away_key)
+                if pair:
+                    home_prices.append(pair[0])
+                    away_prices.append(pair[1])
+    if not home_prices:
         return None
-    return (sum(p1_prices) / len(p1_prices), sum(p2_prices) / len(p2_prices))
+    return (sum(home_prices) / len(home_prices), sum(away_prices) / len(away_prices))
