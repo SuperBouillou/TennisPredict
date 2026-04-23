@@ -320,16 +320,19 @@ def update_player_profiles(df_new: pd.DataFrame,
                 (df_p['tourney_date'] >= cutoff).sum()
             )
 
-        # Rang depuis le dernier match
+        # Rang depuis le dernier match (victoire OU défaite, selon le plus récent)
         last_w = df[w_mask].sort_values('tourney_date')
         last_l = df[l_mask].sort_values('tourney_date')
 
         rank = np.nan
         rank_pts = np.nan
-        if len(last_w) > 0:
+        w_date = last_w.iloc[-1]['tourney_date'] if len(last_w) > 0 else pd.NaT
+        l_date = last_l.iloc[-1]['tourney_date'] if len(last_l) > 0 else pd.NaT
+        use_win = (pd.notna(w_date) and (pd.isna(l_date) or w_date >= l_date))
+        if use_win:
             rank     = last_w.iloc[-1].get('winner_rank', np.nan)
             rank_pts = last_w.iloc[-1].get('winner_rank_pts', np.nan)
-        if len(last_l) > 0 and pd.isna(rank):
+        elif len(last_l) > 0:
             rank     = last_l.iloc[-1].get('loser_rank', np.nan)
             rank_pts = last_l.iloc[-1].get('loser_rank_pts', np.nan)
 
