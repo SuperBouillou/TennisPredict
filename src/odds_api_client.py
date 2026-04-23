@@ -159,37 +159,86 @@ def fetch_odds_today(tour: str) -> OddsResult:
     return result
 
 
+def _name_tokens(name: str) -> frozenset:
+    """
+    Tokenize a normalized player name into a frozenset of words.
+    Hyphens are treated as spaces so "Elena-Gabriela" → {"elena", "gabriela"}.
+    This makes matching order-independent and hyphen-insensitive.
+    """
+    return frozenset(normalize_player_name(name).replace("-", " ").split())
+
+
 def merge_odds(matches: list, odds: dict) -> list:
     """
     Enriches each match dict with odd_p1 / odd_p2 from the odds dict.
 
-    Normalization applied to BOTH sides:
-      - Keys in `odds` are normalized at cache-write time (API names)
-      - ESPN p1_name / p2_name are normalized here at lookup time
+    Four-level lookup (most to least strict):
+      1. Exact key "p1 vs p2"
+      2. Reversed key "p2 vs p1"
+      3. Token-set match — handles word-order differences (e.g. "Shuai Zhang" ↔
+         "Zhang Shuai") and hyphenated names ("Elena-Gabriela Ruse")
+      4. Last-name pair match — fallback for nicknames ("Caty" ↔ "Catherine")
 
-    Tries "p1 vs p2" AND "p2 vs p1" to handle reversed API order.
     Sets odd_p1=None, odd_p2=None for unmatched matches.
     Returns a new list — does not mutate input dicts.
     """
+    # Pre-build token-set index and last-name index from odds dict
+    token_index: dict[tuple, tuple] = {}    # (frozenset, frozenset) → (odd1, odd2)
+    lastname_index: dict[tuple, tuple] = {} # (last1, last2) → (odd1, odd2) — for nicknames
+
+    for key, pair in odds.items():
+        parts = key.split(" vs ", 1)
+        if len(parts) != 2:
+            continue
+        t1 = _name_tokens(parts[0])
+        t2 = _name_tokens(parts[1])
+        o1, o2 = float(pair[0]), float(pair[1])
+        l1 = parts[0].split()[-1] if parts[0].split() else ""  # last word = surname
+        l2 = parts[1].split()[-1] if parts[1].split() else ""
+        # Store both orientations
+        for ta, tb, oa, ob, la, lb in (
+            (t1, t2, o1, o2, l1, l2),
+            (t2, t1, o2, o1, l2, l1),
+        ):
+            token_index[(ta, tb)] = (oa, ob)
+            if la and lb:
+                lastname_index.setdefault((la, lb), (oa, ob))
+
     enriched = []
     for m in matches:
-        m2  = dict(m)
-        p1  = normalize_player_name(m.get("p1_name", ""))
-        p2  = normalize_player_name(m.get("p2_name", ""))
+        m2 = dict(m)
+        p1 = normalize_player_name(m.get("p1_name", ""))
+        p2 = normalize_player_name(m.get("p2_name", ""))
         fwd = f"{p1} vs {p2}"
         rev = f"{p2} vs {p1}"
 
         if fwd in odds:
-            pair         = odds[fwd]
+            pair = odds[fwd]
             m2["odd_p1"] = float(pair[0])
             m2["odd_p2"] = float(pair[1])
         elif rev in odds:
-            pair         = odds[rev]          # API home/away reversed
-            m2["odd_p1"] = float(pair[1])     # swap: API p2 is our p1
+            pair = odds[rev]           # API home/away reversed
+            m2["odd_p1"] = float(pair[1])
             m2["odd_p2"] = float(pair[0])
         else:
-            m2["odd_p1"] = None
-            m2["odd_p2"] = None
+            # Level 3: token-set match (word order + hyphens)
+            t1 = _name_tokens(p1)
+            t2 = _name_tokens(p2)
+            pair = token_index.get((t1, t2))
+            if pair:
+                m2["odd_p1"] = pair[0]
+                m2["odd_p2"] = pair[1]
+            else:
+                # Level 4: last-name pair fallback (nickname tolerance)
+                l1 = p1.split()[-1] if p1 else ""
+                l2 = p2.split()[-1] if p2 else ""
+                pair = lastname_index.get((l1, l2)) if l1 and l2 else None
+                if pair:
+                    m2["odd_p1"] = pair[0]
+                    m2["odd_p2"] = pair[1]
+                else:
+                    m2["odd_p1"] = None
+                    m2["odd_p2"] = None
 
         enriched.append(m2)
     return enriched
