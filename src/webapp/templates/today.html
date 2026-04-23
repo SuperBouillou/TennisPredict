@@ -6,25 +6,26 @@
 {% block page_meta %}{{ match_date }} · {% if page_mode == 'hier' %}{{ match_count }} résultat(s){% elif page_mode == 'demain' %}{{ match_count }} match(s) prévu(s){% else %}{{ match_count }} match(s){% endif %}{% endblock %}
 
 {% block topbar_right %}
+{% set _ct = ('&client_today=' ~ client_today) if client_today else '' %}
 <div style="display:flex;align-items:center;gap:8px">
   <!-- Hier / Aujourd'hui / Demain -->
   <div class="toggle-group">
-    <a href="/today?tour={{ tour }}&match_date={{ yesterday }}" style="text-decoration:none">
+    <a href="/today?tour={{ tour }}&match_date={{ yesterday }}{{ _ct }}" style="text-decoration:none">
       <button class="toggle-btn {% if page_mode=='hier' %}active{% endif %}">Hier</button>
     </a>
-    <a href="/today?tour={{ tour }}" style="text-decoration:none">
+    <a href="/today?tour={{ tour }}&match_date={{ ref_today }}{{ _ct }}" style="text-decoration:none">
       <button class="toggle-btn {% if page_mode=='today' %}active{% endif %}">Aujourd'hui</button>
     </a>
-    <a href="/today?tour={{ tour }}&match_date={{ tomorrow }}" style="text-decoration:none">
+    <a href="/today?tour={{ tour }}&match_date={{ tomorrow }}{{ _ct }}" style="text-decoration:none">
       <button class="toggle-btn {% if page_mode=='demain' %}active{% endif %}">Demain</button>
     </a>
   </div>
   <!-- ATP/WTA toggle -->
   <div class="toggle-group">
-    <a href="/today?tour=atp&match_date={{ match_date }}" style="text-decoration:none">
+    <a href="/today?tour=atp&match_date={{ match_date }}{{ _ct }}" style="text-decoration:none">
       <button class="toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</button>
     </a>
-    <a href="/today?tour=wta&match_date={{ match_date }}" style="text-decoration:none">
+    <a href="/today?tour=wta&match_date={{ match_date }}{{ _ct }}" style="text-decoration:none">
       <button class="toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</button>
     </a>
   </div>
@@ -64,6 +65,24 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+// Synchronise the server's date references with the browser's local timezone.
+// The server runs UTC; a user in UTC+2 at 00:30 already has a different date.
+// We detect the drift once, then reload with ?client_today=YYYY-MM-DD so the
+// server can compute hier/aujourd'hui/demain relative to the user's local date.
+(function () {
+  var clientToday = new Date().toLocaleDateString('en-CA'); // always YYYY-MM-DD
+  var serverToday = '{{ today_date }}';
+  if (clientToday === serverToday) return; // no drift — nothing to do
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('client_today') === clientToday) return; // already corrected
+  params.set('client_today', clientToday);
+  // If the page was loaded without an explicit match_date, anchor it to the
+  // client's local today so we land on the right day after the redirect.
+  if (!params.has('match_date')) params.set('match_date', clientToday);
+  window.location.replace('/today?' + params.toString());
+})();
+</script>
 {% if page_mode == 'hier' %}
 <div class="bankroll-bar">
   <div class="bankroll-group">

@@ -415,15 +415,29 @@ def _get_ranking_updated_at(tour: str) -> str | None:
 
 @router.get("/today", response_class=HTMLResponse)
 async def today_page(request: Request, tour: str = "atp",
-                     match_date: str = Query(default=None)):
-    today = date.today()
-    today_str = today.isoformat()
-    yesterday_str = (today - timedelta(days=1)).isoformat()
-    tomorrow_str = (today + timedelta(days=1)).isoformat()
+                     match_date: str = Query(default=None),
+                     client_today: str | None = Query(default=None)):
+    server_today = date.today()
+    server_today_str = server_today.isoformat()
 
-    # Restrict navigation to ±1 day
+    # Use the client's local date as reference when it differs from server UTC
+    # (e.g. user in UTC+2 at midnight already has a different date than the server)
+    ref_today_str = server_today_str
+    if client_today:
+        try:
+            ct = date.fromisoformat(client_today)
+            if -2 <= (ct - server_today).days <= 2:
+                ref_today_str = client_today
+        except ValueError:
+            pass
+
+    ref_today = date.fromisoformat(ref_today_str)
+    yesterday_str = (ref_today - timedelta(days=1)).isoformat()
+    tomorrow_str = (ref_today + timedelta(days=1)).isoformat()
+
+    # Restrict navigation to ±1 day from the client's reference date
     if not match_date:
-        match_date = today_str
+        match_date = ref_today_str
     if match_date < yesterday_str:
         match_date = yesterday_str
     elif match_date > tomorrow_str:
@@ -464,7 +478,9 @@ async def today_page(request: Request, tour: str = "atp",
         "tour": tour,
         "match_date": match_date,
         "page_mode": page_mode,
-        "today_date": today_str,
+        "today_date": server_today_str,   # raw server date — used by JS to detect drift
+        "ref_today": ref_today_str,        # client-adjusted today
+        "client_today": client_today or "",
         "yesterday": yesterday_str,
         "tomorrow": tomorrow_str,
         "matches": matches, "match_count": len(matches),
@@ -478,16 +494,30 @@ async def today_page(request: Request, tour: str = "atp",
 
 @router.get("/today/matches", response_class=HTMLResponse)
 async def today_matches_partial(request: Request, tour: str = "atp",
-                                match_date: str = Query(default=None)):
+                                match_date: str = Query(default=None),
+                                client_today: str | None = Query(default=None)):
     """HTMX partial — swap #match-list."""
-    today = date.today()
-    today_str = today.isoformat()
-    yesterday_str = (today - timedelta(days=1)).isoformat()
+    server_today = date.today()
+    server_today_str = server_today.isoformat()
+
+    ref_today_str = server_today_str
+    if client_today:
+        try:
+            ct = date.fromisoformat(client_today)
+            if -2 <= (ct - server_today).days <= 2:
+                ref_today_str = client_today
+        except ValueError:
+            pass
+
+    ref_today = date.fromisoformat(ref_today_str)
+    yesterday_str = (ref_today - timedelta(days=1)).isoformat()
+    tomorrow_str = (ref_today + timedelta(days=1)).isoformat()
+
     if not match_date:
-        match_date = today_str
+        match_date = ref_today_str
 
     page_mode = "hier" if match_date == yesterday_str else (
-        "demain" if match_date > today_str else "today"
+        "demain" if match_date > ref_today_str else "today"
     )
 
     db = _app_state()['db']
