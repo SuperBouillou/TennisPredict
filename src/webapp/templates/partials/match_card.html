@@ -83,7 +83,7 @@
   <div class="card-grid">
     <!-- P1 -->
     <div class="player-side">
-      <div class="player-name" onclick="openModal(this.closest('.match-card'))">{{ m.get('p1_name','?') }}</div>
+      <div class="player-name" style="cursor:pointer" onclick="event.stopPropagation();window.location='/joueurs/'+encodeURIComponent(this.closest('.match-card').dataset.p1)+'?tour='+this.closest('.match-card').dataset.tour">{{ m.get('p1_name','?') }}</div>
       <div class="player-chips">
         {% if m.get('p1_rank') %}<span class="player-chip player-chip-rank">#{{ m.p1_rank }}</span>{% endif %}
         {% if m.get('p1_surf_pct') is not none %}<span class="player-chip">{{ m.p1_surf_pct }}% surf</span>{% endif %}
@@ -113,35 +113,7 @@
         {% endif %}
       </div>
       {% if m.get('odd_p1') %}
-      <div>
-        <button class="btn-bet" onclick="event.stopPropagation();toggleBetForm(this,'p1')">Parier →</button>
-        <div class="bet-form" style="display:none">
-          <form hx-post="/bets/quick" hx-target="closest .bet-form" hx-swap="innerHTML"
-                style="display:flex;flex-direction:column;gap:4px" onclick="event.stopPropagation()">
-            <input type="hidden" name="tour"       value="{{ tour }}">
-            <input type="hidden" name="p1_name"    value="{{ m.get('p1_name','') }}">
-            <input type="hidden" name="p2_name"    value="{{ m.get('p2_name','') }}">
-            <input type="hidden" name="tournament" value="{{ m.get('tournament','') }}">
-            <input type="hidden" name="surface"    value="{{ m.get('surface','Hard') }}">
-            <input type="hidden" name="round"      value="{{ m.get('round','') }}">
-            <input type="hidden" name="bet_on"     value="{{ m.get('p1_name','') }}">
-            <input type="hidden" name="odd"        value="{{ m.odd_p1 }}">
-            <input type="hidden" name="prob"       value="{{ m.get('prob_p1','0.5') }}">
-            <input type="hidden" name="edge"       value="{{ m.get('edge_p1','') }}">
-            <input type="hidden" name="kelly_frac" value="{{ m.get('kelly_frac_p1','') }}">
-            <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" name="stake" class="form-input kelly-stake"
-                     data-frac="{{ m.get('kelly_frac_p1', 0) }}"
-                     value="{{ m.kelly_eur_p1 if m.get('kelly_eur_p1') else 1 }}"
-                     min="0.01" step="0.01" style="width:70px;padding:4px 8px;font-size:12px">
-              <span style="font-size:11px;color:var(--muted)">€</span>
-              <button type="submit" class="btn btn-sm" style="background:var(--green);color:#000;border:none">✓</button>
-              <button type="button" class="btn btn-sm"
-                      onclick="event.stopPropagation();this.closest('.bet-form').style.display='none'">✗</button>
-            </div>
-          </form>
-        </div>
-      </div>
+      <button class="btn-bet" onclick="event.stopPropagation();openModal(this.closest('.match-card'))">Parier →</button>
       {% endif %}
     </div>
     <!-- VS center -->
@@ -153,7 +125,7 @@
     </div>
     <!-- P2 -->
     <div class="player-side right">
-      <div class="player-name" onclick="openModal(this.closest('.match-card'))">{{ m.get('p2_name','?') }}</div>
+      <div class="player-name" style="cursor:pointer" onclick="event.stopPropagation();window.location='/joueurs/'+encodeURIComponent(this.closest('.match-card').dataset.p2)+'?tour='+this.closest('.match-card').dataset.tour">{{ m.get('p2_name','?') }}</div>
       <div class="player-chips">
         {% if m.get('p2_days_since') is not none and m.p2_days_since > 10 %}<span class="player-chip player-chip-rest">{{ m.p2_days_since }}j</span>{% endif %}
         {% if m.get('p2_surf_pct') is not none %}<span class="player-chip">{{ m.p2_surf_pct }}% surf</span>{% endif %}
@@ -183,35 +155,7 @@
         {% endif %}
       </div>
       {% if m.get('odd_p2') %}
-      <div style="display:flex;flex-direction:column;align-items:flex-end">
-        <button class="btn-bet" onclick="event.stopPropagation();toggleBetForm(this,'p2')">← Parier</button>
-        <div class="bet-form" style="display:none">
-          <form hx-post="/bets/quick" hx-target="closest .bet-form" hx-swap="innerHTML"
-                style="display:flex;flex-direction:column;gap:4px;align-items:flex-end" onclick="event.stopPropagation()">
-            <input type="hidden" name="tour"       value="{{ tour }}">
-            <input type="hidden" name="p1_name"    value="{{ m.get('p1_name','') }}">
-            <input type="hidden" name="p2_name"    value="{{ m.get('p2_name','') }}">
-            <input type="hidden" name="tournament" value="{{ m.get('tournament','') }}">
-            <input type="hidden" name="surface"    value="{{ m.get('surface','Hard') }}">
-            <input type="hidden" name="round"      value="{{ m.get('round','') }}">
-            <input type="hidden" name="bet_on"     value="{{ m.get('p2_name','') }}">
-            <input type="hidden" name="odd"        value="{{ m.odd_p2 }}">
-            <input type="hidden" name="prob"       value="{{ m.get('prob_p2','0.5') }}">
-            <input type="hidden" name="edge"       value="{{ m.get('edge_p2','') }}">
-            <input type="hidden" name="kelly_frac" value="{{ m.get('kelly_frac_p2','') }}">
-            <div style="display:flex;align-items:center;gap:4px">
-              <button type="button" class="btn btn-sm"
-                      onclick="event.stopPropagation();this.closest('.bet-form').style.display='none'">✗</button>
-              <button type="submit" class="btn btn-sm" style="background:var(--green);color:#000;border:none">✓</button>
-              <span style="font-size:11px;color:var(--muted)">€</span>
-              <input type="number" name="stake" class="form-input kelly-stake"
-                     data-frac="{{ m.get('kelly_frac_p2', 0) }}"
-                     value="{{ m.kelly_eur_p2 if m.get('kelly_eur_p2') else 1 }}"
-                     min="0.01" step="0.01" style="width:70px;padding:4px 8px;font-size:12px">
-            </div>
-          </form>
-        </div>
-      </div>
+      <button class="btn-bet" onclick="event.stopPropagation();openModal(this.closest('.match-card'))">← Parier</button>
       {% endif %}
     </div>
   </div>
