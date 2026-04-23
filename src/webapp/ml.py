@@ -34,18 +34,29 @@ def _has_rank(row: pd.Series) -> bool:
     return v is not None and not (isinstance(v, float) and np.isnan(v))
 
 
+def _name_tokens(name: str) -> frozenset:
+    """Tokenize a normalized name into a frozenset — order-independent, hyphen-insensitive."""
+    return frozenset(name.lower().strip().replace('-', ' ').split())
+
+
 def _get_player(profiles, name: str) -> dict | None:
     key = name.lower().strip()
     last = key.split()[-1] if key else ''
+    tokens = _name_tokens(name)
 
     # Fast path: O(1) dict lookup (profiles_dict built at startup)
     if isinstance(profiles, dict):
         if key in profiles:
             return profiles[key]
-        # Fuzzy fallback: last name match
+        # Token-set match: handles "Zheng Qinwen" ↔ "Qinwen Zheng" and hyphenated names
+        if tokens:
+            for k, v in profiles.items():
+                if _name_tokens(k) == tokens:
+                    return v
+        # Last-name fallback
         if last:
             for k, v in profiles.items():
-                if k.endswith(last):
+                if k.split()[-1] == last if k.split() else False:
                     return v
         return None
 
@@ -54,7 +65,6 @@ def _get_player(profiles, name: str) -> dict | None:
     exact = profiles[valid & (profiles['name_key'] == key)]
     lastname = profiles[valid & profiles['name_key'].str.endswith(last)] if last else pd.DataFrame()
 
-    # Gather all candidates, prefer those with a valid rank
     candidates = pd.concat([exact, lastname]).drop_duplicates()
     if candidates.empty:
         return None
@@ -71,17 +81,29 @@ def _elo_win_prob(elo_a: float, elo_b: float) -> float:
 def _rank_adjusted_elo(elo: float, rank: float | None) -> float:
     """Blend profile ELO with rank-implied ELO when they diverge (stale ELO).
 
-    Uses a simple linear rank→ELO mapping calibrated for ATP/WTA:
-    rank 1 ≈ 2100, rank 100 ≈ 1700, rank 300 ≈ 900.
-    When gap > 100 points, blend 50/50 to reduce systematic bias.
+    Uses a linear rank→ELO mapping: rank 1 ≈ 2100, rank 100 ≈ 1700.
+    Blending weight increases with divergence to handle stale WTA ELOs
+    (e.g. ex-#1 Pliskova ELO=2078 while currently ranked #41).
+
+    Gap thresholds (ELO points):
+      > 400 : 5 % historical ELO + 95 % rank-implied  (extreme staleness)
+      > 200 : 20 %  ELO + 80 % rank
+      >  50 : 50 %  ELO + 50 % rank
+      ≤  50 : keep historical ELO as-is
     """
     if rank is None or (isinstance(rank, float) and np.isnan(rank)):
         return elo
     elo_from_rank = max(1200.0, 2100.0 - 4.0 * float(rank))
-    gap = elo - elo_from_rank
-    if abs(gap) > 50:
-        return 0.5 * elo + 0.5 * elo_from_rank
-    return elo
+    gap = abs(elo - elo_from_rank)
+    if gap > 400:
+        w_elo = 0.05
+    elif gap > 200:
+        w_elo = 0.20
+    elif gap > 50:
+        w_elo = 0.50
+    else:
+        return elo
+    return w_elo * elo + (1.0 - w_elo) * elo_from_rank
 
 
 def _v(d: dict, key: str, default: float) -> float:
@@ -327,13 +349,15 @@ def predict(
         cal_prob = elo_w * elo_prob + (1 - elo_w) * xgb_prob
         cal_prob = max(0.01, min(0.99, cal_prob))
 
-    # Market odds cap: si le marché donne <15% à un joueur (cote >~6.7),
-    # le modèle ne peut pas lui donner plus de 2.5x la probabilité implicite du marché.
-    # Évite les edges aberrants sur les gros outsiders (ex: @19 → max ~13% au lieu de 36%).
+    # Market odds guardrail: le modèle ne peut pas s'éloigner de plus de 2× la proba
+    # no-vig du marché dans AUCUN sens. Protège contre les ELOs WTA aberrants et les
+    # profils manquants qui génèrent des probabilités inversées ou extrêmes.
+    # Exemples : Kenin @4.07 (marché ~24%) → max 48% ; Sakkari @1.72 (marché ~58%) → min 29%.
     if odd_p1 is not None and odd_p1 > 1.0 and odd_p2 is not None and odd_p2 > 1.0:
-        mkt_p1 = 1.0 / odd_p1
-        if mkt_p1 < 0.15:
-            cal_prob = min(cal_prob, mkt_p1 * 2.5)
+        total_implied = 1.0 / odd_p1 + 1.0 / odd_p2
+        novid_p1 = (1.0 / odd_p1) / total_implied   # no-vig market prob for p1
+        cal_prob = min(cal_prob, novid_p1 * 2.0)     # model can't exceed 2× market
+        cal_prob = max(cal_prob, novid_p1 * 0.5)     # model can't be below ½ market
 
     prob_p2 = 1 - cal_prob
 
