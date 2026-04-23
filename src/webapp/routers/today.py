@@ -444,6 +444,7 @@ async def today_page(request: Request, tour: str = "atp",
 
     if page_mode == "hier":
         matches = _get_results(tour, match_date)
+        matches = _enrich_with_predictions(matches, tour, bankroll, kelly_fraction)
         odds_fetched_at = None
     else:
         matches, odds_fetched_at = _build_matches(tour, match_date, bankroll, kelly_fraction)
@@ -487,6 +488,7 @@ async def today_matches_partial(request: Request, tour: str = "atp",
 
     if page_mode == "hier":
         matches = _get_results(tour, match_date)
+        matches = _enrich_with_predictions(matches, tour, bankroll, kelly_fraction)
     else:
         matches, _ = _build_matches(tour, match_date, bankroll, kelly_fraction)
 
