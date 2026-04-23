@@ -126,9 +126,13 @@ def _player_stats(profiles, name: str, surface: str) -> dict:
     form_str = profile.get('form_last5')
     if form_str and isinstance(form_str, str) and form_str.strip():
         form = [c.strip() for c in form_str.split(',') if c.strip() in ('W', 'L')]
-        form = form or _form_dots(wr5, streak)
     else:
-        form = _form_dots(wr5, streak)
+        form = []
+    if not form:
+        form = _form_dots(wr5, streak) or []
+    # Toujours 5 tuiles — compléter à gauche avec 'U' (unknown) si données insuffisantes
+    if 0 < len(form) < 5:
+        form = ['U'] * (5 - len(form)) + form
 
     return {
         'rank':       rank_int,

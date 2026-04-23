@@ -404,6 +404,7 @@ body {
 
 .form-dot.W { background: var(--green); }
 .form-dot.L { background: var(--red); }
+.form-dot.U { background: var(--border); opacity: 0.5; }
 
 /* Probability number */
 .prob-number {
