@@ -64,18 +64,18 @@
     </div>
     <div class="card-badges">
       {% if badge == 'value' %}
-        <span class="badge badge-value tip tip-down" data-tip="Edge ≥12% sur les cotes Pinnacle — mise recommandée">VALUE BET</span>
+        <span class="badge badge-value tip tip-down tip-left" data-tip="Edge ≥12% sur les cotes Pinnacle — mise recommandée">VALUE BET</span>
       {% elif badge == 'edge' %}
-        <span class="badge badge-edge tip tip-down" data-tip="Edge modéré (6–12%) — signal positif, miser prudemment">EDGE</span>
+        <span class="badge badge-edge tip tip-down tip-left" data-tip="Edge modéré (6–12%) — signal positif, miser prudemment">EDGE</span>
       {% else %}
-        <span class="badge badge-neutral tip tip-down" data-tip="Pas d'avantage statistique détecté — match à éviter">NEUTRE</span>
+        <span class="badge badge-neutral tip tip-down tip-left" data-tip="Pas d'avantage statistique détecté — match à éviter">NEUTRE</span>
       {% endif %}
       {% if dq == 'high' %}
-        <span class="badge badge-quality-high tip tip-down" data-tip="Données solides : profil récent complet, prédiction fiable">● HIGH</span>
+        <span class="badge badge-quality-high tip tip-down tip-left" data-tip="Données solides : profil récent complet, prédiction fiable">● HIGH</span>
       {% elif dq == 'medium' %}
-        <span class="badge badge-quality-med tip tip-down" data-tip="Données partielles : peu de matchs récents, seuils relevés">● MED</span>
+        <span class="badge badge-quality-med tip tip-down tip-left" data-tip="Données partielles : peu de matchs récents, seuils relevés">● MED</span>
       {% else %}
-        <span class="badge badge-quality-low tip tip-down" data-tip="Données insuffisantes : ELO uniquement, précision réduite">● LOW</span>
+        <span class="badge badge-quality-low tip tip-down tip-left" data-tip="Données insuffisantes : ELO uniquement, précision réduite">● LOW</span>
       {% endif %}
     </div>
   </div>
