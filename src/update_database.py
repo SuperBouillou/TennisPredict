@@ -321,8 +321,9 @@ def update_player_profiles(df_new: pd.DataFrame,
             )
 
         # Rang depuis le dernier match (victoire OU défaite, selon le plus récent)
-        last_w = df[w_mask].sort_values('tourney_date')
-        last_l = df[l_mask].sort_values('tourney_date')
+        # On filtre sur les matchs ayant une donnée de rang (les matchs ESPN n'en ont pas)
+        last_w = df[w_mask & df['winner_rank'].notna()].sort_values('tourney_date')
+        last_l = df[l_mask & df['loser_rank'].notna()].sort_values('tourney_date')
 
         rank = np.nan
         rank_pts = np.nan
