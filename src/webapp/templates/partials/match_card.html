@@ -64,18 +64,18 @@
     </div>
     <div class="card-badges">
       {% if badge == 'value' %}
-        <span class="badge badge-value">VALUE BET</span>
+        <span class="badge badge-value tip tip-down" data-tip="Edge ≥12% sur les cotes Pinnacle — mise recommandée">VALUE BET</span>
       {% elif badge == 'edge' %}
-        <span class="badge badge-edge">EDGE</span>
+        <span class="badge badge-edge tip tip-down" data-tip="Edge modéré (6–12%) — signal positif, miser prudemment">EDGE</span>
       {% else %}
-        <span class="badge badge-neutral">NEUTRE</span>
+        <span class="badge badge-neutral tip tip-down" data-tip="Pas d'avantage statistique détecté — match à éviter">NEUTRE</span>
       {% endif %}
       {% if dq == 'high' %}
-        <span class="badge badge-quality-high">● HIGH</span>
+        <span class="badge badge-quality-high tip tip-down" data-tip="Données solides : profil récent complet, prédiction fiable">● HIGH</span>
       {% elif dq == 'medium' %}
-        <span class="badge badge-quality-med">● MED</span>
+        <span class="badge badge-quality-med tip tip-down" data-tip="Données partielles : peu de matchs récents, seuils relevés">● MED</span>
       {% else %}
-        <span class="badge badge-quality-low">● LOW</span>
+        <span class="badge badge-quality-low tip tip-down" data-tip="Données insuffisantes : ELO uniquement, précision réduite">● LOW</span>
       {% endif %}
     </div>
   </div>
@@ -86,11 +86,11 @@
       <div class="player-name" style="cursor:pointer" onclick="event.stopPropagation();window.location='/joueurs/'+encodeURIComponent(this.closest('.match-card').dataset.p1)+'?tour='+this.closest('.match-card').dataset.tour">{{ m.get('p1_name','?') }}</div>
       <div class="player-chips">
         {% if m.get('p1_rank') %}<span class="player-chip player-chip-rank">#{{ m.p1_rank }}</span>{% endif %}
-        {% if m.get('p1_surf_pct') is not none %}<span class="player-chip">{{ m.p1_surf_pct }}% surf</span>{% endif %}
-        {% if m.get('p1_days_since') is not none and m.p1_days_since > 10 %}<span class="player-chip player-chip-rest">{{ m.p1_days_since }}j</span>{% endif %}
+        {% if m.get('p1_surf_pct') is not none %}<span class="player-chip tip" data-tip="Win rate sur {{ m.get('surface','cette surface') }}">{{ m.p1_surf_pct }}% {{ m.get('surface','surf') | lower }}</span>{% endif %}
+        {% if m.get('p1_days_since') is not none and m.p1_days_since > 10 %}<span class="player-chip player-chip-rest tip" data-tip="Jours depuis le dernier match">{{ m.p1_days_since }}j</span>{% endif %}
       </div>
       {% if m.get('p1_form') %}
-      <div class="form-dots">
+      <div class="form-dots tip" data-tip="5 derniers matchs · vert = victoire · rouge = défaite · gris = inconnu">
         {% for dot in m.p1_form %}
         <span class="form-dot {{ dot }}"></span>
         {% endfor %}
@@ -120,19 +120,22 @@
     <div class="card-vs" onclick="openModal(this.closest('.match-card'))">
       <span class="vs-label">VS</span>
       {% if m.get('h2h_total') %}
-      <span class="vs-h2h">{{ m.h2h_p1_wins }}<br>—<br>{{ m.h2h_p2_wins }}</span>
+      <span class="vs-h2h tip" data-tip="Face-à-face historique ({{ m.h2h_total }} matchs)">
+        <span style="font-size:8px;color:var(--muted);letter-spacing:.04em">H2H</span><br>
+        {{ m.h2h_p1_wins }}–{{ m.h2h_p2_wins }}
+      </span>
       {% endif %}
     </div>
     <!-- P2 -->
     <div class="player-side right">
       <div class="player-name" style="cursor:pointer" onclick="event.stopPropagation();window.location='/joueurs/'+encodeURIComponent(this.closest('.match-card').dataset.p2)+'?tour='+this.closest('.match-card').dataset.tour">{{ m.get('p2_name','?') }}</div>
       <div class="player-chips">
-        {% if m.get('p2_days_since') is not none and m.p2_days_since > 10 %}<span class="player-chip player-chip-rest">{{ m.p2_days_since }}j</span>{% endif %}
-        {% if m.get('p2_surf_pct') is not none %}<span class="player-chip">{{ m.p2_surf_pct }}% surf</span>{% endif %}
+        {% if m.get('p2_days_since') is not none and m.p2_days_since > 10 %}<span class="player-chip player-chip-rest tip" data-tip="Jours depuis le dernier match">{{ m.p2_days_since }}j</span>{% endif %}
+        {% if m.get('p2_surf_pct') is not none %}<span class="player-chip tip" data-tip="Win rate sur {{ m.get('surface','cette surface') }}">{{ m.p2_surf_pct }}% {{ m.get('surface','surf') | lower }}</span>{% endif %}
         {% if m.get('p2_rank') %}<span class="player-chip player-chip-rank">#{{ m.p2_rank }}</span>{% endif %}
       </div>
       {% if m.get('p2_form') %}
-      <div class="form-dots">
+      <div class="form-dots tip" data-tip="5 derniers matchs · vert = victoire · rouge = défaite · gris = inconnu">
         {% for dot in m.p2_form %}
         <span class="form-dot {{ dot }}"></span>
         {% endfor %}

@@ -469,10 +469,11 @@ body {
 
 .vs-h2h {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--edge);
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 /* Bet button */
@@ -917,6 +918,44 @@ tr:hover td { background: rgba(19,25,32,.6); }
 .text-muted  { color: var(--muted); }
 .text-blue   { color: var(--blue); }
 .value-color { color: var(--value); }
+
+/* ─── TOOLTIPS ───────────────────────────────────────────────── */
+/* Usage: <span class="tip" data-tip="texte">…</span>            */
+/* .tip-down : bulle en dessous (pour éléments en haut de page)  */
+.tip { position: relative; cursor: help; }
+
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 5px 9px;
+  border-radius: 5px;
+  border: 1px solid var(--border2);
+  pointer-events: none;
+  opacity: 0;
+  white-space: normal;
+  text-align: center;
+  max-width: 200px;
+  width: max-content;
+  z-index: 9999;
+  transition: opacity 0.15s;
+  box-shadow: 0 4px 12px rgba(0,0,0,.4);
+}
+.tip:hover::after { opacity: 1; }
+
+/* Bulle en dessous (pour badges en haut de carte) */
+.tip-down::after {
+  bottom: auto;
+  top: calc(100% + 7px);
+}
 
 /* ─── BOTTOM NAV (mobile only, hidden on desktop) ────────────── */
 .bottom-nav { display: none; }
