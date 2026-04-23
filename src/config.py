@@ -34,8 +34,8 @@ TOUR_CONFIG = {
             'atp_rankings_00s.csv', 'atp_rankings_10s.csv',
             'atp_rankings_20s.csv', 'atp_rankings_current.csv',
         ],
-        'match_years'      : list(range(1968, 2026)),
-        'qual_chall_years' : list(range(1978, 2026)),
+        'match_years'      : list(range(1968, 2027)),
+        'qual_chall_years' : list(range(1978, 2027)),
 
         # Cotes tennis-data.co.uk
         'odds_filename'    : lambda year: f'atp_{year}.xlsx',
@@ -86,12 +86,12 @@ TOUR_CONFIG = {
             'wta_rankings_00s.csv', 'wta_rankings_10s.csv',
             'wta_rankings_20s.csv', 'wta_rankings_current.csv',
         ],
-        'match_years'      : list(range(1968, 2026)),
+        'match_years'      : list(range(1968, 2027)),
         'qual_chall_years' : [],   # pas de fichier séparé pour WTA
 
         # Cotes tennis-data.co.uk
         'odds_filename'    : lambda year: f'wta_{year}.xlsx',
-        'odds_url'         : lambda year: f'http://www.tennis-data.co.uk/{year}/{year}W.xlsx',
+        'odds_url'         : lambda year: f'http://www.tennis-data.co.uk/{year}w/{year}.xlsx',
 
         # ELO / Glicko — K-factors par niveau de tournoi
         # WTA levels: G=Grand Slam, PM=Premier Mandatory/WTA1000, P=Premier/WTA500,
