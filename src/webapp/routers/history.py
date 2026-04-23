@@ -1,0 +1,213 @@
+"""Router — Bet history."""
+from __future__ import annotations
+
+import csv
+import io
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+
+from fastapi import APIRouter, Request, Form, Query
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
+
+from src.webapp.db import get_bankroll, list_bets, resolve_bet, delete_bet, delete_resolved_bet, clear_bets, auto_resolve_pending
+
+router = APIRouter()
+templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
+
+
+_SRC = str(Path(__file__).resolve().parents[3] / 'src')
+
+
+def _state():
+    from src.webapp.main import APP_STATE
+    return APP_STATE
+
+
+def _try_auto_resolve(db) -> int:
+    """
+    Fetch ESPN results for the last 3 days and auto-resolve pending bets.
+    Returns total number of bets resolved across ATP + WTA.
+    """
+    if str(_SRC) not in sys.path:
+        sys.path.insert(0, _SRC)
+    try:
+        from espn_client import fetch_results  # noqa: PLC0415
+    except Exception:
+        return 0
+
+    today = date.today()
+    total = 0
+    for tour in ('atp', 'wta'):
+        all_results: list[dict] = []
+        for delta in (1, 2, 3):
+            target = today - timedelta(days=delta)
+            try:
+                all_results.extend(fetch_results(tour, target))
+            except Exception:
+                pass
+        if all_results:
+            total += auto_resolve_pending(db, tour, all_results)
+    return total
+
+
+def _compute_stats(bets: list[dict]) -> dict:
+    """Compute performance stats from a list of resolved bets."""
+    resolved = [b for b in bets if b['status'] != 'pending']
+    if not resolved:
+        return {"win_rate": None, "roi": None, "streak": 0, "streak_type": None,
+                "avg_odds": None, "total_staked": 0, "num_bets": 0, "num_won": 0}
+
+    num_won = sum(1 for b in resolved if b['status'] == 'won')
+    total_staked = sum(b['stake'] for b in resolved)
+    pnl = sum(b['pnl'] for b in resolved)
+    avg_odds = sum(b['odd'] for b in resolved) / len(resolved)
+
+    # Current streak — sort by resolved_at so the last resolved bet is first
+    by_resolved = sorted(resolved, key=lambda b: b.get('resolved_at') or '', reverse=True)
+    streak, streak_type = 0, None
+    for b in by_resolved:
+        if streak == 0:
+            streak_type = b['status']
+            streak = 1
+        elif b['status'] == streak_type:
+            streak += 1
+        else:
+            break
+
+    return {
+        "win_rate": round(num_won / len(resolved) * 100, 1),
+        "roi": round(pnl / total_staked * 100, 1) if total_staked > 0 else 0,
+        "streak": streak,
+        "streak_type": streak_type,
+        "avg_odds": round(avg_odds, 2),
+        "total_staked": round(total_staked, 2),
+        "num_bets": len(resolved),
+        "num_won": num_won,
+    }
+
+
+@router.get("/history", response_class=HTMLResponse)
+async def history_page(
+    request: Request,
+    tour: str | None = Query(default=None),  # None = all tours
+    surface: str | None = None,
+    status: str | None = None,
+    page: int = 1,
+):
+    db = _state()['db']
+
+    # Auto-resolve pending bets against ESPN results (last 3 days)
+    auto_resolved = _try_auto_resolve(db)
+
+    offset = (page - 1) * 20
+    all_bets = list_bets(db, tour=tour, surface=surface, status=status, limit=20, offset=offset)
+    pending  = [b for b in all_bets if b['status'] == 'pending']
+    resolved = [b for b in all_bets if b['status'] != 'pending']
+
+    # P&L + stats (all resolved bets, no limit)
+    all_resolved = list_bets(db, tour=tour, status=None, limit=5000)
+    pnl_total = sum(b['pnl'] for b in all_resolved if b['status'] != 'pending')
+    stats = _compute_stats(all_resolved)
+
+    return templates.TemplateResponse(request, "history.html", {
+        "active": "history",
+        "tour": tour,  # None = tous
+        "pending": pending, "resolved": resolved,
+        "bankroll": get_bankroll(db),
+        "pnl_total": round(pnl_total, 2),
+        "stats": stats,
+        "page": page,
+        "surface_filter": surface,
+        "status_filter": status,
+        "auto_resolved": auto_resolved,
+    })
+
+
+@router.post("/bets/{bet_id}/resolve", response_class=HTMLResponse)
+async def resolve(request: Request, bet_id: int, outcome: str = Form(...)):
+    db = _state()['db']
+    try:
+        resolve_bet(db, bet_id, outcome)
+    except ValueError as e:
+        return HTMLResponse(
+            f'<div class="card" style="color:var(--red)">{e}</div>',
+            status_code=400,
+        )
+    # HX-Refresh reloads the full page so stats bar, P&L, bankroll and chart all update
+    return HTMLResponse("", headers={"HX-Refresh": "true"})
+
+
+@router.post("/bets/{bet_id}/delete", response_class=HTMLResponse)
+async def delete(request: Request, bet_id: int):
+    db = _state()['db']
+    try:
+        delete_bet(db, bet_id)
+    except ValueError as e:
+        return HTMLResponse(
+            f'<div class="card" style="color:var(--red)">{e}</div>',
+            status_code=400,
+        )
+    return HTMLResponse("", headers={"HX-Refresh": "true"})
+
+
+@router.post("/bets/{bet_id}/delete-resolved", response_class=HTMLResponse)
+async def delete_resolved(request: Request, bet_id: int):
+    db = _state()['db']
+    try:
+        delete_resolved_bet(db, bet_id)
+    except ValueError as e:
+        return HTMLResponse(
+            f'<tr><td colspan="7" style="color:var(--red)">{e}</td></tr>',
+            status_code=400,
+        )
+    return HTMLResponse("", headers={"HX-Refresh": "true"})
+
+
+@router.post("/bets/clear", response_class=HTMLResponse)
+async def clear_history(request: Request, tour: str = Form("")):
+    db = _state()['db']
+    n = clear_bets(db, tour=tour or None)
+    return HTMLResponse(
+        f'<div class="card" style="color:var(--muted);text-align:center;padding:20px">'
+        f'{n} paris supprimés.</div>'
+    )
+
+
+@router.get("/history/pnl-data")
+async def pnl_data(tour: str | None = Query(default=None)):
+    """Return cumulative P&L time series for Chart.js equity curve."""
+    db = _state()['db']
+    if tour:
+        rows = db.execute(
+            "SELECT resolved_at, pnl FROM bets WHERE tour=? AND status!='pending' ORDER BY resolved_at",
+            (tour,),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT resolved_at, pnl FROM bets WHERE status!='pending' ORDER BY resolved_at",
+        ).fetchall()
+    cumul = 0.0
+    points = []
+    for r in rows:
+        cumul += r["pnl"]
+        points.append({"date": r["resolved_at"][:10], "pnl": round(cumul, 2)})
+    return JSONResponse({"points": points})
+
+
+@router.get("/history/export")
+async def export_csv(tour: str | None = Query(default=None)):
+    db = _state()['db']
+    bets = list_bets(db, tour=tour, limit=10000)
+    output = io.StringIO()
+    if bets:
+        writer = csv.DictWriter(output, fieldnames=bets[0].keys())
+        writer.writeheader()
+        writer.writerows(bets)
+    filename = f"bets_{tour or 'all'}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

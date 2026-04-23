@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ p.player_name }} — TennisPredict{% endblock %}
+{% block page_title %}{{ p.player_name }}{% endblock %}
+{% block page_meta %}
+  {% if p.get('ioc') %}{{ p.ioc }}{% endif %}
+  {% if p.get('rank') %} · #{{ p.rank | int }}{% endif %}
+{% endblock %}
+
+{% block topbar_right %}
+<a href="/joueurs?tour={{ tour }}">
+  <button class="btn btn-sm" style="background:var(--surface);color:var(--text);border:1px solid var(--border)">
+    ← Retour
+  </button>
+</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Identity card -->
+<div class="card" style="margin-bottom:10px">
+  <div class="grid-3">
+    <div>
+      <div class="kpi-value">#{{ p.get('rank', '—') }}</div>
+      <div class="kpi-label">Classement</div>
+    </div>
+    <div>
+      <div class="kpi-value">{{ p.get('elo', 0) | int }}</div>
+      <div class="kpi-label">ELO Global</div>
+    </div>
+    <div>
+      <div class="kpi-value">{{ p.get('hand', '—') or '—' }}</div>
+      <div class="kpi-label">Main</div>
+    </div>
+  </div>
+</div>
+
+<!-- ELO by surface -->
+<div class="section-label">ELO par surface</div>
+<div class="card" style="margin-bottom:10px">
+  <div style="display:flex;flex-direction:column;gap:10px">
+    {% set surfaces = [('Hard', p.get('elo_Hard', 0) or 0), ('Clay', p.get('elo_Clay', 0) or 0), ('Grass', p.get('elo_Grass', 0) or 0)] %}
+    {% set max_elo = [p.get('elo_Hard', 1) or 1, p.get('elo_Clay', 1) or 1, p.get('elo_Grass', 1) or 1] | max %}
+    {% for surf, val in surfaces %}
+    <div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12px">{{ surf }}</span>
+        <span style="font-size:12px;color:var(--blue)">{{ val | int }}</span>
+      </div>
+      <div style="background:var(--border);border-radius:4px;height:6px">
+        <div style="background:var(--blue);height:6px;border-radius:4px;width:{{ [(val / max_elo * 100) | int, 0] | max }}%"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Forme récente -->
+<div class="section-label">Forme récente (win rate)</div>
+<div class="grid-3" style="margin-bottom:10px">
+  {% for label, key in [('5 matchs', 'winrate_5'), ('10 matchs', 'winrate_10'), ('20 matchs', 'winrate_20')] %}
+  <div class="kpi-card">
+    <div class="kpi-value {% if (p.get(key) or 0) >= 0.6 %}text-green{% elif (p.get(key) or 0) >= 0.4 %}text-orange{% else %}text-red{% endif %}">
+      {{ ((p.get(key) or 0) * 100) | int }}%
+    </div>
+    <div class="kpi-label">{{ label }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Fatigue & points -->
+<div class="grid-3">
+  <div class="kpi-card">
+    <div class="kpi-value">{{ p.get('rank_points', 0) | int }}</div>
+    <div class="kpi-label">Points ATP/WTA</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ p.get('matches_7d', 0) | int }}</div>
+    <div class="kpi-label">Matchs (7j)</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value {% if (p.get('streak', 0) or 0) > 0 %}text-green{% elif (p.get('streak', 0) or 0) < 0 %}text-red{% endif %}">
+      {% if (p.get('streak', 0) or 0) > 0 %}+{% endif %}{{ p.get('streak', 0) | int }}
+    </div>
+    <div class="kpi-label">Série en cours</div>
+  </div>
+</div>
+
+{% endblock %}

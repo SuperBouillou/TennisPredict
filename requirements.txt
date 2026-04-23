@@ -9,7 +9,14 @@ pyarrow==15.0.0
 jupyterlab==4.1.0
 requests==2.31.0
 tqdm==4.66.0
-streamlit==1.55.0
 openpyxl==3.1.5
 optuna==3.6.2
 python-dotenv>=1.0.0
+# Webapp (FastAPI + HTMX)
+fastapi>=0.135.1
+uvicorn[standard]>=0.42.0
+python-multipart>=0.0.22
+httpx>=0.28.1
+itsdangerous>=2.2.0
+bcrypt>=4.2.0
+slowapi>=0.1.9

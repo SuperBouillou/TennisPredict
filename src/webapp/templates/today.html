@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Matchs du jour — TennisPredict{% endblock %}
+{% block page_title %}
+  {% if page_mode == 'hier' %}Résultats d'hier{% elif page_mode == 'demain' %}Matchs de demain{% else %}Matchs du jour{% endif %}
+{% endblock %}
+{% block page_meta %}{{ match_date }} · {% if page_mode == 'hier' %}{{ match_count }} résultat(s){% elif page_mode == 'demain' %}{{ match_count }} match(s) prévu(s){% else %}{{ match_count }} match(s){% endif %}{% endblock %}
+
+{% block topbar_right %}
+<div style="display:flex;align-items:center;gap:8px">
+  <!-- Hier / Aujourd'hui / Demain -->
+  <div class="toggle-group">
+    <a href="/today?tour={{ tour }}&match_date={{ yesterday }}" style="text-decoration:none">
+      <button class="toggle-btn {% if page_mode=='hier' %}active{% endif %}">Hier</button>
+    </a>
+    <a href="/today?tour={{ tour }}" style="text-decoration:none">
+      <button class="toggle-btn {% if page_mode=='today' %}active{% endif %}">Aujourd'hui</button>
+    </a>
+    <a href="/today?tour={{ tour }}&match_date={{ tomorrow }}" style="text-decoration:none">
+      <button class="toggle-btn {% if page_mode=='demain' %}active{% endif %}">Demain</button>
+    </a>
+  </div>
+  <!-- ATP/WTA toggle -->
+  <div class="toggle-group">
+    <a href="/today?tour=atp&match_date={{ match_date }}" style="text-decoration:none">
+      <button class="toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</button>
+    </a>
+    <a href="/today?tour=wta&match_date={{ match_date }}" style="text-decoration:none">
+      <button class="toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</button>
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if page_mode != 'hier' %}
+<div class="filter-bar">
+  <button class="filter-chip active" onclick="setFilter('all',this)">Tous</button>
+  <button class="filter-chip" onclick="setFilter('value',this)" style="border-color:rgba(34,197,94,.4);color:var(--green)">VALUE BET</button>
+  <button class="filter-chip" onclick="setFilter('edge',this)">Edge modéré</button>
+  <button class="filter-chip" onclick="setFilter('neutral',this)">Neutres</button>
+</div>
+{% endif %}
+<div id="match-list">
+  {% include "partials/match_card.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if page_mode == 'hier' %}
+<div class="bankroll-bar">
+  <div class="bankroll-group">
+    <div class="bankroll-label">Résultats ESPN</div>
+    <span style="font-size:11px;color:var(--muted)">{{ match_date }}</span>
+  </div>
+</div>
+{% endif %}
+<script>
+// Recalculate Kelly stakes when bankroll is updated
+document.body.addEventListener('htmx:afterSwap', function(e) {
+  if (e.detail.target && e.detail.target.id === 'bankroll-global') {
+    const bkEl = document.querySelector('#bankroll-global strong');
+    if (!bkEl) return;
+    const bk = parseFloat(bkEl.textContent.replace('€', '').trim());
+    if (!bk || isNaN(bk)) return;
+    document.querySelectorAll('.kelly-eur').forEach(function(el) {
+      var frac = parseFloat(el.dataset.frac) || 0;
+      if (frac > 0) el.textContent = (frac * bk).toFixed(2);
+    });
+    document.querySelectorAll('input.kelly-stake').forEach(function(el) {
+      var frac = parseFloat(el.dataset.frac) || 0;
+      if (frac > 0) el.value = (frac * bk).toFixed(2);
+    });
+  }
+});
+
+let _activeFilter = 'all';
+function setFilter(f, btn) {
+  _activeFilter = f;
+  document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active','value-active'));
+  btn.classList.add(f === 'value' ? 'value-active' : 'active');
+  document.querySelectorAll('.match-card').forEach(card => {
+    card.style.display = (f === 'all' || card.dataset.badge === f) ? '' : 'none';
+  });
+}
+
+function toggleBetForm(btn, side) {
+  const card = btn.closest('.match-card');
+  // Close any open bet forms in this card first
+  card.querySelectorAll('.bet-form').forEach(f => f.style.display = 'none');
+  const form = btn.nextElementSibling;
+  form.style.display = form.style.display === 'none' ? '' : 'none';
+  if (form.style.display !== 'none') {
+    form.querySelector('input[name="stake"]')?.focus();
+  }
+}
+
+function openPrediction(el) {
+  const p = new URLSearchParams({
+    tour:       el.dataset.tour,
+    p1_name:    el.dataset.p1,
+    p2_name:    el.dataset.p2,
+    tournament: el.dataset.tournament,
+    surface:    el.dataset.surface,
+    round:      el.dataset.round,
+    best_of:    el.dataset.bestOf,
+  });
+  if (el.dataset.oddP1) p.append('odd_p1', el.dataset.oddP1);
+  if (el.dataset.oddP2) p.append('odd_p2', el.dataset.oddP2);
+  htmx.ajax('GET', '/today/match-detail?' + p.toString(), {
+    target: '#modal-content',
+    swap: 'innerHTML',
+  }).then(() => {
+    document.getElementById('modal-overlay').style.display = 'block';
+  });
+}
+</script>
+{% if page_mode != 'hier' %}
+<div class="bankroll-bar">
+  <!-- Cotes Pinnacle -->
+  <div class="bankroll-group">
+    <div class="bankroll-label">Cotes</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span id="odds-status" style="font-size:11px;{% if odds_fetched_at %}color:var(--green){% else %}color:var(--muted){% endif %}">
+        {% if odds_fetched_at %}Pinnacle · {{ odds_fetched_at[11:16] }}{% else %}Indisponible{% endif %}
+      </span>
+      <button class="btn btn-sm bankroll-btn"
+              hx-post="/today/refresh-odds?tour={{ tour }}"
+              hx-target="#match-list" hx-swap="innerHTML">↻</button>
+    </div>
+  </div>
+  <div class="bankroll-sep"></div>
+  <!-- Sync données -->
+  <div class="bankroll-group" style="margin-left:auto">
+    <div class="bankroll-label">Données</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      {% if ranking_updated_at %}
+      <span style="font-size:11px;color:var(--muted)" title="Classements mis à jour le {{ ranking_updated_at }}">
+        {{ ranking_updated_at[5:10] | replace('-', '/') }}
+      </span>
+      {% endif %}
+      <span id="sync-status"
+            hx-get="/sync/status?tour={{ tour }}"
+            hx-trigger="every 5s"
+            hx-swap="outerHTML"
+            style="font-size:11px;color:var(--muted)">{{ sync_status }}</span>
+      <button class="btn btn-sm bankroll-btn"
+              hx-post="/sync?tour={{ tour }}"
+              hx-target="#sync-status" hx-swap="innerHTML">↻</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

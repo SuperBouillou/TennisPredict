@@ -189,7 +189,7 @@ def _fetch_day(tour: str, date_str: str, session: requests.Session) -> list[dict
     return matches
 
 
-def fetch_recent(tour: str, days: int = 14) -> pd.DataFrame:
+def fetch_recent(tour: str, days: int = 30) -> pd.DataFrame:
     """
     Fetche les matchs ESPN des `days` derniers jours pour ATP ou WTA.
 
@@ -198,7 +198,7 @@ def fetch_recent(tour: str, days: int = 14) -> pd.DataFrame:
 
     Args:
         tour: 'atp' ou 'wta'
-        days: fenetre en jours (defaut: 14)
+        days: fenetre en jours (defaut: 30)
 
     Returns:
         DataFrame au format Sackmann-compatible, deduplique, filtre sur la periode.
@@ -240,6 +240,103 @@ def fetch_recent(tour: str, days: int = 14) -> pd.DataFrame:
         print(f"    ESPN {tour.upper()}: {len(df)} matchs uniques "
               f"({df['tourney_date'].min().date()} -> {df['tourney_date'].max().date()})")
     return df
+
+
+def _extract_score(competitors: list[dict]) -> str:
+    """Reconstruit le score depuis les linescores ESPN (ex: '6-3 7-5')."""
+    if len(competitors) != 2:
+        return ""
+    ls1 = competitors[0].get("linescores", [])
+    ls2 = competitors[1].get("linescores", [])
+    if not ls1 or not ls2:
+        return ""
+    sets = []
+    for s1, s2 in zip(ls1, ls2):
+        v1 = int(s1.get("value", 0))
+        v2 = int(s2.get("value", 0))
+        sets.append(f"{v1}-{v2}")
+    return " ".join(sets)
+
+
+def fetch_results(tour: str, target_date: date | None = None) -> list[dict]:
+    """
+    Retourne les matchs TERMINÉS (state=post) pour un tour et une date.
+    Inclut winner_name, loser_name et score reconstitué depuis les linescores.
+    """
+    if target_date is None:
+        target_date = date.today() - timedelta(days=1)
+
+    target_slug = _SINGLES_SLUG[tour]
+    date_str = target_date.strftime("%Y%m%d")
+    url = SCOREBOARD_URL.format(tour=tour)
+
+    session = requests.Session()
+    session.headers.update(_HEADERS)
+
+    try:
+        r = session.get(url, params={"dates": date_str}, timeout=15)
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        print(f"  ESPN results {tour} {date_str}: erreur {e}")
+        return []
+
+    matches = []
+    for event in data.get("events", []):
+        tourney_name = event.get("name", "Unknown")
+        surface = _surface(tourney_name)
+        level   = _level(tourney_name)
+
+        for grouping in event.get("groupings", []):
+            if grouping.get("grouping", {}).get("slug", "") != target_slug:
+                continue
+
+            for comp in grouping.get("competitions", []):
+                state = comp.get("status", {}).get("type", {}).get("state", "")
+                if state != "post":
+                    continue
+
+                # Filtrer par date réelle du match (startDate)
+                start_raw = comp.get("startDate", "")
+                try:
+                    match_date = pd.Timestamp(start_raw).tz_convert(None).normalize().date()
+                    if match_date != target_date:
+                        continue
+                except Exception:
+                    pass  # si pas de date, on garde quand même
+
+                competitors = comp.get("competitors", [])
+                if len(competitors) != 2:
+                    continue
+
+                winner_c = next((c for c in competitors if c.get("winner")), None)
+                loser_c  = next((c for c in competitors if not c.get("winner")), None)
+                if not winner_c or not loser_c:
+                    continue
+
+                winner_name = winner_c.get("athlete", {}).get("displayName", "").strip()
+                loser_name  = loser_c.get("athlete",  {}).get("displayName", "").strip()
+                if not winner_name or not loser_name:
+                    continue
+
+                # Score: depuis la perspective winner-loser
+                score = _extract_score([winner_c, loser_c])
+                round_str = comp.get("round", {}).get("displayName", "")
+
+                matches.append({
+                    "p1_name":      winner_name,
+                    "p2_name":      loser_name,
+                    "winner_name":  winner_name,
+                    "score":        score,
+                    "tournament":   tourney_name,
+                    "surface":      surface,
+                    "level":        level,
+                    "round":        round_str,
+                    "best_of":      _best_of(level, round_str),
+                    "state":        "post",
+                })
+
+    return matches
 
 
 def fetch_scheduled(tour: str, target_date: date | None = None) -> list[dict]:
@@ -299,14 +396,20 @@ def fetch_scheduled(tour: str, target_date: date | None = None) -> list[dict]:
                 p2_name = p2_c.get("athlete", {}).get("displayName", "").strip()
                 if not p1_name or not p2_name:
                     continue
+                # Skip matches where the opponent is TBD (not yet determined)
+                if p1_name.upper() == "TBD" or p2_name.upper() == "TBD":
+                    continue
 
                 round_str = comp.get("round", {}).get("displayName", "")
 
-                # Heure estimee du match
+                # Heure du match en heure de Paris
                 start_raw = comp.get("startDate", "")
                 try:
                     start_time = pd.Timestamp(start_raw).tz_convert("Europe/Paris")
                     time_str = start_time.strftime("%H:%M")
+                    # Exclure les matchs dont la date locale (Paris) ne correspond pas
+                    if start_time.date() != target_date:
+                        continue
                 except Exception:
                     time_str = ""
 

@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "TennisPredict WebApp",
+      "runtimeExecutable": "venv/Scripts/python",
+      "runtimeArgs": ["-m", "uvicorn", "src.webapp.main:app", "--port", "8000", "--reload"],
+      "port": 8000
+    },
+    {
+      "name": "Streamlit Dashboard",
+      "runtimeExecutable": "venv/Scripts/python",
+      "runtimeArgs": ["-m", "streamlit", "run", "src/dashboard.py", "--server.port", "8501"],
+      "port": 8501
+    },
+    {
+      "name": "JupyterLab",
+      "runtimeExecutable": "venv/Scripts/python",
+      "runtimeArgs": ["-m", "jupyterlab", "--port", "8888", "--no-browser"],
+      "port": 8888
+    }
+  ]
+}

@@ -9,6 +9,7 @@ Chaque script du pipeline charge ses chemins et paramètres via :
 """
 
 import pandas as pd
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -162,3 +163,11 @@ def make_dirs(tour: str) -> None:
     for key, path in paths.items():
         if key != 'root':
             path.mkdir(parents=True, exist_ok=True)
+
+
+def _file_age_hours(path: Path) -> float:
+    """Retourne l'âge du fichier en heures, ou inf s'il n'existe pas."""
+    if not path.exists():
+        return float("inf")
+    mtime = datetime.fromtimestamp(path.stat().st_mtime)
+    return (datetime.now() - mtime).total_seconds() / 3600
