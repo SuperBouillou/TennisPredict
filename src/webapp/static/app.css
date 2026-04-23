@@ -487,11 +487,11 @@ body {
   cursor: pointer;
   transition: background 0.12s;
   letter-spacing: 0.03em;
-  align-self: flex-start;  /* natural width, left-anchored */
+  width: fit-content;      /* natural width, not stretched */
   margin-top: auto;        /* push to bottom of column */
 }
 .player-side.right .btn-bet {
-  align-self: flex-end;    /* natural width, right-anchored */
+  align-self: flex-end;    /* right-anchored */
 }
 
 .btn-bet:hover { background: rgba(61,220,132,.2); }
