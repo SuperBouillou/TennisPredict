@@ -105,7 +105,7 @@
         {% if m.get('odd_p1') %}
           <div class="prob-odd">@{{ "%.2f"|format(m.odd_p1) }}</div>
         {% endif %}
-        {% if ep1 > 0 %}
+        {% if ep1 > 0 and badge != 'neutral' %}
           <div class="prob-edge">+{{ "%.1f"|format(ep1 * 100) }}% edge</div>
           {% if m.get('kelly_eur_p1') %}
             <div class="prob-kelly">Kelly <span class="kelly-eur" data-frac="{{ m.get('kelly_frac_p1', 0) }}">{{ m.kelly_eur_p1 }}</span>€</div>
@@ -175,7 +175,7 @@
         {% if m.get('odd_p2') %}
           <div class="prob-odd">@{{ "%.2f"|format(m.odd_p2) }}</div>
         {% endif %}
-        {% if ep2 > 0 %}
+        {% if ep2 > 0 and badge != 'neutral' %}
           <div class="prob-edge">+{{ "%.1f"|format(ep2 * 100) }}% edge</div>
           {% if m.get('kelly_eur_p2') %}
             <div class="prob-kelly">Kelly <span class="kelly-eur" data-frac="{{ m.get('kelly_frac_p2', 0) }}">{{ m.kelly_eur_p2 }}</span>€</div>

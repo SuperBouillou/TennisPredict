@@ -79,7 +79,7 @@ def _rank_adjusted_elo(elo: float, rank: float | None) -> float:
         return elo
     elo_from_rank = max(1200.0, 2100.0 - 4.0 * float(rank))
     gap = elo - elo_from_rank
-    if abs(gap) > 100:
+    if abs(gap) > 50:
         return 0.5 * elo + 0.5 * elo_from_rank
     return elo
 
@@ -326,6 +326,14 @@ def predict(
 
         cal_prob = elo_w * elo_prob + (1 - elo_w) * xgb_prob
         cal_prob = max(0.01, min(0.99, cal_prob))
+
+    # Market odds cap: si le marché donne <15% à un joueur (cote >~6.7),
+    # le modèle ne peut pas lui donner plus de 2.5x la probabilité implicite du marché.
+    # Évite les edges aberrants sur les gros outsiders (ex: @19 → max ~13% au lieu de 36%).
+    if odd_p1 is not None and odd_p1 > 1.0 and odd_p2 is not None and odd_p2 > 1.0:
+        mkt_p1 = 1.0 / odd_p1
+        if mkt_p1 < 0.15:
+            cal_prob = min(cal_prob, mkt_p1 * 2.5)
 
     prob_p2 = 1 - cal_prob
 
