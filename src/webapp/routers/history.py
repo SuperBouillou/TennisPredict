@@ -127,22 +127,19 @@ async def history_page(
     tour: str | None = Query(default=None),  # None = all tours
     surface: str | None = None,
     status: str | None = None,
-    page: int = 1,
 ):
     db = _state()['db']
 
     # Auto-resolve pending bets against ESPN results (last 3 days)
     auto_resolved = _try_auto_resolve(db)
 
-    offset = (page - 1) * 20
-    all_bets = list_bets(db, tour=tour, surface=surface, status=status, limit=20, offset=offset)
+    # Fetch all bets — no pagination, history is small enough to show in full
+    all_bets = list_bets(db, tour=tour, surface=surface, status=status, limit=5000)
     pending  = [b for b in all_bets if b['status'] == 'pending']
     resolved = [b for b in all_bets if b['status'] != 'pending']
 
-    # P&L + stats (all resolved bets, no limit)
-    all_resolved = list_bets(db, tour=tour, status=None, limit=5000)
-    pnl_total = sum(b['pnl'] for b in all_resolved if b['status'] != 'pending')
-    stats = _compute_stats(all_resolved)
+    pnl_total = sum(b['pnl'] for b in resolved)
+    stats = _compute_stats(all_bets)
 
     return templates.TemplateResponse(request, "history.html", {
         "active": "history",
@@ -151,7 +148,6 @@ async def history_page(
         "bankroll": get_bankroll(db),
         "pnl_total": round(pnl_total, 2),
         "stats": stats,
-        "page": page,
         "surface_filter": surface,
         "status_filter": status,
         "auto_resolved": auto_resolved,
