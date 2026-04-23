@@ -52,12 +52,26 @@ def _try_auto_resolve(db) -> int:
     return total
 
 
+def _badge_from_edge(edge) -> str:
+    """Approximate badge tier from stored edge value."""
+    try:
+        e = float(edge) if edge else 0.0
+    except (TypeError, ValueError):
+        e = 0.0
+    if e >= 0.10:
+        return 'value'
+    if e >= 0.05:
+        return 'edge'
+    return 'neutral'
+
+
 def _compute_stats(bets: list[dict]) -> dict:
     """Compute performance stats from a list of resolved bets."""
     resolved = [b for b in bets if b['status'] != 'pending']
     if not resolved:
         return {"win_rate": None, "roi": None, "streak": 0, "streak_type": None,
-                "avg_odds": None, "total_staked": 0, "num_bets": 0, "num_won": 0}
+                "avg_odds": None, "total_staked": 0, "num_bets": 0, "num_won": 0,
+                "badge_stats": {}}
 
     num_won = sum(1 for b in resolved if b['status'] == 'won')
     total_staked = sum(b['stake'] for b in resolved)
@@ -76,6 +90,24 @@ def _compute_stats(bets: list[dict]) -> dict:
         else:
             break
 
+    # Badge breakdown (approximate, based on stored edge)
+    badge_stats: dict[str, dict] = {
+        'value':   {'total': 0, 'won': 0, 'pnl': 0.0},
+        'edge':    {'total': 0, 'won': 0, 'pnl': 0.0},
+        'neutral': {'total': 0, 'won': 0, 'pnl': 0.0},
+    }
+    for b in resolved:
+        bg = _badge_from_edge(b.get('edge'))
+        badge_stats[bg]['total'] += 1
+        badge_stats[bg]['pnl'] += b.get('pnl', 0.0)
+        if b['status'] == 'won':
+            badge_stats[bg]['won'] += 1
+    for label, g in badge_stats.items():
+        g['win_rate'] = round(g['won'] / g['total'] * 100) if g['total'] else 0
+        staked = sum(b['stake'] for b in resolved if _badge_from_edge(b.get('edge')) == label)
+        g['roi'] = round(g['pnl'] / staked * 100, 1) if staked > 0 else 0
+        g['pnl'] = round(g['pnl'], 2)
+
     return {
         "win_rate": round(num_won / len(resolved) * 100, 1),
         "roi": round(pnl / total_staked * 100, 1) if total_staked > 0 else 0,
@@ -85,6 +117,7 @@ def _compute_stats(bets: list[dict]) -> dict:
         "total_staked": round(total_staked, 2),
         "num_bets": len(resolved),
         "num_won": num_won,
+        "badge_stats": badge_stats,
     }
 
 

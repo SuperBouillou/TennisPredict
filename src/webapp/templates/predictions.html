@@ -72,7 +72,7 @@
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label">Tour</label>
+      <label class="form-label">Round</label>
       <select class="form-select" name="round">
         {% for r in rounds %}
           <option value="{{ r }}" {% if prefill and prefill.round == r %}selected{% endif %}>{{ r }}</option>

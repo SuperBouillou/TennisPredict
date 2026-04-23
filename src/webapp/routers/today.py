@@ -446,8 +446,15 @@ async def today_page(request: Request, tour: str = "atp",
         matches = _get_results(tour, match_date)
         matches = _enrich_with_predictions(matches, tour, bankroll, kelly_fraction)
         odds_fetched_at = None
+        ml_total = sum(1 for m in matches if m.get('prob_p1') is not None)
+        ml_correct = sum(1 for m in matches if m.get('prob_p1') is not None and m.get('prob_p1', 0) > 0.5)
+        ml_summary = {
+            'correct': ml_correct, 'total': ml_total,
+            'pct': round(ml_correct / ml_total * 100, 1) if ml_total else 0,
+        }
     else:
         matches, odds_fetched_at = _build_matches(tour, match_date, bankroll, kelly_fraction)
+        ml_summary = None
 
     # Read ranking freshness timestamp
     ranking_updated_at = _get_ranking_updated_at(tour)
@@ -465,6 +472,7 @@ async def today_page(request: Request, tour: str = "atp",
         "sync_status": state.get('sync_status', {}).get(tour, 'idle'),
         "odds_fetched_at": odds_fetched_at,
         "ranking_updated_at": ranking_updated_at,
+        "ml_summary": ml_summary,
     })
 
 

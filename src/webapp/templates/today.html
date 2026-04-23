@@ -39,6 +39,24 @@
   <button class="filter-chip" onclick="setFilter('edge',this)">Edge modéré</button>
   <button class="filter-chip" onclick="setFilter('neutral',this)">Neutres</button>
 </div>
+{% elif ml_summary and ml_summary.total > 0 %}
+{% set pct = ml_summary.pct %}
+<div class="card" style="margin-bottom:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
+     border-color:{% if pct >= 60 %}var(--green){% elif pct >= 50 %}var(--orange){% else %}var(--red){% endif %};
+     background:{% if pct >= 60 %}rgba(34,197,94,.06){% elif pct >= 50 %}rgba(249,115,22,.06){% else %}rgba(239,68,68,.06){% endif %}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font-size:18px">🎯</span>
+    <div>
+      <span style="font-weight:700;font-size:15px;color:{% if pct >= 60 %}var(--green){% elif pct >= 50 %}var(--orange){% else %}var(--red){% endif %}">
+        {{ ml_summary.correct }}/{{ ml_summary.total }} prédictions correctes
+      </span>
+      <span style="font-size:12px;color:var(--muted);margin-left:8px">{{ tour | upper }} · {{ match_date }}</span>
+    </div>
+  </div>
+  <div style="font-size:22px;font-weight:800;color:{% if pct >= 60 %}var(--green){% elif pct >= 50 %}var(--orange){% else %}var(--red){% endif %}">
+    {{ pct }}%
+  </div>
+</div>
 {% endif %}
 <div id="match-list">
   {% include "partials/match_card.html" %}
@@ -142,7 +160,7 @@ function openPrediction(el) {
             hx-get="/sync/status?tour={{ tour }}"
             hx-trigger="every 5s"
             hx-swap="outerHTML"
-            style="font-size:11px;color:var(--muted)">{{ sync_status }}</span>
+            style="font-size:11px;color:var(--muted)">{% if sync_status == 'idle' %}inactif{% else %}{{ sync_status }}{% endif %}</span>
       <button class="btn btn-sm bankroll-btn"
               hx-post="/sync?tour={{ tour }}"
               hx-target="#sync-status" hx-swap="innerHTML">↻</button>

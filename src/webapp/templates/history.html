@@ -96,6 +96,37 @@
 </div>
 {% endif %}
 
+<!-- Badge breakdown -->
+{% if stats.badge_stats %}
+{% set bs = stats.badge_stats %}
+{% set has_any = bs.value.total > 0 or bs.edge.total > 0 or bs.neutral.total > 0 %}
+{% if has_any %}
+<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+  {% if bs.value.total > 0 %}
+  <div class="card" style="flex:1;min-width:90px;padding:10px 12px;border-color:var(--green)">
+    <div style="font-size:9px;font-weight:700;color:var(--green);letter-spacing:.05em;margin-bottom:6px">VALUE BET</div>
+    <div style="font-size:20px;font-weight:800;color:{% if bs.value.win_rate >= 60 %}var(--green){% elif bs.value.win_rate >= 50 %}var(--orange){% else %}var(--red){% endif %}">{{ bs.value.win_rate }}%</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">{{ bs.value.won }}/{{ bs.value.total }} · ROI {% if bs.value.roi >= 0 %}+{% endif %}{{ bs.value.roi }}%</div>
+  </div>
+  {% endif %}
+  {% if bs.edge.total > 0 %}
+  <div class="card" style="flex:1;min-width:90px;padding:10px 12px;border-color:var(--orange)">
+    <div style="font-size:9px;font-weight:700;color:var(--orange);letter-spacing:.05em;margin-bottom:6px">EDGE</div>
+    <div style="font-size:20px;font-weight:800;color:{% if bs.edge.win_rate >= 60 %}var(--green){% elif bs.edge.win_rate >= 50 %}var(--orange){% else %}var(--red){% endif %}">{{ bs.edge.win_rate }}%</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">{{ bs.edge.won }}/{{ bs.edge.total }} · ROI {% if bs.edge.roi >= 0 %}+{% endif %}{{ bs.edge.roi }}%</div>
+  </div>
+  {% endif %}
+  {% if bs.neutral.total > 0 %}
+  <div class="card" style="flex:1;min-width:90px;padding:10px 12px">
+    <div style="font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.05em;margin-bottom:6px">NEUTRE</div>
+    <div style="font-size:20px;font-weight:800;color:{% if bs.neutral.win_rate >= 60 %}var(--green){% elif bs.neutral.win_rate >= 50 %}var(--orange){% else %}var(--red){% endif %}">{{ bs.neutral.win_rate }}%</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">{{ bs.neutral.won }}/{{ bs.neutral.total }} · ROI {% if bs.neutral.roi >= 0 %}+{% endif %}{{ bs.neutral.roi }}%</div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}
+
 <!-- P&L equity curve -->
 <div class="card" style="margin-bottom:8px;padding:12px" id="pnl-chart-card">
   <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
