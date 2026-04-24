@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.webapp import ml as ml_module
-from src.webapp.db import get_bankroll, get_setting, add_bet
+from src.webapp.db import get_bankroll, get_setting, add_bet, list_bets
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -144,6 +144,17 @@ async def run_prediction(
             '<div class="card" style="color:var(--red)">Modèle non disponible pour ce circuit.</div>'
         )
 
+    if odd_p1 is not None and odd_p1 < 1.01:
+        return HTMLResponse(
+            '<div class="card" style="color:var(--red)">Cote P1 invalide — minimum 1.01.</div>',
+            status_code=400,
+        )
+    if odd_p2 is not None and odd_p2 < 1.01:
+        return HTMLResponse(
+            '<div class="card" style="color:var(--red)">Cote P2 invalide — minimum 1.01.</div>',
+            status_code=400,
+        )
+
     result = ml_module.predict(
         artifacts,
         p1_name=p1_name, p2_name=p2_name,
@@ -183,6 +194,19 @@ async def quick_bet(
         return HTMLResponse(
             f'<span style="color:var(--red);font-size:12px">Mise invalide (bankroll: {bankroll:.2f}€)</span>'
         )
+    if odd < 1.01:
+        return HTMLResponse(
+            '<span style="color:var(--red);font-size:12px">Cote invalide (minimum 1.01)</span>',
+            status_code=400,
+        )
+    # Guard against duplicate pending bets on the same match/player
+    for b in list_bets(db, tour=tour, status='pending', limit=200):
+        if (b['bet_on'].lower().strip() == bet_on.lower().strip()
+                and b['p1_name'].lower().strip() == p1_name.lower().strip()
+                and b['p2_name'].lower().strip() == p2_name.lower().strip()):
+            return HTMLResponse(
+                f'<span style="color:var(--orange);font-size:12px">⚠ Pari déjà en attente pour {bet_on}</span>'
+            )
     add_bet(db, {
         'tour': tour, 'tournament': tournament, 'surface': surface,
         'round': round_, 'p1_name': p1_name, 'p2_name': p2_name,
@@ -224,6 +248,11 @@ async def save_bet(
     if stake <= 0 or stake > bankroll:
         return HTMLResponse(
             f'<div class="card" style="color:var(--red)">Mise invalide (bankroll: {bankroll:.2f}€)</div>'
+        )
+    if odd < 1.01:
+        return HTMLResponse(
+            '<div class="card" style="color:var(--red)">Cote invalide (minimum 1.01)</div>',
+            status_code=400,
         )
     add_bet(db, {
         'tour': tour, 'tournament': tournament, 'surface': surface,

@@ -29,32 +29,32 @@ def _app_state() -> dict:
     return APP_STATE
 
 
-def _get_today_matches(tour: str, match_date: str) -> list[dict]:
-    """Fetch scheduled matches from ESPN for given tour+date."""
+def _get_today_matches(tour: str, match_date: str) -> tuple[list[dict], bool]:
+    """Fetch scheduled matches from ESPN. Returns (matches, had_error)."""
     try:
         if str(_SRC) not in sys.path:
             sys.path.insert(0, _SRC)
         from espn_client import fetch_scheduled
         target = date.fromisoformat(match_date)
         matches = fetch_scheduled(tour, target)
-        return matches if matches else []
+        return (matches if matches else []), False
     except Exception as e:
-        print(f"[today] ESPN fetch error ({tour} {match_date}): {e}")
-        return []
+        logger.error("ESPN fetch error (%s %s): %s", tour, match_date, e)
+        return [], True
 
 
-def _get_results(tour: str, match_date: str) -> list[dict]:
-    """Fetch completed match results from ESPN for given tour+date."""
+def _get_results(tour: str, match_date: str) -> tuple[list[dict], bool]:
+    """Fetch completed match results from ESPN. Returns (matches, had_error)."""
     try:
         if str(_SRC) not in sys.path:
             sys.path.insert(0, _SRC)
         from espn_client import fetch_results
         target = date.fromisoformat(match_date)
         matches = fetch_results(tour, target)
-        return matches if matches else []
+        return (matches if matches else []), False
     except Exception as e:
-        print(f"[today] ESPN results fetch error ({tour} {match_date}): {e}")
-        return []
+        logger.error("ESPN results fetch error (%s %s): %s", tour, match_date, e)
+        return [], True
 
 
 def _get_odds(tour: str, match_date: str) -> tuple[dict, str | None]:
@@ -93,16 +93,16 @@ def _delete_odds_cache(tour: str) -> None:
         print(f"[today] Could not delete odds cache: {e}")
 
 
-def _build_matches(tour: str, match_date: str, bankroll: float, kelly_fraction: float = 0.25) -> tuple[list[dict], str | None]:
-    """Full pipeline: ESPN → odds merge → ML enrichment."""
+def _build_matches(tour: str, match_date: str, bankroll: float, kelly_fraction: float = 0.25) -> tuple[list[dict], str | None, bool]:
+    """Full pipeline: ESPN → odds merge → ML enrichment. Returns (matches, fetched_at, espn_error)."""
     sys.path.insert(0, _SRC)
-    matches = _get_today_matches(tour, match_date)
+    matches, espn_error = _get_today_matches(tour, match_date)
     odds, fetched_at = _get_odds(tour, match_date)
     if odds:
         from odds_api_client import merge_odds
         matches = merge_odds(matches, odds)
     matches = _enrich_with_predictions(matches, tour, bankroll, kelly_fraction)
-    return matches, fetched_at
+    return matches, fetched_at, espn_error
 
 
 def _player_stats(profiles, name: str, surface: str) -> dict:
@@ -471,7 +471,7 @@ async def today_page(request: Request, tour: str = "atp",
         pending_lookup[k2] = b
 
     if page_mode == "hier":
-        matches = _get_results(tour, match_date)
+        matches, espn_error = _get_results(tour, match_date)
         matches = _enrich_with_predictions(matches, tour, bankroll, kelly_fraction)
         odds_fetched_at = None
         ml_total = sum(1 for m in matches if m.get('prob_p1') is not None)
@@ -481,7 +481,7 @@ async def today_page(request: Request, tour: str = "atp",
             'pct': round(ml_correct / ml_total * 100, 1) if ml_total else 0,
         }
     else:
-        matches, odds_fetched_at = _build_matches(tour, match_date, bankroll, kelly_fraction)
+        matches, odds_fetched_at, espn_error = _build_matches(tour, match_date, bankroll, kelly_fraction)
         ml_summary = None
 
     # Read ranking freshness timestamp
@@ -504,6 +504,7 @@ async def today_page(request: Request, tour: str = "atp",
         "odds_fetched_at": odds_fetched_at,
         "ranking_updated_at": ranking_updated_at,
         "ml_summary": ml_summary,
+        "espn_error": espn_error,
     })
 
 
@@ -546,14 +547,15 @@ async def today_matches_partial(request: Request, tour: str = "atp",
         pending_lookup[f"{b['p2_name']}|{b['p1_name']}"] = b
 
     if page_mode == "hier":
-        matches = _get_results(tour, match_date)
+        matches, espn_error = _get_results(tour, match_date)
         matches = _enrich_with_predictions(matches, tour, bankroll, kelly_fraction)
     else:
-        matches, _ = _build_matches(tour, match_date, bankroll, kelly_fraction)
+        matches, _, espn_error = _build_matches(tour, match_date, bankroll, kelly_fraction)
 
     return templates.TemplateResponse(request, "partials/match_card.html", {
         "matches": matches, "tour": tour, "page_mode": page_mode,
         "pending_lookup": pending_lookup,
+        "espn_error": espn_error,
     })
 
 
@@ -565,7 +567,7 @@ async def refresh_odds(request: Request, tour: str = "atp"):
     bankroll = get_bankroll(db)
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
     match_date = date.today().isoformat()
-    matches, fetched_at = _build_matches(tour, match_date, bankroll, kelly_fraction)
+    matches, fetched_at, espn_error = _build_matches(tour, match_date, bankroll, kelly_fraction)
 
     pending_bets = list_bets(db, tour=tour, status='pending', limit=500)
     pending_lookup: dict = {}
@@ -582,6 +584,7 @@ async def refresh_odds(request: Request, tour: str = "atp"):
     )
     cards_html = templates.TemplateResponse(request, "partials/match_card.html", {
         "matches": matches, "tour": tour, "pending_lookup": pending_lookup,
+        "espn_error": espn_error,
     })
     body = cards_html.body.decode()
     return HTMLResponse(body + oob)

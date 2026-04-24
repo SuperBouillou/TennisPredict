@@ -50,7 +50,7 @@
         <span style="font-size:11px;color:var(--muted)">Kelly</span>
         <span style="font-size:13px;font-weight:700;color:var(--green)">{{ result.kelly_eur_p1 }}€</span>
       </div>
-      <form hx-post="/bets/quick" hx-target="this" hx-swap="outerHTML" style="display:flex;gap:6px" onclick="event.stopPropagation()">
+      <form hx-post="/bets/quick" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]" style="display:flex;gap:6px" onclick="event.stopPropagation()">
         <input type="hidden" name="tour"        value="{{ tour }}">
         <input type="hidden" name="p1_name"     value="{{ p1_name }}">
         <input type="hidden" name="p2_name"     value="{{ p2_name }}">
@@ -103,7 +103,7 @@
         <span style="font-size:11px;color:var(--muted)">Kelly</span>
         <span style="font-size:13px;font-weight:700;color:var(--green)">{{ result.kelly_eur_p2 }}€</span>
       </div>
-      <form hx-post="/bets/quick" hx-target="this" hx-swap="outerHTML" style="display:flex;gap:6px" onclick="event.stopPropagation()">
+      <form hx-post="/bets/quick" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]" style="display:flex;gap:6px" onclick="event.stopPropagation()">
         <input type="hidden" name="tour"        value="{{ tour }}">
         <input type="hidden" name="p1_name"     value="{{ p1_name }}">
         <input type="hidden" name="p2_name"     value="{{ p2_name }}">

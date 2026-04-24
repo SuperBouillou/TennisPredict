@@ -1,5 +1,12 @@
 {% set mode = page_mode if page_mode is defined else 'today' %}
-{% if not matches %}
+{% set _espn_err = espn_error is defined and espn_error %}
+{% if _espn_err %}
+<div class="card" style="text-align:center;padding:20px;border-color:var(--orange);background:rgba(255,170,51,.06)">
+  <div style="font-size:16px;margin-bottom:6px">⚠️</div>
+  <div style="color:var(--orange);font-weight:600;font-size:13px;margin-bottom:4px">ESPN indisponible</div>
+  <div style="color:var(--muted);font-size:12px">Impossible de récupérer les matchs. Réessayez dans quelques minutes.</div>
+</div>
+{% elif not matches %}
 <div class="card" style="text-align:center;color:var(--muted);padding:40px">
   {% if mode == 'hier' %}
     Aucun résultat ESPN trouvé pour {{ tour | upper }} hier.
