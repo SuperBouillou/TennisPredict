@@ -1013,6 +1013,12 @@ tr:hover td { background: rgba(19,25,32,.6); }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
 }
 
+/* ─── TOOLTIPS: masqués sur écrans tactiles ──────────────────── */
+@media (hover: none) {
+  .tip::after  { display: none !important; }
+  .tip::before { display: none !important; }
+}
+
 /* ─── RESPONSIVE — mobile (< 640px) ─────────────────────────── */
 @media (max-width: 640px) {
   /* ── Layout: sidebar off, bottom nav on ── */
@@ -1025,7 +1031,6 @@ tr:hover td { background: rgba(19,25,32,.6); }
     display: flex;
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    height: 56px;
     background: var(--surface);
     border-top: 1px solid var(--border);
     z-index: 100;
@@ -1045,7 +1050,7 @@ tr:hover td { background: rgba(19,25,32,.6); }
     font-family: var(--mono);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    padding: 6px 0;
+    padding: 8px 0;
     transition: color 0.15s;
     min-height: 44px;
   }
@@ -1055,7 +1060,7 @@ tr:hover td { background: rgba(19,25,32,.6); }
 
   /* Safe scroll clearance for bottom nav */
   .content, .main-content {
-    padding: 12px 12px 72px;
+    padding: 12px 12px 76px;
   }
 
   /* ── Topbar: stack title + controls ── */
@@ -1079,19 +1084,28 @@ tr:hover td { background: rgba(19,25,32,.6); }
     flex-wrap: wrap;
     gap: 6px;
   }
+  /* Bouton Déconnexion — caché sur mobile (peu utile, prend de la place) */
+  .topbar-right form[action="/logout"] { display: none; }
   .toggle-btn {
-    padding: 5px 10px;
+    padding: 6px 12px;
     font-size: 11px;
-    min-height: 32px;
+    min-height: 44px;
   }
 
   /* ── Filter bar ── */
-  .filter-bar { flex-wrap: wrap; gap: 4px; padding: 8px 12px; }
-  .filter-chip { font-size: 11px; padding: 4px 10px; }
+  .filter-bar { flex-wrap: wrap; gap: 4px; }
+  .filter-chip {
+    font-size: 11px;
+    padding: 0 12px;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
 
   /* ── Match card grid: tighter columns ── */
-  .card-grid { grid-template-columns: 1fr 40px 1fr; }
-  .card-vs { min-width: 40px; }
+  .card-grid { grid-template-columns: 1fr 48px 1fr; }
+  .card-vs { min-width: 48px; }
+  .vs-h2h { font-size: 11px !important; }
   .player-name { font-size: 13px; }
   .player-chip { font-size: 9px; padding: 1px 5px; }
   .prob-number { font-size: 18px; }
@@ -1104,7 +1118,15 @@ tr:hover td { background: rgba(19,25,32,.6); }
   /* Bet form on mobile */
   .bet-form form { flex-wrap: wrap; }
   input.kelly-stake { width: 60px !important; }
-  .btn-bet { font-size: 11px; padding: 5px 10px; min-height: 32px; }
+  .btn-bet {
+    font-size: 11px;
+    padding: 0 12px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+  }
 
   /* ── KPI + stats grid ── */
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
@@ -1141,18 +1163,37 @@ tr:hover td { background: rgba(19,25,32,.6); }
   /* ── History table: horizontal scroll ── */
   .card table {
     display: block;
+    width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     font-size: 12px;
   }
   th, td { padding: 8px 10px; white-space: nowrap; }
 
-  /* ── Modal ── */
-  #modal-content { margin: 16px auto; }
+  /* ── Modal: pleine largeur ── */
+  #modal-overlay { padding: 0; }
+  #modal-content {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    min-height: 100dvh;
+    border-radius: 0;
+  }
 
   /* ── Cards ── */
   .card { padding: 12px; }
   .section-label { font-size: 10px; }
+}
+
+/* ─── RESPONSIVE — très petits écrans (< 380px) ─────────────── */
+@media (max-width: 380px) {
+  body { font-size: 12px; }
+  .prob-number { font-size: 16px; }
+  .player-name { font-size: 12px; }
+  .card-grid { grid-template-columns: 1fr 40px 1fr; }
+  .card-vs { min-width: 40px; }
+  .player-side { padding: 8px 6px; }
+  .player-side.right { padding: 8px 6px; }
 }
 
 @media (max-width: 480px) {
