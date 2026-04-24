@@ -52,6 +52,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Deployment
+
+- **SSH key**: `C:\Claude\tennispredict_ssh` (not in `~/.ssh/`)
+- **Server**: `root@94.130.226.118` — app at `/app/tennisml`, service name `tennisml`
+- **Deploy command**: `cd /app/tennisml && git pull && systemctl restart tennisml`
+- **Posh-SSH** (PowerShell): use `New-SSHSession -KeyFile C:\Claude\tennispredict_ssh -AcceptKey -Force` for reliable output; plain `ssh` via PowerShell tool backgrounds silently with no output
+
+## CSS Gotchas (webapp)
+
+- `.match-card` must stay `overflow: visible` — tooltips use `::after` positioned outside card bounds; keep `.main-content` at `overflow: hidden auto` to block horizontal scrollbar bleed
+- Flex column alignment: fix badge/button width at parent level (`align-items: flex-start` on `.player-side`) not with `align-self` on the child
+
 ## Project Overview
 
 ATP tennis match outcome prediction system using ML (XGBoost). Predicts match winners and assesses betting value against bookmaker odds.
