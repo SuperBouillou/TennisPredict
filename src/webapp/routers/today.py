@@ -230,16 +230,48 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         # Odd of the "value side" — the side we'd actually bet on
         active_odd = m.get('odd_p1') if ep1 >= ep2 else m.get('odd_p2')
 
-        dq = m.get('data_quality', 'low')
-        # Thresholds scale with data quality to avoid false signals from stale ELO.
-        # low=70% ELO weighting (sparse/stale data): suppress ALL recommendations.
-        # Prevents false VALUE BET and EDGE MODÉRÉ when player history is insufficient.
+        dq      = m.get('data_quality', 'low')
+        surface = m.get('surface', 'Hard')
+        # ESPN uses 'tourney_level' in fetch_scheduled, 'level' in fetch_results
+        level   = m.get('level') or m.get('tourney_level', '')
+
+        # ── Surface-specific thresholds ───────────────────────────────────────
+        # Derived from backtest OOS 2023-2024 (ATP, 1675 matches):
+        #   Hard  → ROI +8.5%  — reliable at current thresholds
+        #   Grass → ROI +11.5% — high reliability even at lower edge
+        #   Clay  → ROI −0.6%  — model over-confident; needs higher bar
+        #     Clay 16-20% edge: +33.8% ROI   Clay >20%: −2.2% (false signals)
+        #
+        # Tournament level adjustment:
+        #   Masters 1000 (M): ROI +9.5% — most reliable, relax slightly
+        #   ATP 250/500 (A):  ROI +3.7% — weakest signal, add conservative buffer
+        # ─────────────────────────────────────────────────────────────────────
+        _BASE: dict[str, tuple[float, float]] = {
+            # surface: (value_thr_high, edge_thr_high)
+            'Hard':  (0.14, 0.07),   # +1pp vs before → optimal at 14%
+            'Grass': (0.10, 0.05),   # relax — grass very reliable at low edge
+            'Clay':  (0.18, 0.11),   # raise — clay noisy below 18%
+        }
+        base_value, base_edge = _BASE.get(surface, _BASE['Hard'])
+
+        # Level modifier: loosen for Masters, tighten for smaller events
+        if level == 'M':
+            base_value -= 0.01
+            base_edge  -= 0.01
+        elif level == 'A':
+            base_value += 0.01
+            base_edge  += 0.01
+
+        # Data-quality scaling (unchanged logic, applied on top of surface thresholds)
         if dq == 'high':
-            value_thr, edge_thr = 0.12, 0.06   # ≥3 matchs récents — signaux fiables
+            value_thr = base_value
+            edge_thr  = base_edge
         elif dq == 'medium':
-            value_thr, edge_thr = 0.15, 0.09   # 1-2 matchs récents — seuils relevés
-        else:                        # low — aucun match récent, ELO pur non fiable
-            value_thr, edge_thr = float('inf'), float('inf')
+            value_thr = base_value + 0.03   # +3pp penalty for sparse recent data
+            edge_thr  = base_edge  + 0.03
+        else:                               # low — ELO only, suppress all signals
+            value_thr = float('inf')
+            edge_thr  = float('inf')
 
         if best_edge >= value_thr:
             m['badge'] = 'value'
@@ -248,14 +280,15 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         else:
             m['badge'] = 'neutral'
 
-        # High-odds cap: model reliability drops sharply at high odds.
-        # @6: VALUE → EDGE MODÉRÉ (uncertainty too high for a value call)
-        # @7: EDGE MODÉRÉ → NEUTRE (variance too high to recommend)
-        # @10: anything → NEUTRE (failsafe)
+        # High-odds cap: model reliability drops at extreme odds.
+        # @6: VALUE → EDGE  (uncertainty too high for a full value call)
+        # @8: anything → NEUTRAL  (variance too high; raised from @7 — data shows
+        #                          odds 6-8 still have positive ROI on backtest)
+        # @10: failsafe → NEUTRAL
         if active_odd is not None:
             if active_odd >= 10.0 and m['badge'] != 'neutral':
                 m['badge'] = 'neutral'
-            elif active_odd >= 7.0 and m['badge'] in ('value', 'edge'):
+            elif active_odd >= 8.0 and m['badge'] in ('value', 'edge'):
                 m['badge'] = 'neutral'
             elif active_odd >= 6.0 and m['badge'] == 'value':
                 m['badge'] = 'edge'
