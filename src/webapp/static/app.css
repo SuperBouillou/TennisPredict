@@ -330,6 +330,7 @@ body {
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
 }
 
@@ -855,7 +856,6 @@ body {
 .parie-badge {
   display: inline-block;
   width: fit-content;
-  align-self: flex-start;
   font-size: 10px;
   font-family: var(--mono);
   color: var(--green);
