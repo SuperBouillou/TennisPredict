@@ -1019,8 +1019,32 @@ tr:hover td { background: rgba(19,25,32,.6); }
   .tip::before { display: none !important; }
 }
 
+/* ─── STATS : sections cachées sur mobile ────────────────────── */
+.stats-desktop { display: block; }
+.stats-mobile-notice { display: none; }
+
 /* ─── RESPONSIVE — mobile (< 640px) ─────────────────────────── */
 @media (max-width: 640px) {
+  /* Stats page: cacher les graphiques complexes */
+  .stats-desktop { display: none !important; }
+  .stats-mobile-notice { display: block !important; }
+
+  /* History table: cacher colonnes secondaires */
+  .resolved-table th:nth-child(2),
+  .resolved-table td:nth-child(2),
+  .resolved-table th:nth-child(4),
+  .resolved-table td:nth-child(4) { display: none; }
+
+  /* Pending bet resolve buttons: touch-friendly */
+  .btn-won, .btn-lost {
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 13px;
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
   /* ── Layout: sidebar off, bottom nav on ── */
   .sidebar { display: none; }
   body { overflow: auto; height: auto; flex-direction: column; }

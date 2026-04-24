@@ -70,7 +70,8 @@
   </div>
 </div>
 
-<!-- Equity Curve -->
+<!-- Equity Curve — desktop only -->
+<div class="stats-desktop">
 <div style="margin-bottom:4px">
   <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Évolution de la bankroll simulée</div>
   <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Simulation avec 3 stratégies de mise différentes. <strong style="color:var(--text)">Kelly</strong> = mise proportionnelle à l'avantage · <strong style="color:var(--text)">Flat</strong> = mise fixe · <strong style="color:var(--text)">% Bankroll</strong> = pourcentage constant</div>
@@ -86,14 +87,17 @@
   </div>
   <canvas id="equity-chart"></canvas>
 </div>
+</div>
 
-<!-- ROI par bookmaker -->
+<!-- ROI par bookmaker — desktop only -->
+<div class="stats-desktop">
 <div style="margin-bottom:4px">
   <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">ROI selon le bookmaker utilisé</div>
   <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Comparer les cotes de différents bookmakers avec les mêmes prédictions. Pinnacle est la référence — marges les plus basses du marché.</div>
 </div>
 <div class="chart-container" style="margin-bottom:10px">
   <canvas id="roi-chart"></canvas>
+</div>
 </div>
 
 <!-- Performance by surface -->
@@ -121,11 +125,12 @@
 {# ═══════════════════════════════════════════════════════
    BLOC 3 — ANALYSE DU MODÈLE (internals, calibration)
    ═══════════════════════════════════════════════════════ #}
-<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
+<div class="stats-desktop" style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
   🔬 Analyse du modèle — fonctionnement interne
 </div>
 
-<!-- Win rate by edge bucket -->
+<!-- Win rate by edge bucket — desktop only -->
+<div class="stats-desktop">
 <div style="margin-bottom:4px">
   <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">L'edge prédit est-il fiable ?</div>
   <div style="font-size:11px;color:var(--muted);margin-bottom:8px">L'<strong style="color:var(--text)">edge</strong> mesure l'écart entre la probabilité du modèle et la cote du bookmaker. Plus il est élevé, plus le pari est censé être rentable. Ce graphique vérifie que c'est bien le cas en pratique.</div>
@@ -133,8 +138,10 @@
 <div class="chart-container" style="margin-bottom:10px">
   <canvas id="edge-chart"></canvas>
 </div>
+</div>
 
-<!-- Feature importance -->
+<!-- Feature importance — desktop only -->
+<div class="stats-desktop">
 <div style="margin-bottom:4px">
   <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Quels facteurs guident les prédictions ?</div>
   <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Les 15 variables les plus influentes dans le modèle XGBoost. <span style="color:var(--blue)">■</span> ELO/classement · <span style="color:var(--green)">■</span> Forme récente · <span style="color:var(--orange)">■</span> Fatigue · <span style="color:var(--muted)">■</span> Contexte du match</div>
@@ -142,14 +149,22 @@
 <div class="chart-container" style="margin-bottom:10px">
   <canvas id="feat-chart"></canvas>
 </div>
+</div>
 
-<!-- Calibration curve -->
+<!-- Calibration curve — desktop only -->
+<div class="stats-desktop">
 <div style="margin-bottom:4px">
   <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Les probabilités annoncées sont-elles réalistes ?</div>
   <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Quand le modèle dit "70% de chances de gagner", le joueur gagne-t-il vraiment 7 fois sur 10 ? Les points <span style="color:var(--green)">■ verts</span> sont bien calibrés (écart ≤ 5%) · les <span style="color:var(--red)">■ rouges</span> sont sur- ou sous-estimés. La taille = nombre de paris dans ce bucket.</div>
 </div>
 <div class="chart-container" style="margin-bottom:10px" id="calib-chart-wrap">
   <canvas id="calib-chart" height="160"></canvas>
+</div>
+</div>
+
+<!-- Notice mobile : graphiques disponibles sur desktop -->
+<div class="stats-mobile-notice card" style="margin:4px 0 16px;padding:12px 14px;border-color:var(--border2);text-align:center">
+  <div style="font-size:13px;color:var(--muted)">📊 Les graphiques d'analyse (courbe d'équité, feature importance, calibration…) sont disponibles sur la <strong style="color:var(--text)">version bureau</strong>.</div>
 </div>
 
 
