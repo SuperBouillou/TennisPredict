@@ -845,6 +845,30 @@ body {
   border-color: var(--edge) !important;
 }
 
+@keyframes spin { to { transform: rotate(360deg); } }
+.bankroll-btn.htmx-request {
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+  pointer-events: none;
+}
+
+.parie-badge {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--green);
+  background: rgba(61,220,132,.1);
+  border: 1px solid rgba(61,220,132,.3);
+  border-radius: 4px;
+  padding: 4px 8px;
+  text-align: center;
+  margin-top: auto;
+  white-space: nowrap;
+}
+
+th .sort-ind { color: var(--blue); font-size: 10px; }
+th[onclick]:hover { color: var(--blue); }
+th[onclick] { cursor: pointer; user-select: none; transition: color 0.15s; }
+
 /* ─── SECTION LABEL ──────────────────────────────────────────── */
 .section-label {
   font-family: var(--mono);

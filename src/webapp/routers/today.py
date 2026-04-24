@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.webapp import ml as ml_module
-from src.webapp.db import get_bankroll, set_bankroll, get_setting
+from src.webapp.db import get_bankroll, set_bankroll, get_setting, list_bets
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -456,6 +456,16 @@ async def today_page(request: Request, tour: str = "atp",
     bankroll = get_bankroll(db)
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
 
+    # Build a lookup of pending bets keyed by player pair so match cards can
+    # show "✓ Parié" instead of the bet form when a bet is already in flight.
+    pending_bets = list_bets(db, tour=tour, status='pending', limit=500)
+    pending_lookup: dict = {}
+    for b in pending_bets:
+        k1 = f"{b['p1_name']}|{b['p2_name']}"
+        k2 = f"{b['p2_name']}|{b['p1_name']}"
+        pending_lookup[k1] = b
+        pending_lookup[k2] = b
+
     if page_mode == "hier":
         matches = _get_results(tour, match_date)
         matches = _enrich_with_predictions(matches, tour, bankroll, kelly_fraction)
@@ -485,6 +495,7 @@ async def today_page(request: Request, tour: str = "atp",
         "tomorrow": tomorrow_str,
         "matches": matches, "match_count": len(matches),
         "bankroll": bankroll,
+        "pending_lookup": pending_lookup,
         "sync_status": state.get('sync_status', {}).get(tour, 'idle'),
         "odds_fetched_at": odds_fetched_at,
         "ranking_updated_at": ranking_updated_at,
@@ -524,6 +535,12 @@ async def today_matches_partial(request: Request, tour: str = "atp",
     bankroll = get_bankroll(db)
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
 
+    pending_bets = list_bets(db, tour=tour, status='pending', limit=500)
+    pending_lookup: dict = {}
+    for b in pending_bets:
+        pending_lookup[f"{b['p1_name']}|{b['p2_name']}"] = b
+        pending_lookup[f"{b['p2_name']}|{b['p1_name']}"] = b
+
     if page_mode == "hier":
         matches = _get_results(tour, match_date)
         matches = _enrich_with_predictions(matches, tour, bankroll, kelly_fraction)
@@ -532,6 +549,7 @@ async def today_matches_partial(request: Request, tour: str = "atp",
 
     return templates.TemplateResponse(request, "partials/match_card.html", {
         "matches": matches, "tour": tour, "page_mode": page_mode,
+        "pending_lookup": pending_lookup,
     })
 
 
@@ -544,6 +562,13 @@ async def refresh_odds(request: Request, tour: str = "atp"):
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
     match_date = date.today().isoformat()
     matches, fetched_at = _build_matches(tour, match_date, bankroll, kelly_fraction)
+
+    pending_bets = list_bets(db, tour=tour, status='pending', limit=500)
+    pending_lookup: dict = {}
+    for b in pending_bets:
+        pending_lookup[f"{b['p1_name']}|{b['p2_name']}"] = b
+        pending_lookup[f"{b['p2_name']}|{b['p1_name']}"] = b
+
     # Return the partial + updated odds badge via OOB swap
     time_str = fetched_at[11:16] if fetched_at else "—"
     n_with_odds = sum(1 for m in matches if m.get('odd_p1') is not None)
@@ -552,7 +577,7 @@ async def refresh_odds(request: Request, tour: str = "atp"):
         f'Cotes Pinnacle·{n_with_odds} matchs·{time_str}</span>'
     )
     cards_html = templates.TemplateResponse(request, "partials/match_card.html", {
-        "matches": matches, "tour": tour,
+        "matches": matches, "tour": tour, "pending_lookup": pending_lookup,
     })
     body = cards_html.body.decode()
     return HTMLResponse(body + oob)

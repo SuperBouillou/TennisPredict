@@ -127,6 +127,7 @@ async def history_page(
     tour: str | None = Query(default=None),  # None = all tours
     surface: str | None = None,
     status: str | None = None,
+    period: str | None = None,  # "7j" | "mois" | None (all)
 ):
     db = _state()['db']
 
@@ -135,6 +136,15 @@ async def history_page(
 
     # Fetch all bets — no pagination, history is small enough to show in full
     all_bets = list_bets(db, tour=tour, surface=surface, status=status, limit=5000)
+
+    # Optional period filter (applied in Python since list is already in memory)
+    if period == "7j":
+        cutoff = (date.today() - timedelta(days=7)).isoformat()
+        all_bets = [b for b in all_bets if (b.get('created_at') or '') >= cutoff]
+    elif period == "mois":
+        cutoff = date.today().replace(day=1).isoformat()
+        all_bets = [b for b in all_bets if (b.get('created_at') or '') >= cutoff]
+
     pending  = [b for b in all_bets if b['status'] == 'pending']
     resolved = [b for b in all_bets if b['status'] != 'pending']
 
@@ -150,6 +160,7 @@ async def history_page(
         "stats": stats,
         "surface_filter": surface,
         "status_filter": status,
+        "period_filter": period,
         "auto_resolved": auto_resolved,
     })
 

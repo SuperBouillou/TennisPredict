@@ -4,15 +4,19 @@
 {% block page_meta %}{{ "ATP + WTA" if not tour else tour | upper }}{% endblock %}
 
 {% block topbar_right %}
+{% set _f = '' %}
+{% if surface_filter %}{% set _f = _f ~ 'surface=' ~ surface_filter ~ '&' %}{% endif %}
+{% if period_filter %}{% set _f = _f ~ 'period=' ~ period_filter ~ '&' %}{% endif %}
+{% if status_filter %}{% set _f = _f ~ 'status=' ~ status_filter ~ '&' %}{% endif %}
 <div style="display:flex;align-items:center;gap:8px">
   <div class="toggle-group">
-    <a href="/history">
+    <a href="/history?{{ _f }}">
       <button class="toggle-btn {% if not tour %}active{% endif %}">Tous</button>
     </a>
-    <a href="/history?tour=atp">
+    <a href="/history?{{ _f }}tour=atp">
       <button class="toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</button>
     </a>
-    <a href="/history?tour=wta">
+    <a href="/history?{{ _f }}tour=wta">
       <button class="toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</button>
     </a>
   </div>
@@ -95,6 +99,22 @@
   </div>
 </div>
 {% endif %}
+
+<!-- Period + Surface filter chips -->
+{% set _t = ('tour=' ~ tour ~ '&') if tour else '' %}
+{% set _s = ('surface=' ~ surface_filter ~ '&') if surface_filter else '' %}
+{% set _p = ('period=' ~ period_filter ~ '&') if period_filter else '' %}
+{% set _st = ('status=' ~ status_filter ~ '&') if status_filter else '' %}
+<div class="filter-bar" style="margin-bottom:8px">
+  <a href="/history?{{ _t }}{{ _s }}{{ _st }}" style="text-decoration:none"><button class="filter-chip {% if not period_filter %}active{% endif %}">Tout</button></a>
+  <a href="/history?{{ _t }}{{ _s }}{{ _st }}period=mois" style="text-decoration:none"><button class="filter-chip {% if period_filter=='mois' %}active{% endif %}">Ce mois</button></a>
+  <a href="/history?{{ _t }}{{ _s }}{{ _st }}period=7j" style="text-decoration:none"><button class="filter-chip {% if period_filter=='7j' %}active{% endif %}">7 jours</button></a>
+  <span style="width:1px;background:var(--border);margin:0 4px;display:inline-block;align-self:stretch"></span>
+  <a href="/history?{{ _t }}{{ _p }}{{ _st }}" style="text-decoration:none"><button class="filter-chip {% if not surface_filter %}active{% endif %}">Toutes</button></a>
+  <a href="/history?{{ _t }}{{ _p }}{{ _st }}surface=Hard" style="text-decoration:none"><button class="filter-chip {% if surface_filter=='Hard' %}active{% endif %}">Hard</button></a>
+  <a href="/history?{{ _t }}{{ _p }}{{ _st }}surface=Clay" style="text-decoration:none"><button class="filter-chip {% if surface_filter=='Clay' %}active{% endif %}">Clay</button></a>
+  <a href="/history?{{ _t }}{{ _p }}{{ _st }}surface=Grass" style="text-decoration:none"><button class="filter-chip {% if surface_filter=='Grass' %}active{% endif %}">Grass</button></a>
+</div>
 
 <!-- Badge breakdown -->
 {% if stats.badge_stats %}
@@ -236,18 +256,24 @@
   <table>
     <thead>
       <tr>
-        <th>Match</th>
-        <th>Tournoi</th>
-        <th>Cote</th>
-        <th>Mise</th>
-        <th>P&L</th>
-        <th>Statut</th>
+        <th data-col="bet_on" onclick="sortTable(this)">Match <span class="sort-ind"></span></th>
+        <th data-col="tournament" onclick="sortTable(this)">Tournoi <span class="sort-ind"></span></th>
+        <th data-col="odd" onclick="sortTable(this)">Cote <span class="sort-ind"></span></th>
+        <th data-col="stake" onclick="sortTable(this)">Mise <span class="sort-ind"></span></th>
+        <th data-col="pnl" onclick="sortTable(this)">P&L <span class="sort-ind"></span></th>
+        <th data-col="status" onclick="sortTable(this)">Statut <span class="sort-ind"></span></th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       {% for b in resolved %}
-      <tr id="resolved-bet-{{ b.id }}">
+      <tr id="resolved-bet-{{ b.id }}"
+          data-bet-on="{{ b.bet_on }}"
+          data-tournament="{{ b.tournament }}"
+          data-odd="{{ b.odd }}"
+          data-stake="{{ b.stake }}"
+          data-pnl="{{ b.pnl }}"
+          data-status="{{ b.status }}">
         <td>
           <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
             <span class="badge" style="font-size:9px;padding:1px 4px;background:{% if b.tour=='atp' %}rgba(59,130,246,.15){% else %}rgba(168,85,247,.15){% endif %};color:{% if b.tour=='atp' %}var(--blue){% else %}#a855f7{% endif %}">{{ b.tour | upper }}</span>
@@ -286,9 +312,36 @@
 
 {% if not pending and not resolved %}
 <div class="card" style="color:var(--muted);text-align:center;padding:40px">
-  Aucun pari enregistré{% if tour %} pour {{ tour | upper }}{% endif %}.<br><br>
+  Aucun pari enregistré{% if tour %} pour {{ tour | upper }}{% endif %}{% if period_filter or surface_filter %} avec ces filtres{% endif %}.<br><br>
   <a href="/predictions" style="color:var(--blue)">→ Faire une prédiction</a>
 </div>
 {% endif %}
 </div><!-- end #history-content -->
+
+<script>
+(function () {
+  var _col = null, _asc = true;
+  var NUMS = { odd: 1, stake: 1, pnl: 1 };
+  window.sortTable = function (th) {
+    var col = th.dataset.col;
+    _asc = (_col === col) ? !_asc : true;
+    _col = col;
+    document.querySelectorAll('.sort-ind').forEach(function (s) { s.textContent = ''; });
+    th.querySelector('.sort-ind').textContent = _asc ? ' ▲' : ' ▼';
+    var tbody = th.closest('table').querySelector('tbody');
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort(function (a, b) {
+      var av = a.dataset[col] || '', bv = b.dataset[col] || '';
+      if (NUMS[col]) {
+        av = parseFloat(av) || 0; bv = parseFloat(bv) || 0;
+        return _asc ? av - bv : bv - av;
+      }
+      return _asc
+        ? av.localeCompare(bv, 'fr', { sensitivity: 'base' })
+        : bv.localeCompare(av, 'fr', { sensitivity: 'base' });
+    });
+    rows.forEach(function (r) { tbody.appendChild(r); });
+  };
+})();
+</script>
 {% endblock %}

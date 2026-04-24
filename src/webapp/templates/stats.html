@@ -95,6 +95,18 @@
   </table>
 </div>
 
+<!-- Monthly breakdown -->
+<div class="section-label">Performance mensuelle (paris réels)</div>
+<div class="chart-container" style="margin-bottom:10px" id="monthly-chart-wrap">
+  <canvas id="monthly-chart"></canvas>
+</div>
+
+<!-- Calibration curve -->
+<div class="section-label">Courbe de calibration du modèle</div>
+<div class="chart-container" style="margin-bottom:10px" id="calib-chart-wrap">
+  <canvas id="calib-chart" height="160"></canvas>
+</div>
+
 <!-- Settings -->
 <div class="section-label">Configuration des seuils</div>
 <div class="card">
@@ -389,6 +401,121 @@ async function loadLivePerf() {
     </div>`;
 }
 
+// ── Monthly breakdown ──────────────────────────────────────────────────────
+async function loadMonthly(tour) {
+  const r = await fetch(`/stats/monthly${tour ? '?tour=' + tour : ''}`);
+  const d = await r.json();
+  if (!d.months || !d.months.length) {
+    document.getElementById('monthly-chart-wrap').style.display = 'none';
+    return;
+  }
+  const ctx = document.getElementById('monthly-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: d.months,
+      datasets: [
+        { label: 'Gagnés', data: d.won, backgroundColor: 'rgba(61,220,132,.75)', stack: 'bets', borderRadius: 3, order: 2 },
+        { label: 'Perdus', data: d.lost, backgroundColor: 'rgba(240,106,106,.75)', stack: 'bets', borderRadius: 3, order: 2 },
+        { label: 'ROI %', type: 'line', data: d.roi, borderColor: '#4FA8FF',
+          backgroundColor: 'transparent', pointRadius: 4, borderWidth: 2, yAxisID: 'y2', order: 1 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
+        tooltip: {
+          mode: 'index', intersect: false,
+          callbacks: {
+            afterBody: function(items) {
+              const i = items[0].dataIndex;
+              return ['P&L: ' + (d.pnl[i] >= 0 ? '+' : '') + d.pnl[i] + '€'];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, ticks: { color: '#64748b' }, grid: { color: 'rgba(51,65,85,.5)' } },
+        y: { stacked: true, ticks: { color: '#64748b', stepSize: 1 }, grid: { color: 'rgba(51,65,85,.5)' },
+             title: { display: true, text: 'Paris', color: '#64748b', font: { size: 10 } } },
+        y2: { position: 'right', grid: { display: false },
+              ticks: { color: '#4FA8FF', callback: function(v) { return v + '%'; } },
+              title: { display: true, text: 'ROI %', color: '#4FA8FF', font: { size: 10 } } },
+      }
+    }
+  });
+}
+
+// ── Calibration curve ──────────────────────────────────────────────────────
+async function loadCalibration(tour) {
+  const r = await fetch(`/stats/calibration${tour ? '?tour=' + tour : ''}`);
+  const d = await r.json();
+  if (!d.buckets || !d.buckets.length) {
+    document.getElementById('calib-chart-wrap').style.display = 'none';
+    return;
+  }
+  const ctx = document.getElementById('calib-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'Calibration réelle',
+          data: d.predicted.map(function(p, i) { return { x: p, y: d.actual[i] }; }),
+          backgroundColor: d.actual.map(function(a, i) {
+            return Math.abs(a - d.predicted[i]) <= 5 ? '#3DDC84' : '#F06A6A';
+          }),
+          pointRadius: d.counts.map(function(c) { return Math.max(5, Math.min(14, c / 1.5)); }),
+          pointHoverRadius: 8,
+        },
+        {
+          label: 'Calibration parfaite',
+          type: 'line',
+          data: [{ x: 50, y: 50 }, { x: 100, y: 100 }],
+          borderColor: 'rgba(100,116,139,.5)',
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(item) {
+              if (item.datasetIndex === 0) {
+                const i = item.dataIndex;
+                return [
+                  'Bucket: ' + d.buckets[i],
+                  'Prédit: ' + d.predicted[i] + '%',
+                  'Réel: ' + d.actual[i] + '%',
+                  'n = ' + d.counts[i] + ' paris',
+                ];
+              }
+              return 'Calibration parfaite (y = x)';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { min: 48, max: 102,
+             title: { display: true, text: 'Probabilité prédite (%)', color: '#64748b', font: { size: 10 } },
+             ticks: { color: '#64748b', callback: function(v) { return v + '%'; } },
+             grid: { color: 'rgba(51,65,85,.5)' } },
+        y: { min: 0, max: 105,
+             title: { display: true, text: 'Win rate réel (%)', color: '#64748b', font: { size: 10 } },
+             ticks: { color: '#64748b', callback: function(v) { return v + '%'; } },
+             grid: { color: 'rgba(51,65,85,.5)' } },
+      }
+    }
+  });
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 function _initCharts() {
   const tour = '{{ tour }}';
@@ -398,6 +525,8 @@ function _initCharts() {
   loadFeatures(tour);
   loadEdgePerf(tour);
   loadSurfacePerf(tour);
+  loadMonthly(tour);
+  loadCalibration(tour);
 }
 // Run when Chart.js is ready — handle both defer timing scenarios
 if (typeof Chart !== 'undefined') {

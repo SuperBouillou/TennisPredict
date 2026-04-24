@@ -84,6 +84,8 @@
 {% set ep2 = m.get('edge_p2') or 0 %}
 {% set badge = m.get('badge','neutral') %}
 {% set dq = m.get('data_quality','low') %}
+{% set _bet_key = m.get('p1_name','') ~ '|' ~ m.get('p2_name','') %}
+{% set placed_bet = (pending_lookup.get(_bet_key)) if pending_lookup is defined else none %}
 <div class="match-card {{ badge }}"
      data-badge="{{ badge }}"
      data-tour="{{ tour }}"
@@ -150,7 +152,9 @@
           {% endif %}
         {% endif %}
       </div>
-      {% if m.get('odd_p1') %}
+      {% if placed_bet and placed_bet.bet_on == m.get('p1_name') %}
+      <div class="parie-badge tip tip-down" data-tip="Pari en attente de résolution">✓ Parié {{ "%.2f"|format(placed_bet.stake) }}€ @{{ "%.2f"|format(placed_bet.odd) }}</div>
+      {% elif not placed_bet and m.get('odd_p1') %}
       <button class="btn-bet" onclick="event.stopPropagation();openModal(this.closest('.match-card'))">Parier →</button>
       {% endif %}
     </div>
@@ -195,7 +199,9 @@
           {% endif %}
         {% endif %}
       </div>
-      {% if m.get('odd_p2') %}
+      {% if placed_bet and placed_bet.bet_on == m.get('p2_name') %}
+      <div class="parie-badge tip tip-down" data-tip="Pari en attente de résolution">✓ Parié {{ "%.2f"|format(placed_bet.stake) }}€ @{{ "%.2f"|format(placed_bet.odd) }}</div>
+      {% elif not placed_bet and m.get('odd_p2') %}
       <button class="btn-bet" onclick="event.stopPropagation();openModal(this.closest('.match-card'))">← Parier</button>
       {% endif %}
     </div>

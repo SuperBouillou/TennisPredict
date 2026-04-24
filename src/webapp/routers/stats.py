@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import pandas as pd
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
@@ -269,6 +269,70 @@ async def live_perf(tour: str | None = None):
         'pnl': round(float(total_pnl), 2),
         'by_tour': by_tour,
     })
+
+
+@router.get("/stats/monthly")
+async def monthly_breakdown(tour: str | None = Query(default=None)):
+    """Monthly P&L breakdown: stacked wins/losses bar + ROI line."""
+    db = _state()['db']
+    base_q = """
+        SELECT substr(resolved_at, 1, 7) AS month,
+               COUNT(*) AS n,
+               SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) AS won,
+               SUM(pnl) AS pnl,
+               SUM(stake) AS staked
+        FROM bets
+        WHERE status != 'pending' AND resolved_at IS NOT NULL
+    """
+    rows = db.execute(
+        base_q + (" AND tour = ?" if tour else "") + " GROUP BY month ORDER BY month",
+        (tour,) if tour else ()
+    ).fetchall()
+    if not rows:
+        return JSONResponse({"months": [], "won": [], "lost": [], "roi": [], "pnl": []})
+    months, won, lost, roi, pnl = [], [], [], [], []
+    for r in rows:
+        months.append(r["month"])
+        won.append(r["won"])
+        lost.append(r["n"] - r["won"])
+        roi.append(round(float(r["pnl"]) / float(r["staked"]) * 100, 1) if r["staked"] else 0.0)
+        pnl.append(round(float(r["pnl"]), 2))
+    return JSONResponse({"months": months, "won": won, "lost": lost, "roi": roi, "pnl": pnl})
+
+
+@router.get("/stats/calibration")
+async def calibration_curve(tour: str | None = Query(default=None)):
+    """Predicted probability vs actual win rate, bucketed in 5% intervals."""
+    db = _state()['db']
+    rows = db.execute(
+        "SELECT prob, status FROM bets WHERE status != 'pending' AND prob IS NOT NULL"
+        + (" AND tour = ?" if tour else ""),
+        (tour,) if tour else ()
+    ).fetchall()
+    if not rows:
+        return JSONResponse({"buckets": [], "predicted": [], "actual": [], "counts": []})
+
+    # 5% buckets: [0.50-0.55, 0.55-0.60, ..., 0.95-1.00]
+    edges = [i / 100 for i in range(50, 101, 5)]
+    data = [{"wins": 0, "total": 0} for _ in range(len(edges) - 1)]
+    for r in rows:
+        prob = float(r["prob"])
+        if prob < 0.50 or prob >= 1.0:
+            continue
+        idx = min(int((prob - 0.50) / 0.05), len(data) - 1)
+        data[idx]["total"] += 1
+        if r["status"] == "won":
+            data[idx]["wins"] += 1
+
+    buckets, predicted, actual, counts = [], [], [], []
+    for i, (lo, hi) in enumerate(zip(edges[:-1], edges[1:])):
+        if data[i]["total"] == 0:
+            continue
+        buckets.append(f"{int(lo * 100)}-{int(hi * 100)}%")
+        predicted.append(round((lo + hi) / 2 * 100, 1))
+        actual.append(round(data[i]["wins"] / data[i]["total"] * 100, 1))
+        counts.append(data[i]["total"])
+    return JSONResponse({"buckets": buckets, "predicted": predicted, "actual": actual, "counts": counts})
 
 
 @router.post("/settings", response_class=HTMLResponse)
