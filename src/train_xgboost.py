@@ -319,11 +319,15 @@ if __name__ == "__main__":
 
     # ── Calibration plot ────────────────────────────────────────────────────
     models_preds = [
-        ('LR Full',        lr_full.predict_proba(X_valid)[:, 1]),
         ('XGB default',    xgb_def_wrapped.predict_proba(X_valid)[:, 1]),
         ('XGB tuned',      xgb_tun_wrapped.predict_proba(X_valid)[:, 1]),
         ('XGB calibrated', xgb_calibrated.predict_proba(X_valid)[:, 1]),
     ]
+    if lr_full is not None:
+        try:
+            models_preds.insert(0, ('LR Full', lr_full.predict_proba(X_valid)[:, 1]))
+        except Exception:
+            pass
     plot_calibration_comparison(models_preds, y_valid, models_dir=MODELS_DIR)
 
     # ── Sauvegarde ──────────────────────────────────────────────────────────
