@@ -1,5 +1,6 @@
 # src/compute_rolling_features.py
 
+import re
 import argparse
 import pandas as pd
 import numpy as np
@@ -26,6 +27,41 @@ ROLLING_STATS = [
 ]
 
 
+def _parse_sets_won(score_str, p1_won: bool) -> tuple[int, int]:
+    """
+    Retourne (sets_won_by_player, total_sets_played) depuis un score brut.
+    'p1_won' indique si le joueur dont on calcule les stats a gagné le match.
+    Exemples : '6-4 3-6 7-5', p1_won=True  → (2, 3)
+               '6-4 3-6 7-5', p1_won=False → (1, 3)
+    """
+    if not isinstance(score_str, str) or not score_str.strip():
+        return 0, 0
+    s = re.sub(r'\s*(RET|W/O|DEF|Def\.?|ret\.?|ABD).*$', '', score_str.strip(),
+               flags=re.IGNORECASE)
+    blocs = re.findall(r'(\d+)-(\d+)', s)
+    if not blocs:
+        return 0, 0
+    sets_won = 0
+    for a, b in blocs:
+        a, b = int(a), int(b)
+        # Le premier score est toujours celui du vainqueur dans Sackmann format
+        # → si p1_won, p1 est le vainqueur donc a > b means p1 won that set
+        if p1_won:
+            if a > b:
+                sets_won += 1
+        else:
+            if b > a:
+                sets_won += 1
+    return sets_won, len(blocs)
+
+
+def _has_tiebreak(score_str) -> bool:
+    """Retourne True si le match a contenu au moins un tiebreak."""
+    if not isinstance(score_str, str):
+        return False
+    return bool(re.search(r'7-6|6-7', score_str))
+
+
 def build_player_match_history(df: pd.DataFrame) -> pd.DataFrame:
     """
     Transforme le dataset ML (p1/p2) en vue par joueur.
@@ -36,30 +72,65 @@ def build_player_match_history(df: pd.DataFrame) -> pd.DataFrame:
     """
     stat_cols = ROLLING_STATS + ['rank', 'rank_points', 'age']
 
+    # Pré-calculer sets joués et tiebreaks (si 'score' disponible)
+    has_score = 'score' in df.columns
+    if has_score:
+        p1_sets_won   = []
+        p1_sets_total = []
+        p1_has_tb     = []
+        for _, row in df.iterrows():
+            sw, st = _parse_sets_won(row.get('score'), bool(row['target'] == 1))
+            p1_sets_won.append(sw)
+            p1_sets_total.append(st)
+            p1_has_tb.append(int(_has_tiebreak(row.get('score'))))
+        df = df.copy()
+        df['_p1_sets_won']   = p1_sets_won
+        df['_p1_sets_total'] = p1_sets_total
+        df['_has_tiebreak']  = p1_has_tb
+
     # Vue joueur 1
     p1_cols = {f'p1_{s}': s for s in stat_cols if f'p1_{s}' in df.columns}
+    extra_p1 = ['tourney_id'] if 'tourney_id' in df.columns else []
+    p1_score_cols = ['_p1_sets_won', '_p1_sets_total', '_has_tiebreak'] if has_score else []
+
     df_p1 = df[['tourney_date', 'tourney_level', 'surface',
-                 'p1_id', 'target'] + list(p1_cols.keys())].copy()
+                 'p1_id', 'target'] + list(p1_cols.keys()) + extra_p1 + p1_score_cols].copy()
     df_p1 = df_p1.rename(columns={'p1_id': 'player_id', 'target': 'won'})
     df_p1 = df_p1.rename(columns=p1_cols)
-    # NOUVEAU : rang de l'adversaire (p2 est l'adversaire de p1)
-    # .values requis car df_p1 est une copie dont l'index peut différer de df
     df_p1['opponent_rank'] = df['p2_rank'].values
+    if has_score:
+        df_p1 = df_p1.rename(columns={'_p1_sets_won': 'sets_won',
+                                       '_p1_sets_total': 'sets_total',
+                                       '_has_tiebreak': 'has_tiebreak'})
 
-    # Vue joueur 2
+    # Vue joueur 2 (sets_won = total - p1_sets_won pour p2)
     p2_cols = {f'p2_{s}': s for s in stat_cols if f'p2_{s}' in df.columns}
     df_p2 = df[['tourney_date', 'tourney_level', 'surface',
-                 'p2_id', 'target'] + list(p2_cols.keys())].copy()
+                 'p2_id', 'target'] + list(p2_cols.keys()) + extra_p1 + p1_score_cols].copy()
     df_p2 = df_p2.rename(columns={'p2_id': 'player_id'})
     df_p2['won'] = 1 - df_p2['target']
     df_p2 = df_p2.drop(columns=['target'])
     df_p2 = df_p2.rename(columns=p2_cols)
-    # NOUVEAU : rang de l'adversaire (p1 est l'adversaire de p2)
     df_p2['opponent_rank'] = df['p1_rank'].values
+    if has_score:
+        # P2's sets won = total - p1's sets won
+        df_p2['sets_won']      = df_p2['_p1_sets_total'] - df_p2['_p1_sets_won']
+        df_p2['sets_total']    = df_p2['_p1_sets_total']
+        df_p2['has_tiebreak']  = df_p2['_has_tiebreak']
+        df_p2 = df_p2.drop(columns=['_p1_sets_won', '_p1_sets_total', '_has_tiebreak'])
+
+    # Nettoyer colonnes intermédiaires de df_p1
+    if has_score:
+        df_p1 = df_p1.drop(columns=[c for c in ['_p1_sets_won','_p1_sets_total','_has_tiebreak']
+                                     if c in df_p1.columns], errors='ignore')
 
     # Concaténation et tri chronologique
     df_history = pd.concat([df_p1, df_p2], ignore_index=True)
     df_history = df_history.sort_values(['player_id', 'tourney_date']).reset_index(drop=True)
+
+    # Nettoyer colonnes intermédiaires du df source
+    if has_score:
+        df.drop(columns=['_p1_sets_won','_p1_sets_total','_has_tiebreak'], inplace=True, errors='ignore')
 
     print(f"✅ Historique joueur construit : {len(df_history):,} entrées")
     return df_history
@@ -130,6 +201,39 @@ def compute_rolling_stats(df_history: pd.DataFrame) -> pd.DataFrame:
                                               .mean()
                                               .values)
 
+        # ── NOUVEAU : win rate par tournoi ──────────────────────────────────
+        # Ratio victoires/matchs joués dans ce tournoi spécifique (historique complet)
+        if 'tourney_id' in df_pid.columns:
+            tourney_wr = np.full(len(df_pid), np.nan)
+            tourney_counts: dict = {}   # {tourney_id: [wins, total]}
+            for idx_t, (_, rw) in enumerate(df_pid.iterrows()):
+                tid = rw['tourney_id']
+                if tid in tourney_counts:
+                    w, t = tourney_counts[tid]
+                    tourney_wr[idx_t] = w / t if t > 0 else np.nan
+                tourney_counts.setdefault(tid, [0, 0])
+                tourney_counts[tid][0] += int(rw['won'])
+                tourney_counts[tid][1] += 1
+            row['tourney_winrate'] = tourney_wr
+
+        # ── NOUVEAU : dominance (ratio sets gagnés) ─────────────────────────
+        if 'sets_won' in df_pid.columns and 'sets_total' in df_pid.columns:
+            sets_ratio = (df_pid['sets_won'] / df_pid['sets_total'].replace(0, np.nan))
+            row['sets_ratio_10'] = (sets_ratio
+                                    .shift(1)
+                                    .rolling(10, min_periods=3)
+                                    .mean()
+                                    .values)
+
+        # ── NOUVEAU : win rate en tiebreak ──────────────────────────────────
+        if 'has_tiebreak' in df_pid.columns:
+            tb_won = df_pid['won'].where(df_pid['has_tiebreak'] == 1)
+            row['tiebreak_winrate_10'] = (tb_won
+                                          .shift(1)
+                                          .rolling(10, min_periods=2)
+                                          .mean()
+                                          .values)
+
         # Streak
         streak_vals = np.zeros(len(df_pid))
         current     = 0
@@ -168,7 +272,9 @@ def join_rolling_to_ml(df_ml: pd.DataFrame,
     Dédoublonne AVANT la jointure pour éviter l'explosion de lignes.
     """
     rolling_cols = [c for c in df_history.columns
-                    if any(x in c for x in ['winrate', 'roll', 'streak'])]
+                    if any(x in c for x in ['winrate', 'roll', 'streak',
+                                             'tourney_winrate', 'sets_ratio',
+                                             'tiebreak_winrate'])]
 
     df_hist_sub = df_history[['player_id', 'tourney_date'] + rolling_cols].copy()
 
@@ -215,6 +321,13 @@ def join_rolling_to_ml(df_ml: pd.DataFrame,
             df_ml[f'p1_winrate_surf_{surface}']
             - df_ml[f'p2_winrate_surf_{surface}']
         )
+
+    # Différences nouvelles features
+    for col in ['tourney_winrate', 'sets_ratio_10', 'tiebreak_winrate_10']:
+        c1 = f'p1_{col}'
+        c2 = f'p2_{col}'
+        if c1 in df_ml.columns and c2 in df_ml.columns:
+            df_ml[f'{col}_diff'] = df_ml[c1] - df_ml[c2]
 
     return df_ml
 

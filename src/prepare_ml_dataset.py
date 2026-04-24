@@ -62,6 +62,7 @@ def define_feature_sets() -> dict:
 
         'h2h': [
             'h2h_p1_winrate',
+            'h2h_p1_winrate_recent',   # pondéré récence [NOUVEAU]
             'h2h_surf_p1_winrate',
             'h2h_total',
             'h2h_played',
@@ -71,6 +72,11 @@ def define_feature_sets() -> dict:
             'p1_matches_7d',  'p2_matches_7d',  'fatigue_diff_7d',
             'p1_matches_14d', 'p2_matches_14d', 'fatigue_diff_14d',
             'p1_days_since',  'p2_days_since',
+            # Fatigue en sets et minutes [NOUVEAU]
+            'p1_sets_7d',     'p2_sets_7d',     'fatigue_sets_diff_7d',
+            'p1_sets_14d',    'p2_sets_14d',     'fatigue_sets_diff_14d',
+            'p1_minutes_7d',  'p2_minutes_7d',  'fatigue_min_diff_7d',
+            'p1_minutes_14d', 'p2_minutes_14d', 'fatigue_min_diff_14d',
         ],
 
         'contexte': [
@@ -89,6 +95,13 @@ def define_feature_sets() -> dict:
             'glicko_rd_surface_diff',# Idem sur surface spécifique
             'p1_glicko_rd',          # Incertitude P1 (haut = peu de matchs récents)
             'p2_glicko_rd',          # Incertitude P2
+        ],
+
+        # ── Features de momentum / performance contextuelle [NOUVEAU] ────────
+        'momentum': [
+            'p1_tourney_winrate',  'p2_tourney_winrate',  'tourney_winrate_diff',
+            'p1_sets_ratio_10',    'p2_sets_ratio_10',    'sets_ratio_10_diff',
+            'p1_tiebreak_winrate_10', 'p2_tiebreak_winrate_10', 'tiebreak_winrate_10_diff',
         ],
 
         # ── Disponibles uniquement post-1991 ───────────────────────────────
@@ -128,7 +141,7 @@ def prepare_dataset(df: pd.DataFrame,
     # ELO : force relative + spécialisation de surface.
     # Glicko : uniquement les 4 features d'incertitude (RD) absentes d'ELO.
     groups = ['elo', 'glicko', 'ranking', 'forme', 'qualite_adversaires',
-              'surface_forme', 'h2h', 'fatigue', 'contexte']
+              'surface_forme', 'h2h', 'fatigue', 'momentum', 'contexte']
     if use_stats:
         groups.append('stats_service')
 

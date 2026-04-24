@@ -1,5 +1,6 @@
 # src/compute_contextual_features.py
 
+import re
 import argparse
 import pandas as pd
 import numpy as np
@@ -9,13 +10,37 @@ from tqdm import tqdm
 from config import get_tour_config, get_paths, make_dirs
 
 
+def _parse_sets(score_str) -> int:
+    """
+    Retourne le nombre de sets disputés dans un score brut.
+    Exemples : '6-4 3-6 7-5' → 3,  '6-2 6-1' → 2,  NaN → 0
+    """
+    if not isinstance(score_str, str) or not score_str.strip():
+        return 0
+    # Supprimer les suffixes (RET, W/O, DEF, etc.)
+    s = re.sub(r'\s*(RET|W/O|DEF|Def\.?|ret\.?|ABD).*$', '', score_str.strip(),
+               flags=re.IGNORECASE)
+    # Compter les blocs score du type '6-4', '7-6(3)', '1-0'
+    return len(re.findall(r'\d+-\d+', s))
+
+
 def compute_fatigue(df: pd.DataFrame) -> pd.DataFrame:
     """
     Calcule la fatigue calendrier pour chaque joueur avant chaque match :
     - Nombre de matchs joués sur les 7, 14, et 21 derniers jours
     - Nombre de jours depuis le dernier match
+    - Nombre de sets joués sur les 7 et 14 derniers jours  [NOUVEAU]
+    - Minutes jouées sur les 7 et 14 derniers jours        [NOUVEAU]
     """
     df = df.sort_values('tourney_date').reset_index(drop=True)
+
+    # Pré-calculer sets et minutes pour chaque ligne
+    if 'score' in df.columns:
+        df['_n_sets'] = df['score'].apply(_parse_sets)
+    else:
+        df['_n_sets'] = 0
+
+    has_minutes = 'minutes' in df.columns
 
     for col_id, prefix in [('p1_id', 'p1'), ('p2_id', 'p2')]:
 
@@ -23,37 +48,65 @@ def compute_fatigue(df: pd.DataFrame) -> pd.DataFrame:
         matches_14d = np.zeros(len(df))
         matches_21d = np.zeros(len(df))
         days_since  = np.full(len(df), np.nan)
+        sets_7d     = np.zeros(len(df))
+        sets_14d    = np.zeros(len(df))
+        minutes_7d  = np.zeros(len(df))
+        minutes_14d = np.zeros(len(df))
 
-        # Historique par joueur : {player_id: [dates]}
-        history = {}
+        # Historique par joueur : {player_id: [(date, n_sets, minutes)]}
+        history: dict = {}
 
         for i, row in df.iterrows():
             pid  = row[col_id]
             date = row['tourney_date']
 
             if pid in history:
-                past_dates = np.array(history[pid])
-                delta      = (date - past_dates).astype('timedelta64[D]').astype(int)
+                past = history[pid]
+                past_dates   = np.array([x[0] for x in past])
+                past_sets    = np.array([x[1] for x in past])
+                past_minutes = np.array([x[2] for x in past])
 
-                matches_7d[i]  = (delta <= 7).sum()
-                matches_14d[i] = (delta <= 14).sum()
+                delta = (date - past_dates).astype('timedelta64[D]').astype(int)
+
+                mask_7  = delta <= 7
+                mask_14 = delta <= 14
+
+                matches_7d[i]  = mask_7.sum()
+                matches_14d[i] = mask_14.sum()
                 matches_21d[i] = (delta <= 21).sum()
-                days_since[i]  = delta.min() if len(delta) > 0 else np.nan
+                days_since[i]  = delta.min()
+                sets_7d[i]     = past_sets[mask_7].sum()
+                sets_14d[i]    = past_sets[mask_14].sum()
+                minutes_7d[i]  = past_minutes[mask_7].sum()
+                minutes_14d[i] = past_minutes[mask_14].sum()
             else:
                 history[pid] = []
 
-            history.setdefault(pid, []).append(date)
+            n_sets   = int(row['_n_sets'])
+            mins     = float(row['minutes']) if has_minutes and not pd.isna(row.get('minutes')) else 0.0
+            history.setdefault(pid, []).append((date, n_sets, mins))
 
         df[f'{prefix}_matches_7d']  = matches_7d
         df[f'{prefix}_matches_14d'] = matches_14d
         df[f'{prefix}_matches_21d'] = matches_21d
         df[f'{prefix}_days_since']  = days_since
+        df[f'{prefix}_sets_7d']     = sets_7d
+        df[f'{prefix}_sets_14d']    = sets_14d
+        df[f'{prefix}_minutes_7d']  = minutes_7d
+        df[f'{prefix}_minutes_14d'] = minutes_14d
 
     # Différences de fatigue
-    df['fatigue_diff_7d']  = df['p1_matches_7d']  - df['p2_matches_7d']
-    df['fatigue_diff_14d'] = df['p1_matches_14d'] - df['p2_matches_14d']
+    df['fatigue_diff_7d']       = df['p1_matches_7d']  - df['p2_matches_7d']
+    df['fatigue_diff_14d']      = df['p1_matches_14d'] - df['p2_matches_14d']
+    df['fatigue_sets_diff_7d']  = df['p1_sets_7d']     - df['p2_sets_7d']
+    df['fatigue_sets_diff_14d'] = df['p1_sets_14d']    - df['p2_sets_14d']
+    df['fatigue_min_diff_7d']   = df['p1_minutes_7d']  - df['p2_minutes_7d']
+    df['fatigue_min_diff_14d']  = df['p1_minutes_14d'] - df['p2_minutes_14d']
 
-    print(f"Features fatigue calculees")
+    # Nettoyage colonne intermédiaire
+    df = df.drop(columns=['_n_sets'])
+
+    print(f"Features fatigue calculees (+ sets/minutes)")
     return df
 
 

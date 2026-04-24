@@ -9,20 +9,25 @@ from tqdm import tqdm
 from config import get_tour_config, get_paths, make_dirs
 
 
+_H2H_HALFLIFE_YEARS = 4.0   # demi-vie exponentielle pour la pondération temporelle
+_H2H_LAMBDA = np.log(2) / _H2H_HALFLIFE_YEARS  # λ tel que poids = exp(-λ * années)
+
+
 def compute_h2h(df_ml: pd.DataFrame) -> pd.DataFrame:
     """
     Calcule les stats H2H entre chaque paire de joueurs AVANT chaque match.
     Features produites :
-    - h2h_p1_wins     : victoires de p1 contre p2 (historique)
-    - h2h_total       : total matchs entre les deux
-    - h2h_p1_winrate  : % victoires p1 sur leurs confrontations
-    - h2h_surface_p1_winrate : % victoires p1 sur cette surface en H2H
+    - h2h_p1_wins          : victoires de p1 contre p2 (historique brut)
+    - h2h_total            : total matchs entre les deux
+    - h2h_p1_winrate       : % victoires p1 (non pondéré)
+    - h2h_surf_p1_winrate  : % victoires p1 sur cette surface
+    - h2h_p1_winrate_recent: win rate pondéré par récence [NOUVEAU]
+                             (demi-vie 4 ans : un match d'il y a 4 ans
+                              pèse moitié moins qu'un match récent)
     """
 
     df_ml = df_ml.sort_values('tourney_date').reset_index(drop=True)
 
-    # Clé canonique de paire — indépendante de l'ordre p1/p2
-    # On utilise toujours min_id vs max_id
     p1_id = df_ml['p1_id'].values
     p2_id = df_ml['p2_id'].values
 
@@ -30,34 +35,38 @@ def compute_h2h(df_ml: pd.DataFrame) -> pd.DataFrame:
     pair_b = np.maximum(p1_id, p2_id)
 
     df_ml['pair_key'] = [f"{a}_{b}" for a, b in zip(pair_a, pair_b)]
-
-    # Pour chaque ligne, est-ce que p1 == pair_a ?
     df_ml['p1_is_a']  = (p1_id == pair_a)
 
-    # Colonnes résultats
+    # Résultats bruts
     h2h_p1_wins    = np.zeros(len(df_ml))
     h2h_total      = np.zeros(len(df_ml))
     h2h_surf_wins  = np.zeros(len(df_ml))
     h2h_surf_total = np.zeros(len(df_ml))
+    # Résultats pondérés récence
+    h2h_recent_num = np.zeros(len(df_ml))   # somme pondérée des victoires a
+    h2h_recent_den = np.zeros(len(df_ml))   # somme des poids
 
-    # Dictionnaires de comptage : {pair_key: [wins_a, total]}
-    h2h_global  = {}
+    # {pair_key: [wins_a, total]}
+    h2h_global: dict  = {}
     # {(pair_key, surface): [wins_a, total]}
-    h2h_surface = {}
+    h2h_surface: dict = {}
+    # {pair_key: [(date, a_won)]}  — pour le calcul pondéré
+    h2h_history: dict = {}
+
+    dates = df_ml['tourney_date'].values  # numpy datetime64
 
     for i, row in tqdm(df_ml.iterrows(), total=len(df_ml), desc="Calcul H2H"):
 
-        key     = row['pair_key']
-        surface = row['surface']
-        surf_key= (key, surface)
-        p1_is_a = row['p1_is_a']
-        p1_won  = row['target'] == 1
+        key      = row['pair_key']
+        surface  = row['surface']
+        surf_key = (key, surface)
+        p1_is_a  = row['p1_is_a']
+        p1_won   = row['target'] == 1
 
-        # ── Enregistrer AVANT le match ───────────────────────────────────────
+        # ── Lire l'historique AVANT ce match ────────────────────────────────
         g = h2h_global.get(key, [0, 0])
         s = h2h_surface.get(surf_key, [0, 0])
 
-        # Du point de vue de p1
         wins_p1_global = g[0] if p1_is_a else (g[1] - g[0])
         wins_p1_surf   = s[0] if p1_is_a else (s[1] - s[0])
 
@@ -66,20 +75,35 @@ def compute_h2h(df_ml: pd.DataFrame) -> pd.DataFrame:
         h2h_surf_wins[i]  = wins_p1_surf
         h2h_surf_total[i] = s[1]
 
-        # ── Mise à jour après le match ───────────────────────────────────────
-        # wins_a = victoires de pair_a (le joueur avec le plus petit ID)
+        # ── H2H pondéré récence (avant ce match) ───────────────────────────
+        if key in h2h_history and h2h_history[key]:
+            cur_date = dates[i]
+            num = 0.0
+            den = 0.0
+            for past_date, a_won_past in h2h_history[key]:
+                years_ago = (cur_date - past_date).astype('timedelta64[D]').astype(float) / 365.25
+                w = np.exp(-_H2H_LAMBDA * max(years_ago, 0.0))
+                # Convertir a_won → p1_won
+                p1_won_past = a_won_past if p1_is_a else not a_won_past
+                num += w * float(p1_won_past)
+                den += w
+            h2h_recent_num[i] = num
+            h2h_recent_den[i] = den
+
+        # ── Mettre à jour après ce match ────────────────────────────────────
         a_won = p1_won if p1_is_a else not p1_won
 
-        h2h_global[key]   = [g[0] + int(a_won), g[1] + 1]
+        h2h_global[key]       = [g[0] + int(a_won), g[1] + 1]
         h2h_surface[surf_key] = [s[0] + int(a_won), s[1] + 1]
+        h2h_history.setdefault(key, []).append((dates[i], a_won))
 
-    # Assignation des colonnes
+    # ── Assignation ─────────────────────────────────────────────────────────
     df_ml['h2h_p1_wins']   = h2h_p1_wins
     df_ml['h2h_total']     = h2h_total
     df_ml['h2h_p1_winrate'] = np.where(
         h2h_total > 0,
         h2h_p1_wins / h2h_total,
-        0.5   # Pas d'historique → on suppose 50/50
+        0.5
     )
 
     df_ml['h2h_surf_p1_wins']    = h2h_surf_wins
@@ -90,10 +114,15 @@ def compute_h2h(df_ml: pd.DataFrame) -> pd.DataFrame:
         0.5
     )
 
-    # Flag : ont-ils déjà joué ?
+    # H2H pondéré récence : 0.5 quand pas d'historique
+    df_ml['h2h_p1_winrate_recent'] = np.where(
+        h2h_recent_den > 0,
+        h2h_recent_num / h2h_recent_den,
+        0.5
+    )
+
     df_ml['h2h_played'] = (h2h_total > 0).astype(int)
 
-    # Nettoyage colonnes intermédiaires
     df_ml = df_ml.drop(columns=['pair_key', 'p1_is_a'])
 
     return df_ml
