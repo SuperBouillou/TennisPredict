@@ -28,6 +28,13 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ─── SCROLLBARS ─────────────────────────────────────────────── */
+::-webkit-scrollbar              { width: 5px; height: 5px; }
+::-webkit-scrollbar-track        { background: transparent; }
+::-webkit-scrollbar-thumb        { background: var(--border2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover  { background: var(--muted2); }
+* { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+
 html, body {
   height: 100%;
 }
@@ -233,7 +240,7 @@ body {
 /* ─── MAIN CONTENT ───────────────────────────────────────────── */
 .main-content {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden auto;
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
@@ -243,7 +250,7 @@ body {
 /* Legacy .content alias */
 .content {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden auto;
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
