@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Statistiques — TennisPredict{% endblock %}
 {% block page_title %}Statistiques{% endblock %}
-{% block page_meta %}Backtest out-of-sample · 2025{% endblock %}
+{% block page_meta %}Modèle · Backtest · Mes paris{% endblock %}
 
 {% block topbar_right %}
 <div class="toggle-group">
@@ -12,41 +12,69 @@
 
 {% block content %}
 
-<!-- Live performance -->
-<div class="section-label">Performance réelle (paris enregistrés)</div>
-<div id="live-perf-card" class="card" style="margin-bottom:10px;padding:14px">
+{# ═══════════════════════════════════════════════════════
+   BLOC 1 — MES PARIS (données réelles, bets enregistrés)
+   ═══════════════════════════════════════════════════════ #}
+<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:0 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
+  📊 Mes paris — résultats réels
+</div>
+
+<div id="live-perf-card" class="card" style="margin-bottom:8px;padding:14px">
   <div style="color:var(--muted);font-size:12px">Chargement…</div>
 </div>
 
+<!-- Monthly breakdown -->
+<div style="margin-bottom:4px">
+  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Évolution mois par mois</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Barres = nombre de paris gagnés (vert) et perdus (rouge) · Ligne bleue = ROI du mois</div>
+</div>
+<div class="chart-container" style="margin-bottom:8px" id="monthly-chart-wrap">
+  <canvas id="monthly-chart"></canvas>
+</div>
+
+
+{# ═══════════════════════════════════════════════════════
+   BLOC 2 — PERFORMANCE DU MODÈLE (backtest historique)
+   ═══════════════════════════════════════════════════════ #}
+<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
+  🤖 Performance du modèle — simulation historique
+</div>
+<div style="font-size:11px;color:var(--muted);margin-bottom:10px;padding:0 2px">
+  Ces chiffres sont calculés sur des données passées (2023–2025) que le modèle n'a jamais vues pendant l'entraînement.
+  Ils donnent une estimation réaliste de ce à quoi s'attendre — sans garantie sur le futur.
+</div>
+
 <!-- KPIs backtest -->
-<div class="section-label">Backtest out-of-sample (2025)</div>
 <div class="grid-4" style="margin-bottom:10px">
-  <div class="kpi-card">
+  <div class="kpi-card tip" data-tip="Retour sur investissement simulé avec les cotes Pinnacle no-vig">
     <div class="kpi-value {% if (kpis.get('roi') or 0) >= 0 %}text-green{% else %}text-red{% endif %}">
       {% if kpis.get('roi') %}{{ "%.1f"|format(kpis.roi * 100) }}%{% else %}—{% endif %}
     </div>
-    <div class="kpi-label">ROI</div>
+    <div class="kpi-label">ROI simulé</div>
   </div>
-  <div class="kpi-card">
+  <div class="kpi-card tip" data-tip="Nombre de paris passant les seuils d'edge et de probabilité">
     <div class="kpi-value">{{ kpis.get('n_bets', '—') }}</div>
-    <div class="kpi-label">Paris backtestés</div>
+    <div class="kpi-label">Signaux générés</div>
   </div>
-  <div class="kpi-card">
+  <div class="kpi-card tip" data-tip="Pourcentage de paris gagnants parmi les signaux retenus">
     <div class="kpi-value">
       {% if kpis.get('win_rate') %}{{ "%.1f"|format(kpis.win_rate * 100) }}%{% else %}—{% endif %}
     </div>
-    <div class="kpi-label">Win Rate</div>
+    <div class="kpi-label">Taux de réussite</div>
   </div>
-  <div class="kpi-card">
+  <div class="kpi-card tip" data-tip="P&L cumulé simulé sur la période de test (mise flat 1€/pari)">
     <div class="kpi-value {% if (kpis.get('pnl') or 0) >= 0 %}text-green{% else %}text-red{% endif %}">
-      {% if kpis.get('pnl') is not none %}{{ kpis.pnl | int }}€{% else %}—{% endif %}
+      {% if kpis.get('pnl') is not none %}{{ kpis.pnl | int }}u{% else %}—{% endif %}
     </div>
-    <div class="kpi-label">P&amp;L Total</div>
+    <div class="kpi-label">P&amp;L simulé</div>
   </div>
 </div>
 
 <!-- Equity Curve -->
-<div class="section-label">Courbe de bankroll</div>
+<div style="margin-bottom:4px">
+  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Évolution de la bankroll simulée</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Simulation avec 3 stratégies de mise différentes. <strong style="color:var(--text)">Kelly</strong> = mise proportionnelle à l'avantage · <strong style="color:var(--text)">Flat</strong> = mise fixe · <strong style="color:var(--text)">% Bankroll</strong> = pourcentage constant</div>
+</div>
 <div class="chart-container" style="margin-bottom:10px">
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn btn-sm strategy-btn active" data-strategy="Kelly"
@@ -60,25 +88,19 @@
 </div>
 
 <!-- ROI par bookmaker -->
-<div class="section-label">ROI par bookmaker</div>
+<div style="margin-bottom:4px">
+  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">ROI selon le bookmaker utilisé</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Comparer les cotes de différents bookmakers avec les mêmes prédictions. Pinnacle est la référence — marges les plus basses du marché.</div>
+</div>
 <div class="chart-container" style="margin-bottom:10px">
   <canvas id="roi-chart"></canvas>
 </div>
 
-<!-- Feature importance -->
-<div class="section-label">Feature importance (Top 15)</div>
-<div class="chart-container" style="margin-bottom:10px">
-  <canvas id="feat-chart"></canvas>
-</div>
-
-<!-- Win rate by edge bucket -->
-<div class="section-label">Win rate par tranche d'edge</div>
-<div class="chart-container" style="margin-bottom:10px">
-  <canvas id="edge-chart"></canvas>
-</div>
-
 <!-- Performance by surface -->
-<div class="section-label">Performance par surface</div>
+<div style="margin-bottom:4px">
+  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Résultats par surface</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Le modèle utilise des ratings ELO spécifiques à chaque surface. Vérifie s'il performe mieux sur un type de terrain en particulier.</div>
+</div>
 <div class="card" style="padding:12px;margin-bottom:10px">
   <table id="surface-table">
     <thead>
@@ -95,35 +117,65 @@
   </table>
 </div>
 
-<!-- Monthly breakdown -->
-<div class="section-label">Performance mensuelle (paris réels)</div>
-<div class="chart-container" style="margin-bottom:10px" id="monthly-chart-wrap">
-  <canvas id="monthly-chart"></canvas>
+
+{# ═══════════════════════════════════════════════════════
+   BLOC 3 — ANALYSE DU MODÈLE (internals, calibration)
+   ═══════════════════════════════════════════════════════ #}
+<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
+  🔬 Analyse du modèle — fonctionnement interne
+</div>
+
+<!-- Win rate by edge bucket -->
+<div style="margin-bottom:4px">
+  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">L'edge prédit est-il fiable ?</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">L'<strong style="color:var(--text)">edge</strong> mesure l'écart entre la probabilité du modèle et la cote du bookmaker. Plus il est élevé, plus le pari est censé être rentable. Ce graphique vérifie que c'est bien le cas en pratique.</div>
+</div>
+<div class="chart-container" style="margin-bottom:10px">
+  <canvas id="edge-chart"></canvas>
+</div>
+
+<!-- Feature importance -->
+<div style="margin-bottom:4px">
+  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Quels facteurs guident les prédictions ?</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Les 15 variables les plus influentes dans le modèle XGBoost. <span style="color:var(--blue)">■</span> ELO/classement · <span style="color:var(--green)">■</span> Forme récente · <span style="color:var(--orange)">■</span> Fatigue · <span style="color:var(--muted)">■</span> Contexte du match</div>
+</div>
+<div class="chart-container" style="margin-bottom:10px">
+  <canvas id="feat-chart"></canvas>
 </div>
 
 <!-- Calibration curve -->
-<div class="section-label">Courbe de calibration du modèle</div>
+<div style="margin-bottom:4px">
+  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Les probabilités annoncées sont-elles réalistes ?</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Quand le modèle dit "70% de chances de gagner", le joueur gagne-t-il vraiment 7 fois sur 10 ? Les points <span style="color:var(--green)">■ verts</span> sont bien calibrés (écart ≤ 5%) · les <span style="color:var(--red)">■ rouges</span> sont sur- ou sous-estimés. La taille = nombre de paris dans ce bucket.</div>
+</div>
 <div class="chart-container" style="margin-bottom:10px" id="calib-chart-wrap">
   <canvas id="calib-chart" height="160"></canvas>
 </div>
 
-<!-- Settings -->
-<div class="section-label">Configuration des seuils</div>
+
+{# ═══════════════════════════════════════════════════════
+   BLOC 4 — CONFIGURATION
+   ═══════════════════════════════════════════════════════ #}
+<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
+  ⚙️ Configuration
+</div>
+
 <div class="card">
+  <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Ces seuils filtrent les signaux affichés sur la page des matchs. Abaisser les valeurs = plus de signaux, moins sélectifs.</div>
   <form hx-post="/settings" hx-target="#settings-result" hx-swap="innerHTML">
     <div class="grid-3" style="margin-bottom:12px">
       <div class="form-group">
-        <label class="form-label">Edge minimum (%)</label>
+        <label class="form-label">Edge minimum <span style="color:var(--muted)">(avantage vs bookmaker)</span></label>
         <input class="form-input" name="min_edge" type="number" step="0.01" min="0" max="0.2"
                value="{{ settings.min_edge }}">
       </div>
       <div class="form-group">
-        <label class="form-label">Probabilité minimum</label>
+        <label class="form-label">Probabilité minimum <span style="color:var(--muted)">(confiance du modèle)</span></label>
         <input class="form-input" name="min_prob" type="number" step="0.01" min="0.5" max="0.8"
                value="{{ settings.min_prob }}">
       </div>
       <div class="form-group">
-        <label class="form-label">Kelly fraction</label>
+        <label class="form-label">Fraction Kelly <span style="color:var(--muted)">(fraction de la mise optimale)</span></label>
         <input class="form-input" name="kelly_fraction" type="number" step="0.05" min="0.1" max="0.5"
                value="{{ settings.kelly_fraction }}">
       </div>
