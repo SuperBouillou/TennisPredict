@@ -364,6 +364,9 @@ def get_player_age(player: dict) -> float | None:
     return dob_lookup.get((last_name, first_init))
 
 
+_H2H_LAMBDA = np.log(2) / 4.0   # exponential decay half-life = 4 years
+
+
 def load_h2h_data() -> pd.DataFrame:
     """Charge matches_features_final en cache mémoire (colonnes nécessaires seulement)."""
     global _h2h_cache
@@ -371,9 +374,11 @@ def load_h2h_data() -> pd.DataFrame:
         path = _PROCESSED_DIR / "matches_features_final.parquet"
         if path.exists():
             _h2h_cache = pd.read_parquet(
-                path, columns=['p1_name', 'p2_name', 'target', 'surface'])
+                path, columns=['p1_name', 'p2_name', 'target', 'surface',
+                               'tourney_name', 'tourney_date'])
         else:
-            _h2h_cache = pd.DataFrame(columns=['p1_name', 'p2_name', 'target', 'surface'])
+            _h2h_cache = pd.DataFrame(columns=['p1_name', 'p2_name', 'target', 'surface',
+                                               'tourney_name', 'tourney_date'])
     return _h2h_cache
 
 
@@ -406,7 +411,7 @@ def compute_h2h(p1_name: str, p2_name: str, surface: str) -> dict:
 
     if len(h2h) == 0:
         return {'h2h_p1_winrate': 0.5, 'h2h_surf_p1_winrate': 0.5,
-                'h2h_total': 0, 'h2h_played': 0}
+                'h2h_total': 0, 'h2h_played': 0, 'h2h_p1_winrate_recent': 0.5}
 
     # p1 (notre joueur 1) gagne quand : il est en position p1 ET target=1
     #                                   OU il est en position p2 ET target=0
@@ -427,12 +432,71 @@ def compute_h2h(p1_name: str, p2_name: str, surface: str) -> dict:
     else:
         surf_winrate = winrate
 
+    # H2H pondéré récence (exponential decay, half-life 4 years)
+    now = pd.Timestamp.now()
+    recent_num, recent_den = 0.0, 0.0
+    if 'tourney_date' in h2h.columns:
+        dates = pd.to_datetime(h2h['tourney_date'])
+        for idx_i, (is_p1, won_t, dt) in enumerate(
+                zip(p1_is_row_p1, h2h['target'].values, dates)):
+            years_ago = (now - dt).days / 365.25
+            w = np.exp(-_H2H_LAMBDA * max(years_ago, 0.0))
+            p1_won_past = (is_p1 and won_t == 1) or (not is_p1 and won_t == 0)
+            recent_num += w * float(p1_won_past)
+            recent_den += w
+    recent_wr = recent_num / recent_den if recent_den > 0 else 0.5
+
     return {
-        'h2h_p1_winrate'    : winrate,
-        'h2h_surf_p1_winrate': surf_winrate,
-        'h2h_total'         : total,
-        'h2h_played'        : total,
+        'h2h_p1_winrate'        : winrate,
+        'h2h_surf_p1_winrate'   : surf_winrate,
+        'h2h_total'             : total,
+        'h2h_played'            : total,
+        'h2h_p1_winrate_recent' : recent_wr,
     }
+
+
+def get_tourney_winrate(player: dict, tournament_name: str) -> float:
+    """
+    Retourne le win rate historique d'un joueur à ce tournoi.
+    Ordre de recherche :
+      1. player profile dict → 'tourney_winrates' (dict from update_database.py)
+      2. matches_features_final historique (via load_h2h_data cache)
+      3. Défaut 0.5
+    """
+    tname_lower = tournament_name.strip().lower() if tournament_name else ''
+
+    # Source 1 : profil joueur pré-calculé (update_database.py)
+    if 'tourney_winrates' in player and isinstance(player['tourney_winrates'], dict):
+        twr = player['tourney_winrates']
+        if tname_lower in twr:
+            return float(twr[tname_lower])
+        # Partial match (e.g. "miami" in "miami open")
+        for k, v in twr.items():
+            if tname_lower in k or k in tname_lower:
+                return float(v)
+
+    # Source 2 : historique global
+    df = load_h2h_data()
+    if df.empty or 'tourney_name' not in df.columns:
+        return 0.5
+    player_name = player.get('player_name', '')
+    if not player_name:
+        return 0.5
+
+    p_last = player_name.lower().replace('.', '').split()[0]
+    p1_last = df['p1_name'].str.lower().str.split().str[-1]
+    p2_last = df['p2_name'].str.lower().str.split().str[-1]
+    t_mask  = df['tourney_name'].str.lower().str.contains(tname_lower, na=False)
+
+    p_rows_as_p1 = df[t_mask & (p1_last == p_last)]
+    p_rows_as_p2 = df[t_mask & (p2_last == p_last)]
+
+    won_p1 = (p_rows_as_p1['target'] == 1).sum()
+    won_p2 = (p_rows_as_p2['target'] == 0).sum()
+    total  = len(p_rows_as_p1) + len(p_rows_as_p2)
+    if total == 0:
+        return 0.5
+    return float(won_p1 + won_p2) / total
 
 
 # Mapping importance tournoi — identique à compute_contextual_features.py
@@ -548,10 +612,11 @@ def build_feature_vector(match: dict, p1: dict, p2: dict,
         p2.get('player_name', ''),
         surface
     )
-    fv['h2h_p1_winrate']     = h2h['h2h_p1_winrate']
-    fv['h2h_surf_p1_winrate']= h2h['h2h_surf_p1_winrate']
-    fv['h2h_total']          = h2h['h2h_total']
-    fv['h2h_played']         = h2h['h2h_played']
+    fv['h2h_p1_winrate']          = h2h['h2h_p1_winrate']
+    fv['h2h_surf_p1_winrate']     = h2h['h2h_surf_p1_winrate']
+    fv['h2h_total']               = h2h['h2h_total']
+    fv['h2h_played']              = h2h['h2h_played']
+    fv['h2h_p1_winrate_recent']   = h2h['h2h_p1_winrate_recent']
 
     # ── Correction 3 : Contexte tournoi / round ───────────────────────────────
     tourney_level            = detect_tourney_level(match.get('tournament', ''))
@@ -596,6 +661,44 @@ def build_feature_vector(match: dict, p1: dict, p2: dict,
     # ── Repos ────────────────────────────────────────────────────────────────
     fv['p1_days_since'] = g(p1, 'days_since', 7)
     fv['p2_days_since'] = g(p2, 'days_since', 7)
+
+    # ── Fatigue sets/minutes (new) ────────────────────────────────────────────
+    for d in [7, 14]:
+        sv1 = g(p1, f'sets_{d}d', np.nan)
+        sv2 = g(p2, f'sets_{d}d', np.nan)
+        fv[f'p1_sets_{d}d'] = sv1
+        fv[f'p2_sets_{d}d'] = sv2
+        fv[f'fatigue_sets_diff_{d}d'] = (sv1 - sv2
+            if not (np.isnan(sv1) or np.isnan(sv2)) else np.nan)
+    # minutes not available in live pipeline → leave as NaN (imputed)
+    for suffix in ['p1_minutes_7d', 'p2_minutes_7d', 'fatigue_min_diff_7d',
+                   'p1_minutes_14d', 'p2_minutes_14d', 'fatigue_min_diff_14d']:
+        fv[suffix] = np.nan
+
+    # ── Momentum (new) ────────────────────────────────────────────────────────
+    # Sets ratio (last 10)
+    sr1 = g(p1, 'sets_ratio_10', np.nan)
+    sr2 = g(p2, 'sets_ratio_10', np.nan)
+    fv['p1_sets_ratio_10'] = sr1
+    fv['p2_sets_ratio_10'] = sr2
+    fv['sets_ratio_10_diff'] = (sr1 - sr2
+        if not (np.isnan(sr1) or np.isnan(sr2)) else np.nan)
+
+    # Tiebreak win rate (last 10)
+    tb1 = g(p1, 'tiebreak_winrate_10', np.nan)
+    tb2 = g(p2, 'tiebreak_winrate_10', np.nan)
+    fv['p1_tiebreak_winrate_10'] = tb1
+    fv['p2_tiebreak_winrate_10'] = tb2
+    fv['tiebreak_winrate_10_diff'] = (tb1 - tb2
+        if not (np.isnan(tb1) or np.isnan(tb2)) else np.nan)
+
+    # Tournament win rate (on-the-fly lookup)
+    tournament = match.get('tournament', '')
+    tw1 = get_tourney_winrate(p1, tournament)
+    tw2 = get_tourney_winrate(p2, tournament)
+    fv['p1_tourney_winrate']   = tw1
+    fv['p2_tourney_winrate']   = tw2
+    fv['tourney_winrate_diff'] = tw1 - tw2
 
     # ── Classement ───────────────────────────────────────────────────────────
     r1 = g(p1, 'rank', 100)

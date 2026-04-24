@@ -274,13 +274,40 @@ def update_player_profiles(df_new: pd.DataFrame,
         w_mask = df['winner_name'] == player
         l_mask = df['loser_name']  == player
 
-        df_w = df[w_mask][['tourney_date','surface','tourney_level']].copy()
+        # Set score columns available in tennis-data (w1..w5, l1..l5)
+        set_cols = [c for c in [f'{p}{i}' for p in ['w','l'] for i in range(1,6)]
+                    if c in df.columns]
+
+        df_w = df[w_mask][['tourney_date','surface','tourney_level','tourney_name'] + set_cols].copy()
         df_w['won'] = 1
+        df_w['_is_winner'] = True
 
-        df_l = df[l_mask][['tourney_date','surface','tourney_level']].copy()
+        df_l = df[l_mask][['tourney_date','surface','tourney_level','tourney_name'] + set_cols].copy()
         df_l['won'] = 0
+        df_l['_is_winner'] = False
 
-        df_p = pd.concat([df_w, df_l]).sort_values('tourney_date')
+        df_p = pd.concat([df_w, df_l]).sort_values('tourney_date').reset_index(drop=True)
+
+        # Compute sets per match (vectorized)
+        n_sets_arr   = np.zeros(len(df_p), dtype=np.int16)
+        sets_won_arr = np.zeros(len(df_p), dtype=np.int16)
+        has_tb_arr   = np.zeros(len(df_p), dtype=bool)
+        is_win = df_p['_is_winner'].values
+        for i in range(1, 6):
+            wc, lc = f'w{i}', f'l{i}'
+            if wc not in df_p.columns or lc not in df_p.columns:
+                break
+            wv = pd.to_numeric(df_p[wc], errors='coerce').values
+            lv = pd.to_numeric(df_p[lc], errors='coerce').values
+            valid = ~(np.isnan(wv) | np.isnan(lv))
+            n_sets_arr   += valid.astype(np.int16)
+            player_won_set = np.where(is_win, wv > lv, lv > wv)
+            sets_won_arr += (valid & player_won_set).astype(np.int16)
+            tb = valid & (((wv == 7) & (lv == 6)) | ((wv == 6) & (lv == 7)))
+            has_tb_arr   |= tb
+        df_p['_n_sets']   = n_sets_arr
+        df_p['_sets_won'] = sets_won_arr
+        df_p['_has_tb']   = has_tb_arr
 
         if len(df_p) == 0:
             continue
@@ -312,13 +339,34 @@ def update_player_profiles(df_new: pd.DataFrame,
             surf_results = df_p[df_p['surface'] == surf]['won'].values
             wr_surf[surf] = surf_results.mean() if len(surf_results) > 0 else 0.5
 
-        # Fatigue
+        # Fatigue (matches + sets in last 7/14/21 days)
+        profiles.setdefault(player, {})
         for d in [7, 14, 21]:
             cutoff = today - pd.Timedelta(days=d)
-            profiles.setdefault(player, {})
-            profiles[player][f'matches_{d}d'] = int(
-                (df_p['tourney_date'] >= cutoff).sum()
-            )
+            recent = df_p[df_p['tourney_date'] >= cutoff]
+            profiles[player][f'matches_{d}d'] = int(len(recent))
+        for d in [7, 14]:
+            cutoff = today - pd.Timedelta(days=d)
+            recent = df_p[df_p['tourney_date'] >= cutoff]
+            profiles[player][f'sets_{d}d'] = int(recent['_n_sets'].sum())
+
+        # Sets ratio over last 10 matches
+        last10 = df_p.tail(10)
+        tot_sets = int(last10['_n_sets'].sum())
+        won_sets = int(last10['_sets_won'].sum())
+        sets_ratio_10 = won_sets / tot_sets if tot_sets > 0 else 0.5
+
+        # Tiebreak win rate over last 10 matches that contained a tiebreak
+        last10_tb = last10[last10['_has_tb']]
+        tiebreak_winrate_10 = (last10_tb['won'].mean()
+                               if len(last10_tb) >= 2 else 0.5)
+
+        # Tournament win rate at each seen tournament (for predict_today lookup)
+        tourney_wr = {}
+        for tname, tgrp in df_p.groupby('tourney_name'):
+            if not isinstance(tname, str) or not tname.strip():
+                continue
+            tourney_wr[tname.strip().lower()] = float(tgrp['won'].mean())
 
         # Rang depuis le dernier match (victoire OU défaite, selon le plus récent)
         # On filtre sur les matchs ayant une donnée de rang (les matchs ESPN n'en ont pas)
@@ -341,24 +389,28 @@ def update_player_profiles(df_new: pd.DataFrame,
         elo_key = name_mapping.get(player, player) if name_mapping else player
 
         profiles[player].update({
-            'player_name'         : player,
-            'last_match'          : last_match.date(),
-            'days_since'          : days_since,
-            'n_matches'           : n,
-            'winrate_5'           : round(wr5, 4),
-            'winrate_10'          : round(wr10, 4),
-            'winrate_20'          : round(wr20, 4),
-            'streak'              : streak,
-            'winrate_surf_Hard'   : round(wr_surf.get('Hard', 0.5), 4),
-            'winrate_surf_Clay'   : round(wr_surf.get('Clay', 0.5), 4),
-            'winrate_surf_Grass'  : round(wr_surf.get('Grass', 0.5), 4),
-            'rank'                : rank,
-            'rank_points'         : rank_pts,
-            'elo'                 : elo_ratings.get(elo_key, 1500),
-            'elo_Hard'            : elo_surface.get(elo_key, {}).get('Hard', 1500),
-            'elo_Clay'            : elo_surface.get(elo_key, {}).get('Clay', 1500),
-            'elo_Grass'           : elo_surface.get(elo_key, {}).get('Grass', 1500),
-            'form_last5'          : form_last5,
+            'player_name'           : player,
+            'last_match'            : last_match.date(),
+            'days_since'            : days_since,
+            'n_matches'             : n,
+            'winrate_5'             : round(wr5, 4),
+            'winrate_10'            : round(wr10, 4),
+            'winrate_20'            : round(wr20, 4),
+            'streak'                : streak,
+            'winrate_surf_Hard'     : round(wr_surf.get('Hard', 0.5), 4),
+            'winrate_surf_Clay'     : round(wr_surf.get('Clay', 0.5), 4),
+            'winrate_surf_Grass'    : round(wr_surf.get('Grass', 0.5), 4),
+            'rank'                  : rank,
+            'rank_points'           : rank_pts,
+            'elo'                   : elo_ratings.get(elo_key, 1500),
+            'elo_Hard'              : elo_surface.get(elo_key, {}).get('Hard', 1500),
+            'elo_Clay'              : elo_surface.get(elo_key, {}).get('Clay', 1500),
+            'elo_Grass'             : elo_surface.get(elo_key, {}).get('Grass', 1500),
+            'form_last5'            : form_last5,
+            # New momentum / fatigue features
+            'sets_ratio_10'         : round(sets_ratio_10, 4),
+            'tiebreak_winrate_10'   : round(tiebreak_winrate_10, 4),
+            'tourney_winrates'      : tourney_wr,   # dict {tourney_lower: wr}
         })
 
     df_profiles = pd.DataFrame(list(profiles.values()))
