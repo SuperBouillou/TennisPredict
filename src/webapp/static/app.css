@@ -1035,16 +1035,20 @@ tr:hover td { background: rgba(19,25,32,.6); }
   .resolved-table th:nth-child(4),
   .resolved-table td:nth-child(4) { display: none; }
 
-  /* Pending bet resolve buttons: touch-friendly */
+  /* Pending bet actions: touch-friendly */
+  .bet-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bet-actions form { flex: 1; display: flex; }
+  .bet-actions form:last-child { flex: 0; margin-left: auto; }
   .btn-won, .btn-lost {
+    width: 100%;
     min-height: 44px;
-    padding: 0 16px;
+    padding: 0 12px;
     font-size: 13px;
-    flex: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
+  .bet-actions .btn-sm { min-height: 44px; padding: 0 14px; }
   /* ── Layout: sidebar off, bottom nav on ── */
   .sidebar { display: none; }
   body { overflow: auto; height: auto; flex-direction: column; }

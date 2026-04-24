@@ -224,19 +224,19 @@
         </div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <form hx-post="/bets/{{ b.id }}/resolve" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML" style="display:contents">
+    <div class="bet-actions">
+      <form hx-post="/bets/{{ b.id }}/resolve" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="outcome" value="won">
         <button type="submit" class="btn-won">✅ Gagné</button>
       </form>
-      <form hx-post="/bets/{{ b.id }}/resolve" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML" style="display:contents">
+      <form hx-post="/bets/{{ b.id }}/resolve" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="outcome" value="lost">
         <button type="submit" class="btn-lost">❌ Perdu</button>
       </form>
       <form hx-post="/bets/{{ b.id }}/delete" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML"
             hx-confirm="Annuler ce pari et rembourser la mise ?"
-            style="display:contents">
-        <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:var(--red);border:1px solid var(--red);min-height:44px;padding:0 14px">
+            style="display:inline;margin-left:auto">
+        <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:var(--red);border:1px solid var(--red)">
           🗑 Annuler
         </button>
       </form>
