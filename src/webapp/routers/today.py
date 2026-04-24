@@ -236,31 +236,34 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         level   = m.get('level') or m.get('tourney_level', '')
 
         # ── Surface-specific thresholds ───────────────────────────────────────
-        # Derived from backtest OOS 2023-2024 (ATP, 1675 matches):
-        #   Hard  → ROI +8.5%  — reliable at current thresholds
-        #   Grass → ROI +11.5% — high reliability even at lower edge
-        #   Clay  → ROI −0.6%  — model over-confident; needs higher bar
-        #     Clay 16-20% edge: +33.8% ROI   Clay >20%: −2.2% (false signals)
+        # Calibrated on backtest OOS 2023-2026 (ATP, 93 features, 1844 matchs):
+        #   Hard  >20% edge:      +4.67% ROI   Hard 12-16%: −6.46% (avoid)
+        #   Clay  16-20% edge:   +23.54% ROI   Clay >20%: −0.88% (ok)
+        #   Grass all edges:     −15.45% ROI   → near-suppress, need huge edge
         #
         # Tournament level adjustment:
-        #   Masters 1000 (M): ROI +9.5% — most reliable, relax slightly
-        #   ATP 250/500 (A):  ROI +3.7% — weakest signal, add conservative buffer
+        #   Masters 1000 (M): +2.11% ROI — most reliable, relax
+        #   Grand Slam (G):   −1.52% ROI — tighten slightly
+        #   ATP 250/500 (A):  −5.08% ROI — weakest signal, tighten significantly
         # ─────────────────────────────────────────────────────────────────────
         _BASE: dict[str, tuple[float, float]] = {
-            # surface: (value_thr_high, edge_thr_high)
-            'Hard':  (0.14, 0.07),   # +1pp vs before → optimal at 14%
-            'Grass': (0.10, 0.05),   # relax — grass very reliable at low edge
-            'Clay':  (0.18, 0.11),   # raise — clay noisy below 18%
+            # surface: (value_thr, edge_thr)
+            'Hard':  (0.20, 0.15),   # raised: hard only reliable above 20%
+            'Clay':  (0.16, 0.12),   # sweet spot 16-20%
+            'Grass': (0.28, 0.23),   # near-suppress: model unreliable on grass
         }
         base_value, base_edge = _BASE.get(surface, _BASE['Hard'])
 
-        # Level modifier: loosen for Masters, tighten for smaller events
+        # Level modifier
         if level == 'M':
-            base_value -= 0.01
-            base_edge  -= 0.01
-        elif level == 'A':
-            base_value += 0.01
+            base_value -= 0.02     # Masters most reliable: relax 2pp
+            base_edge  -= 0.02
+        elif level == 'G':
+            base_value += 0.02     # Grand Slams slightly worse: tighten
             base_edge  += 0.01
+        elif level == 'A':
+            base_value += 0.04     # ATP 250/500 worst: tighten significantly
+            base_edge  += 0.03
 
         # Data-quality scaling (unchanged logic, applied on top of surface thresholds)
         if dq == 'high':
@@ -280,18 +283,12 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         else:
             m['badge'] = 'neutral'
 
-        # High-odds cap: model reliability drops at extreme odds.
-        # @6: VALUE → EDGE  (uncertainty too high for a full value call)
-        # @8: anything → NEUTRAL  (variance too high; raised from @7 — data shows
-        #                          odds 6-8 still have positive ROI on backtest)
-        # @10: failsafe → NEUTRAL
+        # High-odds cap: backtest shows odds 4-6+: +11-12% ROI — do NOT suppress.
+        # Only cap truly extreme odds where sample size is tiny.
+        # @12: failsafe → NEUTRAL  (variance too high, < 5 expected wins per 100 bets)
         if active_odd is not None:
-            if active_odd >= 10.0 and m['badge'] != 'neutral':
+            if active_odd >= 12.0 and m['badge'] != 'neutral':
                 m['badge'] = 'neutral'
-            elif active_odd >= 8.0 and m['badge'] in ('value', 'edge'):
-                m['badge'] = 'neutral'
-            elif active_odd >= 6.0 and m['badge'] == 'value':
-                m['badge'] = 'edge'
         enriched.append(m)
     return sorted(enriched, key=lambda x: -max(x.get('edge_p1') or -99, x.get('edge_p2') or -99))
 
