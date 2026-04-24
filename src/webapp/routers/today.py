@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import sys
 from datetime import date, timedelta
@@ -13,6 +14,8 @@ from fastapi.templating import Jinja2Templates
 
 from src.webapp import ml as ml_module
 from src.webapp.db import get_bankroll, set_bankroll, get_setting, list_bets
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -150,8 +153,8 @@ def _resolve_h2h(h2h_lookup: dict, p1_name: str, p2_name: str, surface: str) -> 
     h2h_for_ml = {'total', 'p1_wins', 'surf_total', 'surf_p1_wins'}
     h2h_display = {'total', 'p1_wins', 'p2_wins'}
     """
-    k1 = p1_name.lower()
-    k2 = p2_name.lower()
+    k1 = p1_name.lower().strip()
+    k2 = p2_name.lower().strip()
     h2h_key = (min(k1, k2), max(k1, k2))
     h2h_raw = h2h_lookup.get(h2h_key)
     if not h2h_raw or h2h_raw['total'] == 0:
@@ -210,8 +213,9 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
                 h2h=h2h_for_ml,
             )
             m.update(result)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ML predict failed for %s vs %s: %s",
+                           m.get('p1_name'), m.get('p2_name'), e)
 
         # Player profile stats (rank, form, surface winrate)
         if profiles is not None:

@@ -4,8 +4,10 @@ from __future__ import annotations
 import csv
 import io
 import sys
+import time
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
@@ -15,6 +17,14 @@ from src.webapp.db import get_bankroll, list_bets, resolve_bet, delete_bet, dele
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
+
+# Simple in-memory cache for the P&L time series (invalidated on any bet resolution/deletion)
+_pnl_cache: dict[str, tuple[dict, float]] = {}  # key → (data, timestamp)
+_PNL_TTL = 30  # seconds
+
+
+def _invalidate_pnl_cache() -> None:
+    _pnl_cache.clear()
 
 
 _SRC = str(Path(__file__).resolve().parents[3] / 'src')
@@ -166,7 +176,7 @@ async def history_page(
 
 
 @router.post("/bets/{bet_id}/resolve", response_class=HTMLResponse)
-async def resolve(request: Request, bet_id: int, outcome: str = Form(...)):
+async def resolve(request: Request, bet_id: int, outcome: Literal['won', 'lost'] = Form(...)):
     db = _state()['db']
     try:
         resolve_bet(db, bet_id, outcome)
@@ -175,6 +185,7 @@ async def resolve(request: Request, bet_id: int, outcome: str = Form(...)):
             f'<div class="card" style="color:var(--red)">{e}</div>',
             status_code=400,
         )
+    _invalidate_pnl_cache()
     # HX-Refresh reloads the full page so stats bar, P&L, bankroll and chart all update
     return HTMLResponse("", headers={"HX-Refresh": "true"})
 
@@ -189,6 +200,7 @@ async def delete(request: Request, bet_id: int):
             f'<div class="card" style="color:var(--red)">{e}</div>',
             status_code=400,
         )
+    _invalidate_pnl_cache()
     return HTMLResponse("", headers={"HX-Refresh": "true"})
 
 
@@ -202,6 +214,7 @@ async def delete_resolved(request: Request, bet_id: int):
             f'<tr><td colspan="7" style="color:var(--red)">{e}</td></tr>',
             status_code=400,
         )
+    _invalidate_pnl_cache()
     return HTMLResponse("", headers={"HX-Refresh": "true"})
 
 
@@ -209,6 +222,7 @@ async def delete_resolved(request: Request, bet_id: int):
 async def clear_history(request: Request, tour: str = Form("")):
     db = _state()['db']
     n = clear_bets(db, tour=tour or None)
+    _invalidate_pnl_cache()
     return HTMLResponse(
         f'<div class="card" style="color:var(--muted);text-align:center;padding:20px">'
         f'{n} paris supprimés.</div>'
@@ -218,6 +232,11 @@ async def clear_history(request: Request, tour: str = Form("")):
 @router.get("/history/pnl-data")
 async def pnl_data(tour: str | None = Query(default=None)):
     """Return cumulative P&L time series for Chart.js equity curve."""
+    cache_key = tour or "all"
+    cached = _pnl_cache.get(cache_key)
+    if cached and (time.time() - cached[1]) < _PNL_TTL:
+        return JSONResponse(cached[0])
+
     db = _state()['db']
     if tour:
         rows = db.execute(
@@ -233,7 +252,9 @@ async def pnl_data(tour: str | None = Query(default=None)):
     for r in rows:
         cumul += r["pnl"]
         points.append({"date": r["resolved_at"][:10], "pnl": round(cumul, 2)})
-    return JSONResponse({"points": points})
+    result = {"points": points}
+    _pnl_cache[cache_key] = (result, time.time())
+    return JSONResponse(result)
 
 
 @router.get("/history/export")

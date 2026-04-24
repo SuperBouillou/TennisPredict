@@ -46,20 +46,27 @@ def set_bankroll(conn: sqlite3.Connection, tour: str = 'global', amount: float =
 # ── Bets ──────────────────────────────────────────────────────────────────────
 
 def add_bet(conn: sqlite3.Connection, bet: dict) -> int:
-    """Insert bet and debit stake from bankroll. Returns new bet id."""
-    cur = conn.execute(
-        """INSERT INTO bets
-           (tour, created_at, tournament, surface, round, p1_name, p2_name,
-            bet_on, prob, edge, odd, stake, kelly_frac, status, pnl)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',0)""",
-        (bet['tour'], _now(), bet['tournament'], bet['surface'], bet.get('round'),
-         bet['p1_name'], bet['p2_name'], bet['bet_on'], bet['prob'],
-         bet.get('edge'), bet['odd'], bet['stake'], bet.get('kelly_frac')),
-    )
-    current = get_bankroll(conn)
-    set_bankroll(conn, amount=current - bet['stake'])
-    conn.commit()
-    return cur.lastrowid
+    """Insert bet and debit stake from bankroll atomically. Returns new bet id."""
+    try:
+        cur = conn.execute(
+            """INSERT INTO bets
+               (tour, created_at, tournament, surface, round, p1_name, p2_name,
+                bet_on, prob, edge, odd, stake, kelly_frac, status, pnl)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',0)""",
+            (bet['tour'], _now(), bet['tournament'], bet['surface'], bet.get('round'),
+             bet['p1_name'], bet['p2_name'], bet['bet_on'], bet['prob'],
+             bet.get('edge'), bet['odd'], bet['stake'], bet.get('kelly_frac')),
+        )
+        current = get_bankroll(conn)
+        conn.execute(
+            "INSERT OR REPLACE INTO bankroll (tour, amount, updated_at) VALUES ('global', ?, ?)",
+            (round(current - bet['stake'], 2), _now()),
+        )
+        conn.commit()
+        return cur.lastrowid
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def get_bet(conn: sqlite3.Connection, bet_id: int) -> dict | None:
@@ -69,25 +76,33 @@ def get_bet(conn: sqlite3.Connection, bet_id: int) -> dict | None:
 
 def resolve_bet(conn: sqlite3.Connection, bet_id: int, outcome: str) -> None:
     """outcome: 'won' | 'lost'"""
+    if outcome not in ('won', 'lost'):
+        raise ValueError(f"Invalid outcome '{outcome}' — must be 'won' or 'lost'")
     bet = get_bet(conn, bet_id)
     if bet is None:
         raise ValueError(f"Bet {bet_id} not found")
     if bet['status'] != 'pending':
         raise ValueError(f"Bet {bet_id} already resolved (status={bet['status']})")
+    try:
+        if outcome == 'won':
+            profit = round(bet['stake'] * (bet['odd'] - 1), 2)
+            pnl = profit
+            current = get_bankroll(conn)
+            conn.execute(
+                "INSERT OR REPLACE INTO bankroll (tour, amount, updated_at) VALUES ('global', ?, ?)",
+                (round(current + bet['stake'] + profit, 2), _now()),
+            )
+        else:
+            pnl = -bet['stake']
 
-    if outcome == 'won':
-        profit = round(bet['stake'] * (bet['odd'] - 1), 2)
-        pnl = profit
-        current = get_bankroll(conn)
-        set_bankroll(conn, amount=current + bet['stake'] + profit)
-    else:
-        pnl = -bet['stake']
-
-    conn.execute(
-        "UPDATE bets SET status=?, pnl=?, resolved_at=? WHERE id=?",
-        (outcome, pnl, _now(), bet_id),
-    )
-    conn.commit()
+        conn.execute(
+            "UPDATE bets SET status=?, pnl=?, resolved_at=? WHERE id=?",
+            (outcome, pnl, _now(), bet_id),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def delete_bet(conn: sqlite3.Connection, bet_id: int) -> None:
@@ -97,10 +112,17 @@ def delete_bet(conn: sqlite3.Connection, bet_id: int) -> None:
         raise ValueError(f"Bet {bet_id} not found")
     if bet['status'] != 'pending':
         raise ValueError(f"Bet {bet_id} is already resolved — cannot delete")
-    current = get_bankroll(conn)
-    set_bankroll(conn, amount=current + bet['stake'])
-    conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
-    conn.commit()
+    try:
+        current = get_bankroll(conn)
+        conn.execute(
+            "INSERT OR REPLACE INTO bankroll (tour, amount, updated_at) VALUES ('global', ?, ?)",
+            (round(current + bet['stake'], 2), _now()),
+        )
+        conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def delete_resolved_bet(conn: sqlite3.Connection, bet_id: int) -> None:
@@ -110,15 +132,21 @@ def delete_resolved_bet(conn: sqlite3.Connection, bet_id: int) -> None:
         raise ValueError(f"Bet {bet_id} not found")
     if bet['status'] == 'pending':
         raise ValueError(f"Bet {bet_id} is pending — use delete_bet instead")
-    current = get_bankroll(conn)
-    if bet['status'] == 'won':
-        # At resolution: bankroll += stake + profit → reverse
-        set_bankroll(conn, amount=current - bet['stake'] - bet['pnl'])
-    else:
-        # At placement: bankroll -= stake (lost resolution didn't credit anything) → refund
-        set_bankroll(conn, amount=current + bet['stake'])
-    conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
-    conn.commit()
+    try:
+        current = get_bankroll(conn)
+        if bet['status'] == 'won':
+            new_amount = round(current - bet['stake'] - bet['pnl'], 2)
+        else:
+            new_amount = round(current + bet['stake'], 2)
+        conn.execute(
+            "INSERT OR REPLACE INTO bankroll (tour, amount, updated_at) VALUES ('global', ?, ?)",
+            (new_amount, _now()),
+        )
+        conn.execute("DELETE FROM bets WHERE id = ?", (bet_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def auto_resolve_pending(conn: sqlite3.Connection, tour: str, results: list[dict]) -> int:
@@ -173,18 +201,19 @@ def list_bets(
     limit: int = 20,
     offset: int = 0,
 ) -> list[dict]:
-    clauses, params = [], []
+    clauses: list[str] = []
+    params: list = []
     if tour:
         clauses.append("tour = ?"); params.append(tour)
     if status:
         clauses.append("status = ?"); params.append(status)
     if surface:
         clauses.append("surface = ?"); params.append(surface)
-    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
-    rows = conn.execute(
-        f"SELECT * FROM bets {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
-        params + [limit, offset],
-    ).fetchall()
+    base = "SELECT * FROM bets"
+    if clauses:
+        base += " WHERE " + " AND ".join(clauses)
+    base += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    rows = conn.execute(base, params + [limit, offset]).fetchall()
     return [dict(r) for r in rows]
 
 

@@ -25,12 +25,13 @@
       ↓ CSV
     </button>
   </a>
+  {% set _total_bets = (pending | length) + (resolved | length) %}
   <form hx-post="/bets/clear" hx-target="#history-content" hx-swap="innerHTML"
-        hx-confirm="Supprimer {% if tour %}tout l'historique {{ tour | upper }}{% else %}tout l'historique ATP + WTA{% endif %} ?"
+        hx-confirm="Supprimer {% if tour %}tout l'historique {{ tour | upper }}{% else %}tout l'historique ATP + WTA{% endif %} ({{ _total_bets }} paris) ?"
         style="display:inline">
     <input type="hidden" name="tour" value="{{ tour or '' }}">
     <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid var(--red)">
-      🗑 Vider
+      🗑 Vider ({{ _total_bets }})
     </button>
   </form>
 </div>
@@ -42,7 +43,7 @@
 <div class="card" style="margin-bottom:8px;padding:10px 14px;background:rgba(34,197,94,.08);border-color:var(--green);display:flex;align-items:center;gap:8px">
   <span style="font-size:16px">✅</span>
   <span style="font-size:13px;color:var(--green)">
-    <strong>{{ auto_resolved }} pari{{ 's' if auto_resolved > 1 else '' }}</strong> résolu{{ 's' if auto_resolved > 1 else '' }} automatiquement via ESPN.
+    <strong>{{ auto_resolved }} pari{{ 's' if auto_resolved > 1 else '' }}</strong> résolu{{ 's' if auto_resolved > 1 else '' }} automatiquement via ESPN (dernières 72h).
   </span>
 </div>
 {% endif %}
@@ -186,8 +187,19 @@
         options: {
           plugins: { legend: { display: false } },
           scales: {
-            y: { grid: { color: 'rgba(100,116,139,.2)' }, ticks: { color: '#64748b', font: { size: 10 } } },
-            x: { ticks: { maxTicksLimit: 8, color: '#64748b', font: { size: 10 } }, grid: { display: false } },
+            y: {
+              grid: { color: 'rgba(100,116,139,.2)' },
+              ticks: {
+                color: '#64748b', font: { size: 10 },
+                callback: function(v) { return (v >= 0 ? '+' : '') + v + '€'; },
+              },
+              title: { display: true, text: 'P&L cumulé (€)', color: '#64748b', font: { size: 10 } },
+            },
+            x: {
+              ticks: { maxTicksLimit: 8, color: '#64748b', font: { size: 10 } },
+              grid: { display: false },
+              title: { display: true, text: 'Date de résolution', color: '#64748b', font: { size: 10 } },
+            },
           },
         },
       });
