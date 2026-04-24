@@ -264,7 +264,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 10px;
   border-left: 3px solid var(--border2);
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 0.15s;
   margin-bottom: 8px;
 }
@@ -853,6 +853,9 @@ body {
 }
 
 .parie-badge {
+  display: inline-block;
+  width: fit-content;
+  align-self: flex-start;
   font-size: 10px;
   font-family: var(--mono);
   color: var(--green);
