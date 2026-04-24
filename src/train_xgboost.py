@@ -124,7 +124,10 @@ if __name__ == "__main__":
 
     splits   = joblib.load(MODELS_DIR / "splits.pkl")
     features = joblib.load(MODELS_DIR / "feature_list.pkl")
-    lr_full  = joblib.load(MODELS_DIR / "lr_full.pkl")
+    try:
+        lr_full = joblib.load(MODELS_DIR / "lr_full.pkl")
+    except Exception:
+        lr_full = None  # modèle de référence absent ou features incompatibles
 
     X_train = splits['X_train']
     X_valid = splits['X_valid']
@@ -276,19 +279,23 @@ if __name__ == "__main__":
     print("TABLEAU COMPARATIF COMPLET")
     print("=" * 55)
 
-    # Ajouter LR_full pour comparaison
+    # Ajouter LR_full pour comparaison (facultatif — peut être absent ou incompatible)
     lr_results = []
-    for split_name, Xs, ys in eval_sets:
-        y_prob = lr_full.predict_proba(Xs)[:, 1]
-        y_pred = lr_full.predict(Xs)
-        prob_true, prob_pred = calibration_curve(ys, y_prob, n_bins=10)
-        lr_results.append({
-            'model': 'LR_full', 'split': split_name,
-            'accuracy': accuracy_score(ys, y_pred),
-            'log_loss': log_loss(ys, y_prob),
-            'brier': brier_score_loss(ys, y_prob),
-            'calibration_error': np.mean(np.abs(prob_true - prob_pred))
-        })
+    if lr_full is not None:
+        try:
+            for split_name, Xs, ys in eval_sets:
+                y_prob = lr_full.predict_proba(Xs)[:, 1]
+                y_pred = lr_full.predict(Xs)
+                prob_true, prob_pred = calibration_curve(ys, y_prob, n_bins=10)
+                lr_results.append({
+                    'model': 'LR_full', 'split': split_name,
+                    'accuracy': accuracy_score(ys, y_pred),
+                    'log_loss': log_loss(ys, y_prob),
+                    'brier': brier_score_loss(ys, y_prob),
+                    'calibration_error': np.mean(np.abs(prob_true - prob_pred))
+                })
+        except Exception as e:
+            print(f"  [WARN] LR_full ignoré (features incompatibles) : {e}")
 
     df_all = pd.DataFrame(lr_results + results)
     for split_name in df_all['split'].unique():
