@@ -1,4 +1,4 @@
-"""SQLite helpers — bets, bankroll, settings."""
+"""SQLite helpers — bets, bankroll, settings, signal_log."""
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -227,6 +227,152 @@ def get_setting(conn: sqlite3.Connection, key: str, default: str = '') -> str:
 def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
     conn.commit()
+
+
+# ── Signal log (track record automatique) ────────────────────────────────────
+
+def log_signal(conn: sqlite3.Connection, signal: dict) -> int | None:
+    """
+    Insère un signal VALUE dans signal_log si pas encore présent pour ce match/côté.
+    Retourne l'id inséré ou None si doublon.
+    """
+    existing = conn.execute(
+        """SELECT id FROM signal_log
+           WHERE tour=? AND p1_name=? AND p2_name=? AND bet_on=?
+             AND date(created_at)=date(?)""",
+        (signal['tour'], signal['p1_name'], signal['p2_name'],
+         signal['bet_on'], _now()),
+    ).fetchone()
+    if existing:
+        return None
+
+    cur = conn.execute(
+        """INSERT INTO signal_log
+           (created_at, tour, tournament, surface, level, round,
+            p1_name, p2_name, bet_on, prob_model, odd_snapshot, edge, stake_units)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1.0)""",
+        (_now(), signal['tour'], signal.get('tournament'), signal.get('surface'),
+         signal.get('level'), signal.get('round'),
+         signal['p1_name'], signal['p2_name'], signal['bet_on'],
+         signal.get('prob_model'), signal.get('odd_snapshot'), signal.get('edge')),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def resolve_signals(conn: sqlite3.Connection, tour: str, results: list[dict]) -> int:
+    """
+    Résout les signaux pending à partir des résultats ESPN.
+    results: liste de dicts avec p1_name (winner) et p2_name (loser).
+    Retourne le nombre de signaux résolus.
+    """
+    pending = conn.execute(
+        "SELECT * FROM signal_log WHERE tour=? AND result='pending'", (tour,)
+    ).fetchall()
+    if not pending or not results:
+        return 0
+
+    result_pairs: set[tuple[str, str]] = set()
+    for r in results:
+        w = r.get('p1_name', '').lower().strip()
+        l = r.get('p2_name', '').lower().strip()
+        if w and l:
+            result_pairs.add((w, l))
+
+    resolved = 0
+    now = _now()
+    for sig in pending:
+        bet_on   = sig['bet_on'].lower().strip()
+        p1_lower = sig['p1_name'].lower().strip()
+        p2_lower = sig['p2_name'].lower().strip()
+        opponent = p2_lower if bet_on == p1_lower else p1_lower
+        odd      = sig['odd_snapshot'] or 2.0
+
+        if (bet_on, opponent) in result_pairs:
+            pnl = round(odd - 1, 4)   # gain : (cote - 1) × 1 unité
+            conn.execute(
+                "UPDATE signal_log SET result='won', pnl_units=?, resolved_at=? WHERE id=?",
+                (pnl, now, sig['id']),
+            )
+            resolved += 1
+        elif (opponent, bet_on) in result_pairs:
+            conn.execute(
+                "UPDATE signal_log SET result='lost', pnl_units=-1.0, resolved_at=? WHERE id=?",
+                (now, sig['id']),
+            )
+            resolved += 1
+
+    if resolved:
+        conn.commit()
+    return resolved
+
+
+def get_signal_stats(conn: sqlite3.Connection,
+                     tour: str | None = None) -> dict:
+    """Retourne les KPIs du track record."""
+    clauses = ["result != 'void'"]
+    params: list = []
+    if tour:
+        clauses.append("tour = ?"); params.append(tour)
+
+    base = f"SELECT * FROM signal_log WHERE {' AND '.join(clauses)}"
+    rows = conn.execute(base, params).fetchall()
+
+    total    = len(rows)
+    pending  = sum(1 for r in rows if r['result'] == 'pending')
+    resolved = [r for r in rows if r['result'] in ('won', 'lost')]
+    won      = sum(1 for r in resolved if r['result'] == 'won')
+    pnl      = sum(r['pnl_units'] or 0 for r in resolved)
+    n_res    = len(resolved)
+    win_rate = won / n_res if n_res else None
+    roi      = pnl / n_res if n_res else None
+
+    return {
+        'total': total, 'pending': pending, 'resolved': n_res,
+        'won': won, 'lost': n_res - won,
+        'win_rate': round(win_rate, 4) if win_rate is not None else None,
+        'roi': round(roi, 4) if roi is not None else None,
+        'pnl_units': round(pnl, 2),
+    }
+
+
+def list_signals(conn: sqlite3.Connection,
+                 tour: str | None = None,
+                 limit: int = 50) -> list[dict]:
+    """Retourne les derniers signaux, du plus récent au plus ancien."""
+    q = "SELECT * FROM signal_log"
+    params: list = []
+    if tour:
+        q += " WHERE tour = ?"; params.append(tour)
+    q += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    return [dict(r) for r in conn.execute(q, params).fetchall()]
+
+
+def get_signal_curve(conn: sqlite3.Connection,
+                     tour: str | None = None) -> dict:
+    """Retourne les données pour la courbe P&L cumulative."""
+    clauses = ["result IN ('won','lost')"]
+    params: list = []
+    if tour:
+        clauses.append("tour = ?"); params.append(tour)
+
+    rows = conn.execute(
+        f"SELECT resolved_at, pnl_units FROM signal_log "
+        f"WHERE {' AND '.join(clauses)} ORDER BY resolved_at",
+        params,
+    ).fetchall()
+
+    if not rows:
+        return {'labels': [], 'values': []}
+
+    labels, values, cumul = [], [], 0.0
+    for r in rows:
+        cumul += r['pnl_units'] or 0
+        labels.append(r['resolved_at'][:10])
+        values.append(round(cumul, 2))
+
+    return {'labels': labels, 'values': values}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

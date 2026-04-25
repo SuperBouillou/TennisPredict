@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from src.webapp.db import get_bankroll, get_setting, set_setting
+from src.webapp.db import get_bankroll, get_setting, set_setting, get_signal_stats, list_signals, get_signal_curve
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -333,6 +333,29 @@ async def calibration_curve(tour: str | None = Query(default=None)):
         actual.append(round(data[i]["wins"] / data[i]["total"] * 100, 1))
         counts.append(data[i]["total"])
     return JSONResponse({"buckets": buckets, "predicted": predicted, "actual": actual, "counts": counts})
+
+
+@router.get("/stats/signals")
+async def signal_stats(tour: str | None = Query(default=None)):
+    """KPIs du track record automatique."""
+    db = _state()['db']
+    return JSONResponse(get_signal_stats(db, tour=tour))
+
+
+@router.get("/stats/signals/curve")
+async def signal_curve(tour: str | None = Query(default=None)):
+    """Courbe P&L cumulative (en unités) pour le track record."""
+    db = _state()['db']
+    return JSONResponse(get_signal_curve(db, tour=tour))
+
+
+@router.get("/stats/signals/recent")
+async def signal_recent(tour: str | None = Query(default=None),
+                        limit: int = Query(default=50)):
+    """Derniers signaux VALUE pour le tableau du track record."""
+    db = _state()['db']
+    signals = list_signals(db, tour=tour, limit=limit)
+    return JSONResponse(signals)
 
 
 @router.post("/settings", response_class=HTMLResponse)

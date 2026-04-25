@@ -169,7 +169,59 @@
 
 
 {# ═══════════════════════════════════════════════════════
-   BLOC 4 — CONFIGURATION
+   BLOC 4 — TRACK RECORD AUTOMATIQUE
+   ═══════════════════════════════════════════════════════ #}
+<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
+  📈 Track Record — Signaux VALUE automatiques
+</div>
+
+{# KPI strip #}
+<div id="tr-kpis" class="card" style="margin-bottom:8px">
+  <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+    <div style="font-size:11px;color:var(--muted)">Chargement…</div>
+  </div>
+</div>
+
+{# Courbe P&L cumulative #}
+<div class="stats-desktop">
+<div style="margin-bottom:4px">
+  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Courbe P&amp;L cumulative (1 unité flat par signal VALUE)</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Chaque signal VALUE génère automatiquement un pari virtuel de 1 unité. La courbe montre l'évolution des gains/pertes cumulés au fil du temps.</div>
+</div>
+<div class="chart-container" style="margin-bottom:10px" id="tr-chart-wrap">
+  <canvas id="tr-chart" height="120"></canvas>
+</div>
+</div>
+
+{# Tableau des derniers signaux #}
+<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden">
+  <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:12px;font-weight:600">Derniers signaux VALUE</span>
+    <span id="tr-pending-badge" style="font-size:10px;color:var(--muted)"></span>
+  </div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px" id="tr-table">
+      <thead>
+        <tr style="background:var(--surface2);color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">
+          <th style="padding:6px 10px;text-align:left">Date</th>
+          <th style="padding:6px 10px;text-align:left">Match</th>
+          <th style="padding:6px 10px;text-align:left">Surface</th>
+          <th style="padding:6px 10px;text-align:left">Pari sur</th>
+          <th style="padding:6px 6px;text-align:right">Cote</th>
+          <th style="padding:6px 6px;text-align:right">Edge</th>
+          <th style="padding:6px 10px;text-align:center">Résultat</th>
+          <th style="padding:6px 10px;text-align:right">P&amp;L</th>
+        </tr>
+      </thead>
+      <tbody id="tr-tbody">
+        <tr><td colspan="8" style="padding:16px;text-align:center;color:var(--muted)">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════
+   BLOC 5 — CONFIGURATION
    ═══════════════════════════════════════════════════════ #}
 <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
   ⚙️ Configuration
@@ -583,6 +635,176 @@ async function loadCalibration(tour) {
   });
 }
 
+// ── Track Record automatique ───────────────────────────────────────────────
+let _trChart = null;
+
+async function loadTrackRecord(tour) {
+  const qs = tour ? '?tour=' + tour : '';
+
+  // 1. KPIs
+  const kpiResp = await fetch('/stats/signals' + qs);
+  const kpi = await kpiResp.json();
+  const kpiEl = document.getElementById('tr-kpis');
+  if (!kpi.resolved) {
+    kpiEl.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center">Aucun signal résolu pour l\'instant — les stats apparaîtront ici au fur et à mesure.</div>';
+  } else {
+    const roiColor  = (kpi.roi  || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+    const pnlColor  = (kpi.pnl_units || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+    const roiSign   = (kpi.roi  || 0) >= 0 ? '+' : '';
+    const pnlSign   = (kpi.pnl_units || 0) >= 0 ? '+' : '';
+    kpiEl.innerHTML = `
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;padding:4px 0">
+        <div>
+          <div style="font-size:20px;font-weight:800;color:${roiColor}">${roiSign}${kpi.roi !== null ? (kpi.roi * 100).toFixed(1) + '%' : '—'}</div>
+          <div style="font-size:11px;color:var(--muted)">ROI / signal</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800">${kpi.total}</div>
+          <div style="font-size:11px;color:var(--muted)">Signaux totaux</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800">${kpi.win_rate !== null ? (kpi.win_rate * 100).toFixed(1) + '%' : '—'}</div>
+          <div style="font-size:11px;color:var(--muted)">Win Rate</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800;color:${pnlColor}">${pnlSign}${kpi.pnl_units !== null ? kpi.pnl_units.toFixed(2) + 'u' : '—'}</div>
+          <div style="font-size:11px;color:var(--muted)">P&L (unités)</div>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800">${kpi.won}W / ${kpi.lost}L</div>
+          <div style="font-size:11px;color:var(--muted)">Bilan</div>
+        </div>
+        ${kpi.pending > 0 ? `<div style="margin-left:auto"><span class="badge" style="background:rgba(251,191,36,.12);color:#fbbf24;font-size:11px">${kpi.pending} en attente</span></div>` : ''}
+      </div>`;
+  }
+  // Update pending badge in table header
+  const pb = document.getElementById('tr-pending-badge');
+  if (pb && kpi.pending > 0) pb.textContent = kpi.pending + ' en attente';
+
+  // 2. P&L curve
+  const curveResp = await fetch('/stats/signals/curve' + qs);
+  const curve = await curveResp.json();
+  if (curve.labels && curve.labels.length) {
+    const ctx = document.getElementById('tr-chart').getContext('2d');
+    if (_trChart) _trChart.destroy();
+    const isPositive = curve.values[curve.values.length - 1] >= 0;
+    _trChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: curve.labels,
+        datasets: [{
+          label: 'P&L cumulé (unités)',
+          data: curve.values,
+          borderColor: isPositive ? '#3DDC84' : '#F06A6A',
+          backgroundColor: isPositive ? 'rgba(61,220,132,.08)' : 'rgba(240,106,106,.08)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2,
+        }, {
+          label: 'Baseline 0',
+          data: curve.labels.map(() => 0),
+          borderColor: 'rgba(100,116,139,0.4)',
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
+          tooltip: {
+            mode: 'index', intersect: false,
+            callbacks: { label: c => (c.datasetIndex === 0 ? (c.raw >= 0 ? '+' : '') + c.raw.toFixed(2) + 'u' : '0') }
+          },
+        },
+        scales: chartScales(),
+      }
+    });
+  } else {
+    document.getElementById('tr-chart-wrap').style.display = 'none';
+  }
+
+  // 3. Signals table
+  const recResp = await fetch('/stats/signals/recent' + qs + (qs ? '&' : '?') + 'limit=50');
+  const signals = await recResp.json();
+  const tbody = document.getElementById('tr-tbody');
+  tbody.replaceChildren();
+  if (!signals.length) {
+    const tr = tbody.insertRow();
+    const td = tr.insertCell();
+    td.colSpan = 8;
+    td.style.cssText = 'padding:16px;text-align:center;color:var(--muted)';
+    td.textContent = 'Aucun signal enregistré pour l\'instant.';
+    return;
+  }
+  const statusMap = {
+    won:     { label: '✓ Gagné',   cls: 'text-green' },
+    lost:    { label: '✗ Perdu',   cls: 'text-red'   },
+    pending: { label: '⏳ Attente', cls: ''            },
+    void:    { label: '—',         cls: 'text-muted'  },
+  };
+  const surfColors = { Hard: '#3b82f6', Clay: '#f97316', Grass: '#22c55e' };
+  for (const s of signals) {
+    const tr = tbody.insertRow();
+    tr.style.borderBottom = '1px solid var(--border)';
+
+    // Date
+    const tdDate = tr.insertCell();
+    tdDate.style.cssText = 'padding:6px 10px;color:var(--muted);white-space:nowrap';
+    tdDate.textContent = (s.created_at || '').slice(0, 10);
+
+    // Match
+    const tdMatch = tr.insertCell();
+    tdMatch.style.cssText = 'padding:6px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    tdMatch.textContent = `${s.p1_name} vs ${s.p2_name}`;
+    tdMatch.title = `${s.tournament || ''} · ${s.p1_name} vs ${s.p2_name}`;
+
+    // Surface
+    const tdSurf = tr.insertCell();
+    tdSurf.style.cssText = 'padding:6px 10px';
+    const dot = document.createElement('span');
+    dot.style.cssText = 'display:inline-block;width:8px;height:8px;border-radius:50%;background:' +
+      (surfColors[s.surface] || '#64748b') + ';margin-right:4px';
+    tdSurf.appendChild(dot);
+    tdSurf.appendChild(document.createTextNode(s.surface || '—'));
+
+    // Bet on
+    const tdBet = tr.insertCell();
+    tdBet.style.cssText = 'padding:6px 10px;font-weight:600;color:var(--blue)';
+    tdBet.textContent = s.bet_on || '—';
+
+    // Odds
+    const tdOdd = tr.insertCell();
+    tdOdd.style.cssText = 'padding:6px 6px;text-align:right;font-family:var(--mono)';
+    tdOdd.textContent = s.odd_snapshot ? s.odd_snapshot.toFixed(2) : '—';
+
+    // Edge
+    const tdEdge = tr.insertCell();
+    tdEdge.style.cssText = 'padding:6px 6px;text-align:right;font-family:var(--mono)';
+    tdEdge.textContent = s.edge ? '+' + (s.edge * 100).toFixed(1) + '%' : '—';
+
+    // Result
+    const info = statusMap[s.result] || { label: s.result, cls: '' };
+    const tdRes = tr.insertCell();
+    tdRes.style.cssText = 'padding:6px 10px;text-align:center';
+    tdRes.className = info.cls;
+    tdRes.textContent = info.label;
+
+    // P&L
+    const tdPnl = tr.insertCell();
+    tdPnl.style.cssText = 'padding:6px 10px;text-align:right;font-family:var(--mono)';
+    if (s.pnl_units !== null && s.pnl_units !== undefined && s.result !== 'pending') {
+      tdPnl.className = s.pnl_units >= 0 ? 'text-green' : 'text-red';
+      tdPnl.textContent = (s.pnl_units >= 0 ? '+' : '') + s.pnl_units.toFixed(2) + 'u';
+    } else {
+      tdPnl.style.color = 'var(--muted)';
+      tdPnl.textContent = '—';
+    }
+  }
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 function _initCharts() {
   const tour = '{{ tour }}';
@@ -594,6 +816,7 @@ function _initCharts() {
   loadSurfacePerf(tour);
   loadMonthly(tour);
   loadCalibration(tour);
+  loadTrackRecord(tour);
 }
 // Run when Chart.js is ready — handle both defer timing scenarios
 if (typeof Chart !== 'undefined') {

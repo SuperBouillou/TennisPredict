@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.webapp import ml as ml_module
-from src.webapp.db import get_bankroll, set_bankroll, get_setting, list_bets
+from src.webapp.db import get_bankroll, set_bankroll, get_setting, list_bets, log_signal
 
 logger = logging.getLogger(__name__)
 
@@ -292,6 +292,31 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         if active_odd is not None:
             if active_odd >= 12.0 and m['badge'] != 'neutral':
                 m['badge'] = 'neutral'
+
+        # ── Auto-log dans signal_log pour le track record ─────────────────────
+        if m['badge'] == 'value':
+            try:
+                db = _app_state().get('db')
+                if db is not None:
+                    bet_on   = m.get('p1_name') if ep1 >= ep2 else m.get('p2_name')
+                    odd_snap = m.get('odd_p1') if ep1 >= ep2 else m.get('odd_p2')
+                    prob_val = m.get('prob_p1') if ep1 >= ep2 else m.get('prob_p2')
+                    log_signal(db, {
+                        'tour':         tour,
+                        'tournament':   m.get('tournament', ''),
+                        'surface':      surface,
+                        'level':        level,
+                        'round':        m.get('round', ''),
+                        'p1_name':      m.get('p1_name', ''),
+                        'p2_name':      m.get('p2_name', ''),
+                        'bet_on':       bet_on or '',
+                        'prob_model':   prob_val,
+                        'odd_snapshot': odd_snap,
+                        'edge':         best_edge,
+                    })
+            except Exception as _exc:
+                logger.warning("signal_log insert failed: %s", _exc)
+
         enriched.append(m)
     return sorted(enriched, key=lambda x: -max(x.get('edge_p1') or -99, x.get('edge_p2') or -99))
 
