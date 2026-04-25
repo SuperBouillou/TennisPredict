@@ -102,21 +102,32 @@ def _load_feature_importance(tour: str) -> dict:
 
 
 def _kpis(tour: str) -> dict:
-    """Compute summary KPIs from backtest_real_Pinnacle if available."""
+    """Compute summary KPIs — same source as the default (Kelly) equity curve."""
     bt_cache = _state().get('backtest', {}).get(tour, {})
-    df = bt_cache.get('backtest_real_Pinnacle.parquet')
-    if df is None:
-        df = bt_cache.get('backtest_kelly.parquet')
+    # Priority: Kelly strategy file (matches equity curve default) → Pinnacle real → Kelly raw
+    df = (
+        bt_cache.get('backtest_strat_Kelly_1_4_cap2%.parquet')
+        or bt_cache.get('backtest_real_Pinnacle.parquet')
+        or bt_cache.get('backtest_kelly.parquet')
+    )
     if df is None:
         return {}
     n_bets = len(df)
     if 'pnl' not in df.columns:
         return {'n_bets': n_bets}
-    total_stake = df.get('stake', pd.Series([1]*n_bets)).sum()
+    stake_col = df['stake'] if 'stake' in df.columns else pd.Series([1.0] * n_bets)
+    total_stake = stake_col.sum()
     roi  = round(float(df['pnl'].sum() / total_stake) if total_stake > 0 else 0, 4)
     won  = int((df['pnl'] > 0).sum())
     wr   = round(won / n_bets, 4) if n_bets > 0 else 0
-    return {'n_bets': n_bets, 'roi': roi, 'win_rate': wr, 'pnl': round(float(df['pnl'].sum()), 2)}
+    # Final bankroll from equity curve (strategy simulation starts at 1000€)
+    bk_col = next((c for c in df.columns if 'bankroll' in c.lower()), None)
+    final_bankroll = round(float(df[bk_col].iloc[-1]), 2) if bk_col else None
+    return {
+        'n_bets': n_bets, 'roi': roi, 'win_rate': wr,
+        'pnl': round(float(df['pnl'].sum()), 2),
+        'final_bankroll': final_bankroll,
+    }
 
 
 @router.get("/stats", response_class=HTMLResponse)
