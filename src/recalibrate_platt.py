@@ -162,11 +162,17 @@ def recalibrate(tour: str, years: list[int]) -> None:
     print("\n── Scalers par surface ──────────────────────────────")
     meta_valid_joined = meta_joined[valid_mask].reset_index(drop=True)
 
+    MIN_SURFACE_SAMPLES = 400  # en dessous : trop peu de données, scaler global préféré
     for surf in ['Hard', 'Clay', 'Grass']:
         surf_mask = (meta_valid_joined.get('surface', pd.Series(dtype=str)) == surf).values
         n_surf = int(surf_mask.sum())
-        if n_surf < 50:
-            print(f"  {surf}: {n_surf} échantillons — ignoré (< 50)")
+        if n_surf < MIN_SURFACE_SAMPLES:
+            print(f"  {surf}: {n_surf} échantillons — ignoré (< {MIN_SURFACE_SAMPLES}, scaler global utilisé)")
+            # Supprimer un éventuel ancien scaler pour éviter de l'utiliser par erreur
+            old_path = models_dir / f"platt_{surf}.pkl"
+            if old_path.exists():
+                old_path.unlink()
+                print(f"    → {old_path} supprimé")
             continue
 
         X_surf = X_sub[surf_mask]
