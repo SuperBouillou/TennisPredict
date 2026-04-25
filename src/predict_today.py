@@ -830,8 +830,16 @@ def prompt_odds(df_pred: pd.DataFrame) -> pd.DataFrame:
 
 def compute_value_bets(df: pd.DataFrame,
                         min_edge: float = 0.03,
-                        min_prob: float = 0.55) -> pd.DataFrame:
+                        min_prob: float = 0.55,
+                        min_bk_dir_prob: float = 0.40) -> pd.DataFrame:
+    """
+    Identifie les value bets en comparant la proba modèle à la proba implicite bookmaker.
 
+    min_bk_dir_prob : probabilité implicite bookmaker minimale pour le côté parié.
+        Ne pas signaler de value bet sur un joueur que le marché donne à < 40%
+        (cote > ~2.5) — le modèle surévalue systématiquement les gros outsiders
+        faute de données d'entraînement suffisantes.
+    """
     df = df.copy()
     df['edge_p1']   = np.nan
     df['edge_p2']   = np.nan
@@ -860,9 +868,9 @@ def compute_value_bets(df: pd.DataFrame,
         df.at[i, 'ev_p2']   = row['prob_p2'] * o2 - 1
 
         vbs = []
-        if e1 >= min_edge and row['prob_p1'] >= min_prob:
+        if e1 >= min_edge and row['prob_p1'] >= min_prob and imp_p1 >= min_bk_dir_prob:
             vbs.append(f"✅ {row['p1_name']} edge={e1:+.1%} EV={df.at[i,'ev_p1']:+.1%}")
-        if e2 >= min_edge and row['prob_p2'] >= min_prob:
+        if e2 >= min_edge and row['prob_p2'] >= min_prob and imp_p2 >= min_bk_dir_prob:
             vbs.append(f"✅ {row['p2_name']} edge={e2:+.1%} EV={df.at[i,'ev_p2']:+.1%}")
 
         df.at[i, 'value_bet'] = ' | '.join(vbs)

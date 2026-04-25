@@ -385,12 +385,17 @@ def predict(
         if odd >= 3.0:  return 0.5
         return 1.0
 
+    # Seuil de direction marché : ne pas signaler de value bet si le bookmaker
+    # donne < 40% à ce joueur (cote > ~2.5). Le modèle surévalue les outsiders
+    # extrêmes faute de signal Pinnacle suffisant en entraînement.
+    MIN_BK_DIR_PROB = 0.40
+
     edge_p1 = ev_p1 = kelly_frac_p1 = kelly_eur_p1 = None
     if odd_p1 is not None and odd_p1 > 1.0 and novid_p1 is not None:
         edge_p1 = round(cal_prob - novid_p1, 4)
         ev_p1   = round(cal_prob * (odd_p1 - 1) - (1 - cal_prob), 4)
         discount = _odds_discount(odd_p1)
-        if edge_p1 > 0 and discount > 0:
+        if edge_p1 > 0 and discount > 0 and novid_p1 >= MIN_BK_DIR_PROB:
             raw_kelly = (cal_prob * odd_p1 - 1) / (odd_p1 - 1)
             if raw_kelly > 0:
                 kelly_frac_p1 = round(min(raw_kelly * kelly_fraction * discount, 0.05), 4)
@@ -401,7 +406,7 @@ def predict(
         edge_p2 = round(prob_p2 - novid_p2, 4)
         ev_p2   = round(prob_p2 * (odd_p2 - 1) - (1 - prob_p2), 4)
         discount2 = _odds_discount(odd_p2)
-        if edge_p2 > 0 and discount2 > 0:
+        if edge_p2 > 0 and discount2 > 0 and novid_p2 >= MIN_BK_DIR_PROB:
             raw_kelly2 = (prob_p2 * odd_p2 - 1) / (odd_p2 - 1)
             if raw_kelly2 > 0:
                 kelly_frac_p2 = round(min(raw_kelly2 * kelly_fraction * discount2, 0.05), 4)
