@@ -422,7 +422,7 @@ def predict(
     ) if not elo_only else 0.0
     if min_m14 >= 3:
         data_quality = 'high'    # 70% XGBoost → edge estimates are reliable
-    elif min_m14 >= 1 or min_m21 >= 2:
+    elif min_m14 >= 1 or min_m21 >= 1:
         data_quality = 'medium'  # moderate reliability (incl. players 15-21d inactive)
     else:
         data_quality = 'low'     # 70% ELO → no recent data, suppress signals
