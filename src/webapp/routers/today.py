@@ -248,26 +248,26 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         # ─────────────────────────────────────────────────────────────────────
         _BASE: dict[str, tuple[float, float]] = {
             # surface: (value_thr, edge_thr)
-            # Re-calibrated on Optuna model (OOS 2023-2026, 1982 bets):
-            #   Hard >20%:  +6.60% ROI ← excellent, keep 20%
-            #   Clay >20%:  −1.57% ROI ← uniformly bad, raise to 25%
-            #   Grass all:  −15%   ROI ← suppress, keep 28%
-            'Hard':  (0.20, 0.15),   # confirmed: Hard >20% = +6.60% ROI
-            'Clay':  (0.25, 0.21),   # raised: Clay uniformly bad across all tiers
-            'Grass': (0.28, 0.23),   # near-suppress: still unreliable
+            # Calibrated on Optuna model — simulated webapp thresholds (OOS 2025, 1477 signals):
+            #   Hard VALUE  (≥20%): +6.37% ROI / 769 bets  ← excellent
+            #   Clay VALUE  (≥25%): -0.07% ROI / 384 bets  ← near neutral, raise slightly
+            #   Grass VALUE (≥28%): -19.15% ROI / 133 bets ← still bad, raise hard
+            'Hard':  (0.20, 0.15),   # confirmed: Hard ≥20% = +6.37% ROI
+            'Clay':  (0.27, 0.22),   # raised +2pp: Clay ≥25% still near-neutral
+            'Grass': (0.35, 0.31),   # hard raise: Grass ≥28% still -19% ROI
         }
         base_value, base_edge = _BASE.get(surface, _BASE['Hard'])
 
         # Level modifier
         if level == 'M':
-            base_value -= 0.02     # Masters most reliable: relax 2pp
+            base_value -= 0.02     # Masters: +3.16% ROI, relax 2pp
             base_edge  -= 0.02
         elif level == 'G':
-            base_value += 0.02     # Grand Slams slightly worse: tighten
-            base_edge  += 0.01
+            base_value -= 0.01     # Grand Slams: +6.83% ROI (good!), relax slightly
+            base_edge  -= 0.01
         elif level == 'A':
-            base_value += 0.04     # ATP 250/500 worst: tighten significantly
-            base_edge  += 0.03
+            base_value += 0.05     # ATP 250/500: -0.71% ROI, tighten +5pp total
+            base_edge  += 0.04
 
         # Data-quality scaling (unchanged logic, applied on top of surface thresholds)
         if dq == 'high':
