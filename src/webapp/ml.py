@@ -409,14 +409,21 @@ def predict(
 
     # Data quality: based on how much recent match data we have for both players.
     # This determines ELO vs XGBoost blend weight AND is used to calibrate badge thresholds.
+    # Use 14d for high/medium split, but extend to 21d for medium/low:
+    # normal inter-tournament gap (e.g. Monte Carlo → Madrid) is 15-20 days,
+    # so players who last played 15-21 days ago are NOT data-poor — use 'medium' not 'low'.
     min_m14 = min(
         _v(p1, 'matches_14d', 0.0) if p1_found else 0.0,
         _v(p2, 'matches_14d', 0.0) if p2_found else 0.0,
     ) if not elo_only else 0.0
+    min_m21 = min(
+        _v(p1, 'matches_21d', 0.0) if p1_found else 0.0,
+        _v(p2, 'matches_21d', 0.0) if p2_found else 0.0,
+    ) if not elo_only else 0.0
     if min_m14 >= 3:
         data_quality = 'high'    # 70% XGBoost → edge estimates are reliable
-    elif min_m14 >= 1:
-        data_quality = 'medium'  # 50/50 blend → moderate reliability
+    elif min_m14 >= 1 or min_m21 >= 2:
+        data_quality = 'medium'  # moderate reliability (incl. players 15-21d inactive)
     else:
         data_quality = 'low'     # 70% ELO → no recent data, suppress signals
 

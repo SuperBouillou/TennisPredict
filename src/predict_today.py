@@ -55,10 +55,11 @@ def load_player_database(processed_dir: Path):
     if updated_path.exists():
         df = pd.read_parquet(updated_path)
         print(f"  ✅ {len(df):,} joueurs | MAJ : {df['last_match'].max()}")
-        # Format tennis-data : "Alcaraz C." → Nom=premier mot, Initiale=dernier mot
+        # Profiles are in "First Last" format (e.g. "Alexander Zverev")
+        # last_name = last word, first_init = first letter of first word
         df['name_key']   = df['player_name'].str.lower().str.strip()
-        df['last_name']  = df['player_name'].str.split().str[0].str.lower()
-        df['first_init'] = df['player_name'].str.split().str[-1].str[0].str.lower()
+        df['last_name']  = df['player_name'].str.split().str[-1].str.lower()
+        df['first_init'] = df['player_name'].str.split().str[0].str[0].str.lower()
         return df
 
     # Fallback : ancienne base
