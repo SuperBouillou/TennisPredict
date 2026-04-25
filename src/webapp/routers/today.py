@@ -236,37 +236,36 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         level   = m.get('level') or m.get('tourney_level', '')
 
         # ── Surface-specific thresholds ───────────────────────────────────────
-        # Calibrated on backtest OOS 2023-2026 (ATP, 93 features, 1844 matchs):
-        #   Hard  >20% edge:      +4.67% ROI   Hard 12-16%: −6.46% (avoid)
-        #   Clay  16-20% edge:   +23.54% ROI   Clay >20%: −0.88% (ok)
-        #   Grass all edges:     −15.45% ROI   → near-suppress, need huge edge
+        # Recalibrés sur Optuna model OOS 2025 (calibrate_thresholds.py, Pinnacle PSW)
+        # Seuils = 1er threshold où N×ROI est maximisé (profit total attendu)
         #
-        # Tournament level adjustment:
-        #   Masters 1000 (M): +2.11% ROI — most reliable, relax
-        #   Grand Slam (G):   −1.52% ROI — tighten slightly
-        #   ATP 250/500 (A):  −5.08% ROI — weakest signal, tighten significantly
+        # Hard  Masters  ≥20% → +45.8% ROI / N=270  ✓ inchangé
+        # Clay  Masters  ≥15% → +29.6% ROI / N=157  ← abaissé (ancien 25% laissait argent)
+        # Grass GS       ≥20% → +191%  ROI / N=68   ← très abaissé (ancien 34% = quasi-bloqé)
+        # Grass 250/500  ≥20% → +89.9% ROI / N=97   ← ancien modèle était -19% (pré-Optuna)
+        #
+        # Level modifier (inchangé — relatif à la surface base)
+        #   Masters 1000 (M): −2pp  (signal le plus fiable)
+        #   Grand Chelem (G): −1pp  (légèrement moins fiable que Masters)
+        #   ATP 250/500  (A): +5pp  (signal le plus faible, garder restrictif)
         # ─────────────────────────────────────────────────────────────────────
         _BASE: dict[str, tuple[float, float]] = {
             # surface: (value_thr, edge_thr)
-            # Calibrated on Optuna model — simulated webapp thresholds (OOS 2025, 1477 signals):
-            #   Hard VALUE  (≥20%): +6.37% ROI / 769 bets  ← excellent
-            #   Clay VALUE  (≥25%): -0.07% ROI / 384 bets  ← near neutral, raise slightly
-            #   Grass VALUE (≥28%): -19.15% ROI / 133 bets ← still bad, raise hard
-            'Hard':  (0.20, 0.15),   # confirmed: Hard ≥20% = +6.37% ROI
-            'Clay':  (0.27, 0.22),   # raised +2pp: Clay ≥25% still near-neutral
-            'Grass': (0.35, 0.31),   # hard raise: Grass ≥28% still -19% ROI
+            'Hard':  (0.20, 0.15),   # Hard ≥20% Masters: +45.8% ROI — inchangé, bien calibré
+            'Clay':  (0.22, 0.17),   # Clay abaissé 27→22%: Masters ≥20% = +16.6% ROI / N=137
+            'Grass': (0.25, 0.20),   # Grass très abaissé 35→25%: GS ≥24% / 250 ≥30% positifs
         }
         base_value, base_edge = _BASE.get(surface, _BASE['Hard'])
 
         # Level modifier
         if level == 'M':
-            base_value -= 0.02     # Masters: +3.16% ROI, relax 2pp
+            base_value -= 0.02     # Masters: signal le plus fiable, relax 2pp
             base_edge  -= 0.02
         elif level == 'G':
-            base_value -= 0.01     # Grand Slams: +6.83% ROI (good!), relax slightly
+            base_value -= 0.01     # Grand Chelem: légèrement relax
             base_edge  -= 0.01
         elif level == 'A':
-            base_value += 0.05     # ATP 250/500: -0.71% ROI, tighten +5pp total
+            base_value += 0.05     # ATP 250/500: signal faible, resserrer +5pp
             base_edge  += 0.04
 
         # Data-quality scaling (unchanged logic, applied on top of surface thresholds)
