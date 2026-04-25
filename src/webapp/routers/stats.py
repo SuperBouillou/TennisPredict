@@ -105,11 +105,11 @@ def _kpis(tour: str) -> dict:
     """Compute summary KPIs — same source as the default (Kelly) equity curve."""
     bt_cache = _state().get('backtest', {}).get(tour, {})
     # Priority: Kelly strategy file (matches equity curve default) → Pinnacle real → Kelly raw
-    df = (
-        bt_cache.get('backtest_strat_Kelly_1_4_cap2%.parquet')
-        or bt_cache.get('backtest_real_Pinnacle.parquet')
-        or bt_cache.get('backtest_kelly.parquet')
-    )
+    df = bt_cache.get('backtest_strat_Kelly_1_4_cap2%.parquet')
+    if df is None:
+        df = bt_cache.get('backtest_real_Pinnacle.parquet')
+    if df is None:
+        df = bt_cache.get('backtest_kelly.parquet')
     if df is None:
         return {}
     n_bets = len(df)
