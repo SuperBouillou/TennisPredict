@@ -248,9 +248,13 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         # ─────────────────────────────────────────────────────────────────────
         _BASE: dict[str, tuple[float, float]] = {
             # surface: (value_thr, edge_thr)
-            'Hard':  (0.20, 0.15),   # raised: hard only reliable above 20%
-            'Clay':  (0.16, 0.12),   # sweet spot 16-20%
-            'Grass': (0.28, 0.23),   # near-suppress: model unreliable on grass
+            # Re-calibrated on Optuna model (OOS 2023-2026, 1982 bets):
+            #   Hard >20%:  +6.60% ROI ← excellent, keep 20%
+            #   Clay >20%:  −1.57% ROI ← uniformly bad, raise to 25%
+            #   Grass all:  −15%   ROI ← suppress, keep 28%
+            'Hard':  (0.20, 0.15),   # confirmed: Hard >20% = +6.60% ROI
+            'Clay':  (0.25, 0.21),   # raised: Clay uniformly bad across all tiers
+            'Grass': (0.28, 0.23),   # near-suppress: still unreliable
         }
         base_value, base_edge = _BASE.get(surface, _BASE['Hard'])
 
