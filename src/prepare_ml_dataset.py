@@ -104,6 +104,14 @@ def define_feature_sets() -> dict:
             'p1_tiebreak_winrate_10', 'p2_tiebreak_winrate_10', 'tiebreak_winrate_10_diff',
         ],
 
+        # ── Signal de marché (disponible depuis ~2010, NaN sinon) ───────────
+        # La probabilité Pinnacle no-vig est le meilleur estimateur externe.
+        # L'inclure comme feature permet au modèle d'apprendre les désaccords
+        # systématiques entre nos features internes et le consensus du marché.
+        'market': [
+            'pinnacle_p1_prob',   # P(p1 gagne) selon Pinnacle no-vig
+        ],
+
         # ── Disponibles uniquement post-1991 ───────────────────────────────
         'stats_service': [
             'p1_1stIn_pct_roll10',   'p2_1stIn_pct_roll10',
@@ -141,7 +149,7 @@ def prepare_dataset(df: pd.DataFrame,
     # ELO : force relative + spécialisation de surface.
     # Glicko : uniquement les 4 features d'incertitude (RD) absentes d'ELO.
     groups = ['elo', 'glicko', 'ranking', 'forme', 'qualite_adversaires',
-              'surface_forme', 'h2h', 'fatigue', 'momentum', 'contexte']
+              'surface_forme', 'h2h', 'fatigue', 'momentum', 'contexte', 'market']
     if use_stats:
         groups.append('stats_service')
 
@@ -176,9 +184,9 @@ def temporal_split(X: pd.DataFrame,
     """
     Split temporel strict — pas de random split pour les séries temporelles.
 
-    Train  : ≤ 2022  (TEMPORAL_SPLIT['train_end'])
-    Valid  : 2023-2024
-    Test   : ≥ 2025  (ne pas toucher avant évaluation finale)
+    Train  : ≤ 2023  (TEMPORAL_SPLIT['train_end'])
+    Valid  : 2024    (TEMPORAL_SPLIT['valid_start'] → valid_end)
+    Test   : ≥ 2025  (TEMPORAL_SPLIT['test_start'] — ne pas toucher avant évaluation)
     """
     year = df_meta['year']
 
