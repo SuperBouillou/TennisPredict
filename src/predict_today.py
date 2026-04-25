@@ -37,8 +37,17 @@ def load_model_artifacts(models_dir: Path):
     model    = joblib.load(models_dir / "xgb_tuned.pkl")
     imputer  = joblib.load(models_dir / "imputer.pkl")
     features = joblib.load(models_dir / "feature_list.pkl")
-    platt    = joblib.load(models_dir / "platt_scaler.pkl")
-    print(f"  ✅ XGBoost tuned + Platt scaler | {len(features)} features")
+    # Préférer platt_pinnacle.pkl (calibré contre Pinnacle no-vig)
+    # sinon fallback sur platt_scaler.pkl (calibré contre outcomes)
+    platt = None
+    for platt_name in ("platt_pinnacle.pkl", "platt_scaler.pkl"):
+        p = models_dir / platt_name
+        if p.exists():
+            platt = joblib.load(p)
+            print(f"  ✅ XGBoost tuned + {platt_name} | {len(features)} features")
+            break
+    if platt is None:
+        print(f"  ✅ XGBoost tuned (pas de scaler) | {len(features)} features")
     return model, imputer, features, platt
 
 
@@ -737,7 +746,11 @@ def predict_matches(matches: list, model, imputer, features: list,
             Ximp  = imputer.transform(Xv)
             p     = float(model.predict_proba(Ximp)[0, 1])
             if platt is not None:
-                p = float(platt.predict_proba([[p]])[0, 1])
+                if hasattr(platt, 'predict_proba'):
+                    p = float(platt.predict_proba([[p]])[0, 1])
+                else:
+                    # LinearRegression (platt_pinnacle) — clip pour rester dans [0.01, 0.99]
+                    p = float(np.clip(platt.predict([[p]])[0], 0.01, 0.99))
             return p
 
         prob_fwd = _predict_one(p1, p2)          # prob p1 gagne quand p1 est "p1"

@@ -305,6 +305,7 @@ def run_backtest(df: pd.DataFrame,
                  min_edge: float  = 0.03,
                  min_prob: float  = 0.55,
                  min_odd: float   = 1.30,
+                 min_bk_dir_prob: float = 0.35,
                  bankroll_init: float = 1000.0,
                  strategy: str    = 'flat',
                  flat_stake: float= 10.0,
@@ -313,8 +314,14 @@ def run_backtest(df: pd.DataFrame,
     """
     Backtest avec cotes réelles.
 
-    odds_col_w : colonne cote du vainqueur  (PSW, B365W, MaxW, AvgW)
-    odds_col_l : colonne cote du perdant    (PSL, B365L, MaxL, AvgL)
+    odds_col_w      : colonne cote du vainqueur  (PSW, B365W, MaxW, AvgW)
+    odds_col_l      : colonne cote du perdant    (PSL, B365L, MaxL, AvgL)
+    min_bk_dir_prob : probabilité implicite bookmaker minimale pour le côté parié.
+                      Bloque les paris où le marché donne < 35% à ce joueur —
+                      évite de miser sur des outsiders extrêmes que le modèle
+                      surévalue par manque de données d'entraînement.
+                      Ex: cote > 2.6 → bk_imp ~0.36 → autorisé
+                          cote > 2.85 → bk_imp ~0.32 → bloqué
     """
     # Garder uniquement les matchs avec cotes disponibles
     df = df.dropna(subset=[odds_col_w, odds_col_l]).copy()
@@ -349,7 +356,14 @@ def run_backtest(df: pd.DataFrame,
             edge = our_prob - bk_imp
             ev   = our_prob * odd - 1
 
+            # Filtre principal : edge, probabilité modèle, cote minimale
             if edge < min_edge or our_prob < min_prob or odd < min_odd:
+                continue
+
+            # Filtre direction marché : ne pas parier contre le consensus fort
+            # Si le marché donne < min_bk_dir_prob à ce joueur, le modèle
+            # crée un "edge" artificiel (outsider × proba modèle surévaluée).
+            if bk_imp < min_bk_dir_prob:
                 continue
 
             if strategy == 'flat':
@@ -540,8 +554,15 @@ if __name__ == "__main__":
     imputer  = joblib.load(MODELS_DIR / "imputer.pkl")
     model    = joblib.load(MODELS_DIR / "xgb_tuned.pkl")
 
-    platt_path = MODELS_DIR / "platt_scaler.pkl"
-    platt = joblib.load(platt_path) if platt_path.exists() else None
+    # Charger le scaler de calibration — préférer platt_pinnacle.pkl (calibré sur
+    # Pinnacle no-vig, évite la surconfiance vs marché) sinon fallback platt_scaler.pkl
+    platt = None
+    for platt_name in ("platt_pinnacle.pkl", "platt_scaler.pkl"):
+        p = MODELS_DIR / platt_name
+        if p.exists():
+            platt = joblib.load(p)
+            print(f"  Calibration scaler : {platt_name}")
+            break
 
     # Utilise valid si test est vide (split train≤2022 / valid=2023-2024 / test≥2025)
     if len(splits['X_test']) > 0:
@@ -556,7 +577,15 @@ if __name__ == "__main__":
 
     X_imp    = imputer.transform(X_test)
     raw_prob = model.predict_proba(X_imp)[:, 1]
-    p1_prob  = platt.predict_proba(raw_prob.reshape(-1, 1))[:, 1] if platt else raw_prob
+
+    # Appliquer la calibration : LogisticRegression → predict_proba,
+    # LinearRegression (platt_pinnacle) → predict + clip
+    if platt is None:
+        p1_prob = raw_prob
+    elif hasattr(platt, 'predict_proba'):
+        p1_prob = platt.predict_proba(raw_prob.reshape(-1, 1))[:, 1]
+    else:
+        p1_prob = np.clip(platt.predict(raw_prob.reshape(-1, 1)), 0.01, 0.99)
 
     calib = "Platt" if platt else "brut"
     print(f"  Modèle : xgb_tuned | Calibration : {calib}")
@@ -644,11 +673,13 @@ if __name__ == "__main__":
 
 
     # ── Candidats bruts pour optimize_thresholds.py ──────────────────────────
+    # Sans filtre min_bk_dir_prob pour garder tous les candidats potentiels
     print("\n── Sauvegarde candidats bruts ───────────────────────")
     hist_all = run_backtest(
         df_joined,
         odds_col_w='PSW', odds_col_l='PSL',
         min_edge=0.0, min_prob=0.50, min_odd=1.10,
+        min_bk_dir_prob=0.0,
         bankroll_init=BANKROLL, strategy='flat', flat_stake=10.0,
     )
     if len(hist_all) > 0:
