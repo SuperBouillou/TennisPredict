@@ -327,11 +327,16 @@ def predict(
         X_df = pd.DataFrame(X, columns=feature_list)
         X_imp = imputer.transform(X_df)
         raw_prob = model.predict_proba(X_imp)[0, 1]
-        if artifacts.get('platt_pinnacle'):
-            # LinearRegression calibrated against Pinnacle no-vig probabilities
-            xgb_prob = float(np.clip(platt.predict([[raw_prob]])[0], 0.01, 0.99))
+        # Scaler surface-spécifique > scaler global > brut
+        platt_surfaces = artifacts.get('platt_surfaces', {})
+        active_scaler = platt_surfaces.get(surface) or platt
+        if active_scaler is not None:
+            if hasattr(active_scaler, 'predict_proba'):
+                xgb_prob = float(active_scaler.predict_proba([[raw_prob]])[0, 1])
+            else:
+                xgb_prob = float(np.clip(active_scaler.predict([[raw_prob]])[0], 0.01, 0.99))
         else:
-            xgb_prob = float(platt.predict_proba([[raw_prob]])[0, 1])
+            xgb_prob = float(raw_prob)
 
         # Dynamic ELO blend: XGBoost was trained on rich historical features.
         # When recent match samples are sparse (ESPN sync only has 14 days),

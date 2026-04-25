@@ -48,7 +48,17 @@ def load_model_artifacts(models_dir: Path):
             break
     if platt is None:
         print(f"  ✅ XGBoost tuned (pas de scaler) | {len(features)} features")
-    return model, imputer, features, platt
+
+    # Scalers surface-spécifiques (platt_Hard.pkl, platt_Clay.pkl, platt_Grass.pkl)
+    platt_surfaces = {}
+    for surf in ['Hard', 'Clay', 'Grass']:
+        sp = models_dir / f"platt_{surf}.pkl"
+        if sp.exists():
+            platt_surfaces[surf] = joblib.load(sp)
+    if platt_surfaces:
+        print(f"  Surface scalers : {list(platt_surfaces.keys())}")
+
+    return model, imputer, features, platt, platt_surfaces
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -732,7 +742,7 @@ def build_feature_vector(match: dict, p1: dict, p2: dict,
 
 def predict_matches(matches: list, model, imputer, features: list,
                     df_players: pd.DataFrame, df_elo: pd.DataFrame,
-                    platt=None) -> pd.DataFrame:
+                    platt=None, platt_surfaces: dict | None = None) -> pd.DataFrame:
 
     print(f"\n── Prédictions ({len(matches)} matchs) ─────────────────────")
 
@@ -745,12 +755,14 @@ def predict_matches(matches: list, model, imputer, features: list,
             Xv    = build_feature_vector(match, pa, pb, features, df_elo).reshape(1, -1)
             Ximp  = imputer.transform(Xv)
             p     = float(model.predict_proba(Ximp)[0, 1])
-            if platt is not None:
-                if hasattr(platt, 'predict_proba'):
-                    p = float(platt.predict_proba([[p]])[0, 1])
+            # Scaler surface-spécifique > scaler global > brut
+            surface = match.get('surface', '')
+            active_scaler = (platt_surfaces or {}).get(surface) or platt
+            if active_scaler is not None:
+                if hasattr(active_scaler, 'predict_proba'):
+                    p = float(active_scaler.predict_proba([[p]])[0, 1])
                 else:
-                    # LinearRegression (platt_pinnacle) — clip pour rester dans [0.01, 0.99]
-                    p = float(np.clip(platt.predict([[p]])[0], 0.01, 0.99))
+                    p = float(np.clip(active_scaler.predict([[p]])[0], 0.01, 0.99))
             return p
 
         prob_fwd = _predict_one(p1, p2)          # prob p1 gagne quand p1 est "p1"
@@ -924,7 +936,7 @@ def main():
     print(f"PRÉDICTIONS {tour.upper()} — {target_date}")
     print("=" * 55)
 
-    model, imputer, features, platt = load_model_artifacts(MODELS_DIR)
+    model, imputer, features, platt, platt_surfaces = load_model_artifacts(MODELS_DIR)
     df_players = load_player_database(paths['processed_dir'])
     df_elo     = load_elo_ratings(paths['processed_dir'])
 
@@ -937,7 +949,8 @@ def main():
         return
 
     # Prédictions
-    df = predict_matches(matches, model, imputer, features, df_players, df_elo, platt)
+    df = predict_matches(matches, model, imputer, features, df_players, df_elo,
+                         platt=platt, platt_surfaces=platt_surfaces)
 
     # Cotes + value bets
     if args.odds:

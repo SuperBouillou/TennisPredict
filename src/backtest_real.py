@@ -578,14 +578,34 @@ if __name__ == "__main__":
     X_imp    = imputer.transform(X_test)
     raw_prob = model.predict_proba(X_imp)[:, 1]
 
-    # Appliquer la calibration : LogisticRegression → predict_proba,
-    # LinearRegression (platt_pinnacle) → predict + clip
-    if platt is None:
-        p1_prob = raw_prob
-    elif hasattr(platt, 'predict_proba'):
-        p1_prob = platt.predict_proba(raw_prob.reshape(-1, 1))[:, 1]
-    else:
-        p1_prob = np.clip(platt.predict(raw_prob.reshape(-1, 1)), 0.01, 0.99)
+    # Charger les scalers surface-spécifiques (platt_Hard.pkl, etc.)
+    surface_scalers = {}
+    for surf in ['Hard', 'Clay', 'Grass']:
+        sp = MODELS_DIR / f"platt_{surf}.pkl"
+        if sp.exists():
+            surface_scalers[surf] = joblib.load(sp)
+    if surface_scalers:
+        print(f"  Scalers surface : {list(surface_scalers.keys())}")
+
+    # Appliquer la calibration par surface si disponible,
+    # fallback sur le scaler global (LinearRegression ou LogisticRegression)
+    def _apply_scaler(scaler, probs):
+        if scaler is None:
+            return probs
+        if hasattr(scaler, 'predict_proba'):
+            return scaler.predict_proba(probs.reshape(-1, 1))[:, 1]
+        return np.clip(scaler.predict(probs.reshape(-1, 1)), 0.01, 0.99)
+
+    p1_prob = np.full(len(raw_prob), np.nan)
+    surf_col = meta['surface'].values if 'surface' in meta.columns else np.array([''] * len(meta))
+    for surf, scaler in surface_scalers.items():
+        mask = surf_col == surf
+        if mask.any():
+            p1_prob[mask] = _apply_scaler(scaler, raw_prob[mask])
+    # Fallback global pour les surfaces sans scaler ou surfaces rares (Carpet…)
+    remaining = np.isnan(p1_prob)
+    if remaining.any():
+        p1_prob[remaining] = _apply_scaler(platt, raw_prob[remaining])
 
     calib = "Platt" if platt else "brut"
     print(f"  Modèle : xgb_tuned | Calibration : {calib}")

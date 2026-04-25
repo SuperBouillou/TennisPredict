@@ -106,11 +106,21 @@ async def lifespan(app: FastAPI):
                 if k:
                     profiles_dict[k] = row.to_dict()
 
+            # Load per-surface scalers if available
+            platt_surfaces = {}
+            for surf in ['Hard', 'Clay', 'Grass']:
+                sp = mdir / f'platt_{surf}.pkl'
+                if sp.exists():
+                    platt_surfaces[surf] = joblib.load(sp)
+            if platt_surfaces:
+                print(f"  [{tour.upper()}] Surface scalers: {list(platt_surfaces.keys())}")
+
             models[tour] = {
                 'model':           joblib.load(mdir / 'xgb_tuned.pkl'),
                 'imputer':         joblib.load(mdir / 'imputer.pkl'),
                 'platt':           joblib.load(platt_path),
                 'platt_pinnacle':  platt_path.stem == 'platt_pinnacle',
+                'platt_surfaces':  platt_surfaces,
                 'feature_list':    joblib.load(mdir / 'feature_list.pkl'),
                 'profiles':        profiles,
                 'profiles_dict':   profiles_dict,

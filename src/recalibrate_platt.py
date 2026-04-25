@@ -151,11 +151,47 @@ def recalibrate(tour: str, years: list[int]) -> None:
     print(f"  mean={cal_probs.mean():.3f}  std={cal_probs.std():.3f}  "
           f"min={cal_probs.min():.3f}  max={cal_probs.max():.3f}")
 
-    # ── 8. Save ───────────────────────────────────────────────────────────────
+    # ── 8. Save global scaler ─────────────────────────────────────────────────
     out_path = models_dir / "platt_pinnacle.pkl"
     joblib.dump(lr, out_path)
     print(f"\nSaved: {out_path}")
-    print("→ Restart webapp to use new scaler (main.py auto-detects platt_pinnacle.pkl)")
+
+    # ── 9. Per-surface scalers ────────────────────────────────────────────────
+    # meta_joined a une colonne 'surface' héritée de meta_valid.
+    # On filtre sur les lignes jointées et on fitte un scaler séparé par surface.
+    print("\n── Scalers par surface ──────────────────────────────")
+    meta_valid_joined = meta_joined[valid_mask].reset_index(drop=True)
+
+    for surf in ['Hard', 'Clay', 'Grass']:
+        surf_mask = (meta_valid_joined.get('surface', pd.Series(dtype=str)) == surf).values
+        n_surf = int(surf_mask.sum())
+        if n_surf < 50:
+            print(f"  {surf}: {n_surf} échantillons — ignoré (< 50)")
+            continue
+
+        X_surf = X_sub[surf_mask]
+        y_surf = y_target[surf_mask]
+
+        lr_surf = LinearRegression()
+        lr_surf.fit(X_surf, y_surf)
+
+        y_pred_surf = lr_surf.predict(X_surf)
+        r2_surf  = r2_score(y_surf, y_pred_surf)
+        mae_surf = mean_absolute_error(y_surf, y_pred_surf)
+
+        cal_surf = np.clip(lr_surf.predict(raw_probs.reshape(-1, 1)), 0.01, 0.99)
+        print(f"  {surf} ({n_surf} matchs) : "
+              f"coef={lr_surf.coef_[0]:.4f}  intercept={lr_surf.intercept_:.4f}  "
+              f"R²={r2_surf:.4f}  MAE={mae_surf:.4f}")
+        print(f"    cal_prob : mean={cal_surf.mean():.3f}  "
+              f"std={cal_surf.std():.3f}  "
+              f"min={cal_surf.min():.3f}  max={cal_surf.max():.3f}")
+
+        surf_path = models_dir / f"platt_{surf}.pkl"
+        joblib.dump(lr_surf, surf_path)
+        print(f"    → {surf_path}")
+
+    print("\n→ Restart webapp to use new scalers (main.py auto-detects platt_pinnacle.pkl + platt_<Surface>.pkl)")
 
 
 def recalibrate_from_outcomes(tour: str) -> None:
