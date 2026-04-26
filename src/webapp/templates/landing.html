@@ -3,14 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TennisPredict — Betting Intelligence</title>
-  <meta name="description" content="Prédictions tennis basées sur XGBoost, calibrées sur les cotes Pinnacle. Pas de tips, pas de feeling. Des probabilités.">
+  <title>Oddshift — Betting Intelligence</title>
+  <meta name="description" content="Prédictions tennis basées sur XGBoost, calibrées sur les cotes Pinnacle. Edge calculé, Kelly appliqué. Pas de tips, pas de feeling — des probabilités.">
+  <meta property="og:title" content="Oddshift — Betting Intelligence">
+  <meta property="og:description" content="XGBoost calibré sur les cotes Pinnacle. Edge calculé, Kelly appliqué.">
+  <meta property="og:image" content="/static/img/oddshift-og.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="/static/img/oddshift-og.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/tokens.css">
-  <link rel="stylesheet" href="/static/css/components.css">
-  <link rel="stylesheet" href="/static/css/mobile.css">
+  <link rel="stylesheet" href="/static/css/tokens.css?v=20260426i">
+  <link rel="stylesheet" href="/static/css/components.css?v=20260426i">
+  <link rel="stylesheet" href="/static/css/mobile.css?v=20260426i">
   <style>
     html { scroll-behavior: smooth; }
     body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 14px; line-height: 1.6; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
@@ -25,19 +31,24 @@
     /* Nav */
     .landing-nav { position: sticky; top: 0; z-index: 100; background: rgba(10,13,16,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
     .landing-nav-inner { display: flex; align-items: center; justify-content: space-between; padding: 0 48px; height: 60px; border-bottom: 1px solid var(--line); }
-    .landing-logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
-    .landing-logo-dot { width: 9px; height: 9px; background: var(--lime); border-radius: 50%; box-shadow: 0 0 8px var(--lime); }
-    .landing-logo-text { font-family: var(--font-mono); font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--fg); }
+
+    /* Wordmark */
+    .landing-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .landing-logo-dot { width: 9px; height: 9px; background: var(--lime); border-radius: 50%; box-shadow: 0 0 8px var(--lime); flex-shrink: 0; }
+    .landing-logo-text { font-family: var(--font-sans); font-size: 15px; font-weight: 700; letter-spacing: -0.02em; color: var(--fg); }
+    .landing-logo-text .shift { color: var(--lime); }
+
     .nav-links { display: flex; gap: 28px; }
     .nav-link-item { font-family: var(--font-mono); font-size: 11px; color: var(--fg-2); letter-spacing: .10em; text-transform: uppercase; cursor: pointer; text-decoration: none; transition: color .15s; }
     .nav-link-item:hover { color: var(--lime); }
+    .nav-btn-group { display: flex; gap: 10px; align-items: center; }
 
     /* Hero */
     .hero-section { position: relative; overflow: hidden; }
     .hero-section::after { content:''; position: absolute; inset: 0; pointer-events: none; z-index: 0; background-image: radial-gradient(circle, rgba(200,255,61,.07) 1px, transparent 1px); background-size: 36px 36px; mask-image: radial-gradient(ellipse 70% 80% at 60% 40%, black 30%, transparent 80%); -webkit-mask-image: radial-gradient(ellipse 70% 80% at 60% 40%, black 30%, transparent 80%); }
     .hero-inner { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; }
     .landing-hero { padding: 80px 48px 100px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
-    .landing-headline { font-size: clamp(56px, 7vw, 96px); font-weight: 800; line-height: 0.95; letter-spacing: -0.04em; text-transform: uppercase; margin: 0 0 28px; font-family: var(--font-sans); }
+    .landing-headline { font-size: clamp(48px, 7vw, 96px); font-weight: 800; line-height: 0.95; letter-spacing: -0.04em; text-transform: uppercase; margin: 0 0 28px; font-family: var(--font-sans); }
     .hero-sub { font-size: 15px; color: var(--fg-3); line-height: 1.65; max-width: 480px; margin-bottom: 32px; }
     .hero-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .hero-note { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); letter-spacing: .08em; }
@@ -81,14 +92,24 @@
     .landing-anj-badge { width: 32px; height: 32px; flex-shrink: 0; border: 1.5px solid var(--warn); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--warn); }
     .landing-footer-bottom { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); letter-spacing: .10em; text-transform: uppercase; padding-top: 14px; border-top: 1px solid var(--line); }
 
+    /* Responsive */
     @media (max-width: 900px) {
-      .landing-hero { grid-template-columns: 1fr; padding: 48px 20px; }
-      .hero-card-wrap { display: none; }
-      .landing-headline { font-size: 56px; }
-      .hero-sub { max-width: none; }
+      .landing-hero { grid-template-columns: 1fr; padding: 40px 20px 48px; gap: 32px; }
+      .hero-card-wrap { display: flex; }
+      .hero-card-float { animation: none; }
+      .hero-mock-stack { display: none; }
+      .hero-mock-card { width: 100%; max-width: 100%; }
+      .landing-headline { font-size: clamp(40px, 11vw, 64px); }
+      .hero-sub { max-width: none; margin-bottom: 24px; }
+      .hero-sub .hero-sub-extra { display: none; }
+      .hero-cta-row { flex-direction: column; align-items: stretch; gap: 10px; }
+      .hero-cta-row .tp-btn { text-align: center; }
+      .hero-cta-row .hero-ghost-btn { display: none; }
+      .hero-note { text-align: center; }
       .landing-section { padding: 48px 20px; }
       .landing-nav-inner { padding: 0 20px; }
       .nav-links { display: none; }
+      .nav-login-btn { display: none !important; }
       .faq-grid { grid-template-columns: 1fr; }
       .cta-section { padding: 48px 20px; }
       .landing-footer { padding: 24px 20px; }
@@ -96,6 +117,7 @@
     @media (max-width: 600px) {
       .landing-metrics { grid-template-columns: repeat(2, 1fr); }
       .landing-metric:nth-child(2) { border-right: none; }
+      .landing-metric-val { font-size: 32px; }
     }
   </style>
 </head>
@@ -138,7 +160,7 @@
       <span style="color:var(--lime)">+13.2%</span>
       <span style="color:var(--fg-5);margin-left:8px">·</span>
     </span>
-    <!-- dupliqué pour loop seamless -->
+    <!-- duplicate for seamless loop -->
     <span style="display:inline-flex;align-items:center;gap:8px">
       <span style="padding:2px 6px;background:var(--lime);color:#000;border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">VALUE BET</span>
       <span style="color:var(--fg-2)">Alcaraz vs Zverev</span>
@@ -177,7 +199,7 @@
   <div class="landing-nav-inner">
     <a class="landing-logo" href="/">
       <span class="landing-logo-dot"></span>
-      <span class="landing-logo-text">TENNISPREDICT</span>
+      <span class="landing-logo-text">odd<span class="shift">shift</span></span>
     </a>
     <div class="nav-links">
       <a href="#approche" class="nav-link-item">Approche</a>
@@ -185,9 +207,12 @@
       <a href="#how" class="nav-link-item">Comment ça marche</a>
       <a href="#faq" class="nav-link-item">FAQ</a>
     </div>
-    <div style="display:flex;gap:10px">
-      <a href="/login" class="tp-btn ghost" style="text-decoration:none">Connexion</a>
-      <a href="/today" class="tp-btn primary" style="text-decoration:none">Ouvrir l'app →</a>
+    <div class="nav-btn-group">
+      <a href="/login" class="tp-btn ghost nav-login-btn" style="text-decoration:none">Connexion</a>
+      <a href="/today" class="tp-btn primary" style="text-decoration:none">
+        <span class="hide-mobile">Ouvrir l'app →</span>
+        <span class="show-mobile">APP →</span>
+      </a>
     </div>
   </div>
 </div>
@@ -198,20 +223,19 @@
     <div class="landing-hero">
       <!-- Left copy -->
       <div>
-        <div class="tp-section-mark reveal" style="margin-bottom:24px">// ML · ATP &amp; WTA · PINNACLE NO-VIG</div>
+        <div class="tp-section-mark reveal" style="margin-bottom:24px">// ML · ATP &amp; WTA<span class="hide-mobile"> · PINNACLE NO-VIG</span></div>
         <h1 class="landing-headline reveal reveal-delay-1">
           <span style="color:var(--fg)">Pas de<br>superstitions.</span><br>
           <span style="color:var(--lime)">Que des<br>probabilités.</span>
         </h1>
         <p class="hero-sub reveal reveal-delay-2">
-          XGBoost calibré sur les cotes Pinnacle. Edge calculé, Kelly appliqué.
-          Chaque signal repose sur des données — pas sur des opinions.
+          XGBoost calibré sur les cotes Pinnacle. Edge calculé, Kelly appliqué.<span class="hero-sub-extra"><br>Chaque signal repose sur des données — pas sur des opinions.</span>
         </p>
         <div class="hero-cta-row reveal reveal-delay-3">
           <a href="/today" class="tp-btn primary" style="padding:14px 22px;font-size:12px;text-decoration:none">
             ▸ Voir les signaux du jour
           </a>
-          <a href="#backtest" class="tp-btn ghost" style="text-decoration:none">Voir le backtest</a>
+          <a href="#backtest" class="tp-btn ghost hero-ghost-btn" style="text-decoration:none">Voir le backtest</a>
           <span class="hero-note">78.1% précision · +7.4% ROI</span>
         </div>
       </div>
@@ -224,10 +248,9 @@
             <div class="hero-mock-card">
               <!-- Card meta -->
               <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg);font-family:var(--font-mono);font-size:10px;letter-spacing:.10em;color:var(--fg-3);text-transform:uppercase">
-                <span>Madrid Open · Clay · R2</span>
+                <span>Madrid · Clay · R2</span>
                 <div style="display:flex;gap:6px">
                   <span class="tp-badge lime">VALUE BET</span>
-                  <span class="tp-badge lime-outline dot">HIGH</span>
                 </div>
               </div>
               <!-- Players grid -->
@@ -235,18 +258,9 @@
                 <!-- P1 -->
                 <div>
                   <div style="font-size:13px;color:var(--fg);font-weight:600;margin-bottom:6px">J. Sinner</div>
-                  <div style="display:flex;gap:5px;margin-bottom:8px">
-                    <span class="tp-badge ghost">#1</span>
-                    <span class="tp-badge ghost" style="font-family:var(--font-mono);text-transform:none;letter-spacing:0">82% clay</span>
-                  </div>
-                  <!-- Form dots -->
-                  <div class="tp-form-dots" style="margin-bottom:8px">
-                    <i class="w"></i><i class="w"></i><i class="w"></i><i class="w"></i><i class="w"></i>
-                  </div>
-                  <div style="font-family:var(--font-mono);font-size:32px;font-weight:600;color:var(--lime);letter-spacing:-0.02em;line-height:1">67.4%</div>
-                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg-3);margin-top:4px">@1.45</div>
-                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--lime);margin-top:4px">+13.2% edge</div>
-                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4);margin-top:2px">Kelly 4.2€</div>
+                  <div style="font-family:var(--font-mono);font-size:38px;font-weight:600;color:var(--lime);letter-spacing:-0.02em;line-height:1">67.4%</div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:var(--lime);margin-top:6px">+13.2% edge</div>
+                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4);margin-top:2px">@1.45</div>
                 </div>
                 <!-- VS -->
                 <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
@@ -259,21 +273,14 @@
                 <!-- P2 -->
                 <div style="text-align:right">
                   <div style="font-size:13px;color:var(--fg);font-weight:600;margin-bottom:6px">D. Medvedev</div>
-                  <div style="display:flex;gap:5px;margin-bottom:8px;justify-content:flex-end">
-                    <span class="tp-badge ghost" style="font-family:var(--font-mono);text-transform:none;letter-spacing:0">54% clay</span>
-                    <span class="tp-badge ghost">#4</span>
-                  </div>
-                  <div class="tp-form-dots" style="margin-bottom:8px;justify-content:flex-end">
-                    <i class="w"></i><i class="l"></i><i class="w"></i><i class="l"></i><i class="l"></i>
-                  </div>
-                  <div style="font-family:var(--font-mono);font-size:32px;font-weight:600;color:var(--fg-2);letter-spacing:-0.02em;line-height:1">32.6%</div>
-                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg-3);margin-top:4px">@2.98</div>
+                  <div style="font-family:var(--font-mono);font-size:38px;font-weight:600;color:var(--fg-2);letter-spacing:-0.02em;line-height:1">32.6%</div>
+                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg-3);margin-top:6px">@2.98</div>
                 </div>
               </div>
               <!-- Footer -->
               <div style="padding:10px 14px;border-top:1px solid var(--line);background:var(--bg);display:flex;justify-content:space-between;align-items:center">
-                <span style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4)">ELO seul · 61.3%</span>
-                <span class="tp-badge lime-outline dot">DONNÉES FIABLES</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4)">ELO · 61.3%</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4)">Kelly 4.2€</span>
               </div>
             </div>
           </div>
@@ -505,7 +512,7 @@
     <div class="landing-anj-badge">18+</div>
     <div style="font-size:12px;color:var(--fg-2);line-height:1.55">
       <b style="color:var(--fg)">Jouer comporte des risques : endettement, isolement, dépendance.</b><br>
-      TennisPredict est un outil d'analyse statistique. Aucun signal ne garantit un gain.
+      Oddshift est un outil d'analyse statistique. Aucun signal ne garantit un gain.
       Pour vous faire aider, appelez le <b>09 74 75 13 13</b> (appel non surtaxé) ou rendez-vous sur
       <span style="color:var(--warn)">joueurs-info-service.fr</span>.
       Conformément aux recommandations de l'<span style="color:var(--warn)">ANJ</span>,
@@ -513,12 +520,21 @@
     </div>
   </div>
   <div class="landing-footer-bottom">
-    <div>© 2026 TennisPredict — Betting Intelligence</div>
+    <div>© 2026 Oddshift — Betting Intelligence</div>
     <div>v2.1 · ML EDGE · Usage personnel</div>
   </div>
 </div>
 
 <script src="/static/js/ui.js"></script>
+<style>
+  /* show/hide helpers for mobile nav */
+  .hide-mobile { display: inline; }
+  .show-mobile { display: none; }
+  @media (max-width: 900px) {
+    .hide-mobile { display: none; }
+    .show-mobile { display: inline; }
+  }
+</style>
 
 </body>
 </html>

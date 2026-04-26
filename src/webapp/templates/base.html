@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0a0d10">
-  <title>{% block title %}TennisML{% endblock %}</title>
+  <title>{% block title %}Oddshift{% endblock %}</title>
   <link rel="manifest" href="/static/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,8 +27,11 @@
   {# ── Sidebar ── #}
   <aside class="tp-sidebar">
     <div class="brand">
-      <div class="row">TENNIS<span style="color:var(--lime)">ML</span></div>
-      <div class="sub">QUANTUM EDGE SYSTEM</div>
+      <div class="row" style="display:flex;align-items:center;gap:8px;font-family:var(--font-sans);font-weight:700;letter-spacing:-0.02em;font-size:18px;text-transform:none">
+        <span style="width:10px;height:10px;background:var(--lime);border-radius:50%;box-shadow:0 0 8px var(--lime);flex-shrink:0;display:inline-block"></span>
+        odd<span style="color:var(--lime)">shift</span>
+      </div>
+      <div class="sub">BETTING INTELLIGENCE</div>
     </div>
     <nav>
       <div class="tp-nav-group">
@@ -100,7 +103,7 @@
         <div class="tp-anj-badge">18+</div>
         <div style="font-size:12px;color:var(--fg-2);line-height:1.55">
           <b style="color:var(--fg)">Jouer comporte des risques : endettement, isolement, dépendance.</b><br>
-          TennisPredict est un outil d'analyse statistique. Aucun signal ne garantit un gain.
+          Oddshift est un outil d'analyse statistique. Aucun signal ne garantit un gain.
           Pour vous faire aider, appelez le <b>09 74 75 13 13</b> (appel non surtaxé) ou rendez-vous sur
           <span style="color:var(--warn)">joueurs-info-service.fr</span>.
           Conformément aux recommandations de l'<span style="color:var(--warn)">ANJ</span>,
@@ -108,7 +111,7 @@
         </div>
       </div>
       <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--fg-4);letter-spacing:.10em;text-transform:uppercase">
-        <div>© 2026 TennisPredict</div>
+        <div>© 2026 Oddshift</div>
         <div>v2.1 · ML EDGE</div>
       </div>
     </footer>
