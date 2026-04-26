@@ -1,5 +1,38 @@
 /* TennisPredict — mobile.css (refonte v2) */
 
+/* ── Mobile card show/hide ── */
+.mobile-body  { display: none; }
+.desktop-body { display: contents; }
+
+/* Mobile card pieces */
+.mobile-names {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+.mobile-prob-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.mobile-prob {
+  font-family: var(--font-mono);
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--fg-2);
+  line-height: 1;
+}
+.mobile-prob.lime { color: var(--lime); }
+.mobile-edge-txt {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lime);
+  letter-spacing: .04em;
+}
+
 @media (max-width: 768px) {
   .tp-sidebar { display: none !important; }
   .tp-mobile-tabbar {
@@ -26,21 +59,15 @@
   .landing-nav { padding: 14px 20px; }
   .landing-nav .nav-links { display: none; }
 
-  /* Match cards — new card-body grid */
-  .card-body {
-    grid-template-columns: 1fr 120px 1fr;
-    gap: 12px;
-    padding: 14px 16px;
+  /* Match cards — swap desktop↔mobile views */
+  .mobile-body {
+    display: block;
+    padding: 12px 16px 14px;
+    cursor: pointer;
   }
-  .card-footer-strip {
-    grid-template-columns: 1fr;
-    padding: 10px 16px;
-  }
-  /* Hide sparklines + footer stats on mobile — keep only center button */
-  .footer-side { display: none !important; }
-  /* Narrower center column, smaller prob numbers */
-  .prob-number { font-size: 20px; }
-  .player-name { font-size: 13px; }
+  .desktop-body { display: none; }
+  /* Card header stays visible but compact */
+  .card-header { padding: 10px 16px 8px; }
   /* Old compat classes */
   .match-card-body { grid-template-columns: 1fr; gap: 12px; }
   .match-card-footer { grid-template-columns: 1fr; }

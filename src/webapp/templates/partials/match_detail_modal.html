@@ -19,12 +19,12 @@
   <div class="grid-2" style="gap:10px;margin-bottom:14px">
     <!-- P1 -->
     <div style="padding:12px;border-radius:8px;
-         border:1px solid {% if ep1 >= 0.05 %}var(--green){% elif ep1 > 0 %}var(--orange){% else %}var(--border){% endif %};
-         background:{% if ep1 > 0 %}rgba(0,200,100,.05){% else %}rgba(100,116,139,.05){% endif %}">
+         border:1px solid {% if ep1 > 0 %}var(--lime-line){% else %}var(--border){% endif %};
+         background:{% if ep1 > 0 %}var(--lime-bg){% else %}rgba(100,116,139,.05){% endif %}">
       <div style="font-weight:700;font-size:13px;margin-bottom:10px">{{ p1_name }}</div>
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
         <span class="tip" style="font-size:11px;color:var(--muted)" data-tip="Probabilité XGBoost calibrée sur les cotes Pinnacle no-vig">Proba ML ⓘ</span>
-        <span style="font-size:15px;font-weight:800;color:{% if ep1 > 0 %}var(--green){% else %}var(--blue){% endif %}">
+        <span style="font-size:15px;font-weight:800;color:{% if ep1 > 0 %}var(--lime){% else %}var(--fg-2){% endif %}">
           {{ "%.1f"|format(result.prob_p1 * 100) }}%
         </span>
       </div>
@@ -35,21 +35,22 @@
       </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:11px;color:var(--muted)">Edge</span>
-        <span style="font-size:13px;font-weight:700;color:{% if ep1 >= 0.05 %}var(--green){% elif ep1 > 0 %}var(--orange){% else %}var(--red){% endif %}">
+        <span style="font-size:13px;font-weight:700;color:{% if ep1 > 0 %}var(--lime){% else %}var(--loss){% endif %}">
           {% if ep1 > 0 %}+{% endif %}{{ "%.1f"|format(ep1 * 100) }}%
         </span>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:{% if result.get('kelly_eur_p1') %}10px{% else %}0{% endif %}">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px">
         <span style="font-size:11px;color:var(--muted)">EV</span>
-        <span style="font-size:12px;color:{% if (result.get('ev_p1') or 0) > 0 %}var(--green){% else %}var(--red){% endif %}">
+        <span style="font-size:12px;color:{% if (result.get('ev_p1') or 0) > 0 %}var(--lime){% else %}var(--loss){% endif %}">
           {{ "%.3f"|format(result.get('ev_p1') or 0) }}
         </span>
       </div>
       {% if result.get('kelly_eur_p1') %}
       <div style="display:flex;justify-content:space-between;margin-bottom:10px">
         <span style="font-size:11px;color:var(--muted)">Kelly</span>
-        <span style="font-size:13px;font-weight:700;color:var(--green)">{{ result.kelly_eur_p1 }}€</span>
+        <span style="font-size:13px;font-weight:700;color:var(--lime)">{{ result.kelly_eur_p1 }}€</span>
       </div>
+      {% endif %}
       <form hx-post="/bets/quick" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]" style="display:flex;gap:6px" onclick="event.stopPropagation()">
         <input type="hidden" name="tour"        value="{{ tour }}">
         <input type="hidden" name="p1_name"     value="{{ p1_name }}">
@@ -63,21 +64,21 @@
         <input type="hidden" name="edge"        value="{{ result.get('edge_p1', '') }}">
         <input type="hidden" name="kelly_frac"  value="{{ result.get('kelly_frac_p1', '') }}">
         <input class="form-input" name="stake" type="number" step="0.01" min="0.01"
-               value="{{ result.kelly_eur_p1 | round(2) }}" style="width:70px;padding:4px 8px">
-        <button type="submit" class="btn btn-primary" style="flex:1;font-size:12px;padding:4px 8px">Parier</button>
+               value="{% if result.get('kelly_eur_p1') %}{{ result.kelly_eur_p1 | round(2) }}{% endif %}"
+               placeholder="Mise €" style="width:80px;padding:6px 8px">
+        <button type="submit" class="btn btn-primary" style="flex:1;font-size:12px;padding:6px 10px">▸ Parier</button>
       </form>
-      {% endif %}
       {% endif %}
     </div>
 
     <!-- P2 -->
     <div style="padding:12px;border-radius:8px;
-         border:1px solid {% if ep2 >= 0.05 %}var(--green){% elif ep2 > 0 %}var(--orange){% else %}var(--border){% endif %};
-         background:{% if ep2 > 0 %}rgba(0,200,100,.05){% else %}rgba(100,116,139,.05){% endif %}">
+         border:1px solid {% if ep2 > 0 %}var(--lime-line){% else %}var(--border){% endif %};
+         background:{% if ep2 > 0 %}var(--lime-bg){% else %}rgba(100,116,139,.05){% endif %}">
       <div style="font-weight:700;font-size:13px;margin-bottom:10px">{{ p2_name }}</div>
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
         <span class="tip" style="font-size:11px;color:var(--muted)" data-tip="Probabilité XGBoost calibrée sur les cotes Pinnacle no-vig">Proba ML ⓘ</span>
-        <span style="font-size:15px;font-weight:800;color:{% if ep2 > 0 %}var(--green){% else %}var(--blue){% endif %}">
+        <span style="font-size:15px;font-weight:800;color:{% if ep2 > 0 %}var(--lime){% else %}var(--fg-2){% endif %}">
           {{ "%.1f"|format(result.prob_p2 * 100) }}%
         </span>
       </div>
@@ -88,21 +89,22 @@
       </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:11px;color:var(--muted)">Edge</span>
-        <span style="font-size:13px;font-weight:700;color:{% if ep2 >= 0.05 %}var(--green){% elif ep2 > 0 %}var(--orange){% else %}var(--red){% endif %}">
+        <span style="font-size:13px;font-weight:700;color:{% if ep2 > 0 %}var(--lime){% else %}var(--loss){% endif %}">
           {% if ep2 > 0 %}+{% endif %}{{ "%.1f"|format(ep2 * 100) }}%
         </span>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:{% if result.get('kelly_eur_p2') %}10px{% else %}0{% endif %}">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px">
         <span style="font-size:11px;color:var(--muted)">EV</span>
-        <span style="font-size:12px;color:{% if (result.get('ev_p2') or 0) > 0 %}var(--green){% else %}var(--red){% endif %}">
+        <span style="font-size:12px;color:{% if (result.get('ev_p2') or 0) > 0 %}var(--lime){% else %}var(--loss){% endif %}">
           {{ "%.3f"|format(result.get('ev_p2') or 0) }}
         </span>
       </div>
       {% if result.get('kelly_eur_p2') %}
       <div style="display:flex;justify-content:space-between;margin-bottom:10px">
         <span style="font-size:11px;color:var(--muted)">Kelly</span>
-        <span style="font-size:13px;font-weight:700;color:var(--green)">{{ result.kelly_eur_p2 }}€</span>
+        <span style="font-size:13px;font-weight:700;color:var(--lime)">{{ result.kelly_eur_p2 }}€</span>
       </div>
+      {% endif %}
       <form hx-post="/bets/quick" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button[type=submit]" style="display:flex;gap:6px" onclick="event.stopPropagation()">
         <input type="hidden" name="tour"        value="{{ tour }}">
         <input type="hidden" name="p1_name"     value="{{ p1_name }}">
@@ -116,10 +118,10 @@
         <input type="hidden" name="edge"        value="{{ result.get('edge_p2', '') }}">
         <input type="hidden" name="kelly_frac"  value="{{ result.get('kelly_frac_p2', '') }}">
         <input class="form-input" name="stake" type="number" step="0.01" min="0.01"
-               value="{{ result.kelly_eur_p2 | round(2) }}" style="width:70px;padding:4px 8px">
-        <button type="submit" class="btn btn-primary" style="flex:1;font-size:12px;padding:4px 8px">Parier</button>
+               value="{% if result.get('kelly_eur_p2') %}{{ result.kelly_eur_p2 | round(2) }}{% endif %}"
+               placeholder="Mise €" style="width:80px;padding:6px 8px">
+        <button type="submit" class="btn btn-primary" style="flex:1;font-size:12px;padding:6px 10px">▸ Parier</button>
       </form>
-      {% endif %}
       {% endif %}
     </div>
   </div>
@@ -135,7 +137,7 @@
       <span class="badge tip" style="background:rgba(59,130,246,.15);color:var(--blue)"
             data-tip="Profil récent complet — au moins 3 matchs récents, prédiction fiable">● Données fiables</span>
     {% elif dq == 'medium' %}
-      <span class="badge tip" style="background:rgba(249,115,22,.12);color:var(--orange)"
+      <span class="badge tip" style="background:var(--lime-bg);color:var(--lime)"
             data-tip="Peu de matchs récents — seuils d'edge plus élevés pour compenser">● Données partielles</span>
     {% else %}
       <span class="badge tip" style="background:rgba(100,116,139,.12);color:var(--muted)"

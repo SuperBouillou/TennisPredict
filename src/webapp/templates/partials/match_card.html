@@ -113,6 +113,29 @@
     </div>
   </div>
 
+  {# Mobile simplified view — hidden on desktop #}
+  <div class="mobile-body" onclick="openModal(this.closest('.match-card'))">
+    <div class="mobile-names">{{ m.get('p1_name','?') }} vs {{ m.get('p2_name','?') }}</div>
+    <div class="mobile-prob-row">
+      {% if m.get('prob_p1') %}
+      <span class="mobile-prob {{ 'lime' if badge != 'neutral' else '' }}">{{ "%.1f"|format(m.prob_p1 * 100) }}%</span>
+      {% endif %}
+      {% if pick_edge > 0.03 %}
+      <span class="mobile-edge-txt">EDGE +{{ "%.1f"|format(pick_edge * 100) }}%</span>
+      {% endif %}
+    </div>
+    {% if m.get('prob_p1') and m.get('prob_p2') %}
+    <div class="prob-split" style="margin-top:10px">
+      <div class="prob-split-half {{ 'lime' if badge != 'neutral' else 'dim' }}"
+           style="width:{{ "%.1f"|format(m.prob_p1 * 100) }}%"></div>
+      <div class="prob-split-half dim" style="flex:1"></div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# Desktop body — hidden on mobile #}
+  <div class="desktop-body">
+
   {# Body — 3-col: P1 | Center | P2 #}
   <div class="card-body">
 
@@ -255,6 +278,8 @@
     </div>
 
   </div>{# /card-footer-strip #}
+
+  </div>{# /desktop-body #}
 
 </div>{# /match-card #}
 {% endif %}

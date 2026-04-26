@@ -526,8 +526,8 @@ body {
 }
 
 .player-chip-rest {
-  background: rgba(255,170,51,.12);
-  color: var(--orange);
+  background: var(--lime-bg);
+  color: var(--lime);
 }
 
 /* Form dots */
@@ -685,7 +685,7 @@ body {
 }
 
 .badge-quality-high  { color: var(--green); border-color: rgba(61,220,132,.3); background: rgba(61,220,132,.06); }
-.badge-quality-med   { color: var(--orange); border-color: rgba(255,170,51,.3); background: rgba(255,170,51,.06); }
+.badge-quality-med   { color: var(--lime); border-color: var(--lime-line); background: var(--lime-bg); }
 .badge-quality-low   { color: var(--muted2); border-color: var(--border); background: transparent; }
 
 /* ─── TOGGLE GROUP ───────────────────────────────────────────── */

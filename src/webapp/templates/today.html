@@ -25,10 +25,10 @@
 {# Filter bar (non-hier mode) #}
 {% if page_mode != 'hier' %}
 <div class="tp-filter-bar">
-  <button class="tp-filter-chip active" onclick="setFilter('all',this)">Tous</button>
-  <button class="tp-filter-chip" onclick="setFilter('value',this)" style="border-color:var(--lime-line);color:var(--lime)">VALUE BET</button>
-  <button class="tp-filter-chip" onclick="setFilter('edge',this)">Edge modéré</button>
-  <button class="tp-filter-chip" onclick="setFilter('neutral',this)">Neutres</button>
+  <button class="tp-filter-chip active" data-fk="all" onclick="setFilter('all',this)">Tous</button>
+  <button class="tp-filter-chip" data-fk="value" onclick="setFilter('value',this)" style="border-color:var(--lime-line);color:var(--lime)">VALUE BET</button>
+  <button class="tp-filter-chip" data-fk="edge" onclick="setFilter('edge',this)">Edge</button>
+  <button class="tp-filter-chip" data-fk="neutral" onclick="setFilter('neutral',this)">Neutres</button>
   <div style="flex:1"></div>
   <span style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4);letter-spacing:.10em;text-transform:uppercase">≥ 5% edge · trié par kelly</span>
 </div>
@@ -118,6 +118,24 @@ function setFilter(f, btn) {
     card.style.display = (f === 'all' || card.dataset.badge === f) ? '' : 'none';
   });
 }
+
+function _updateFilterCounts() {
+  var counts = {all:0, value:0, edge:0, neutral:0};
+  document.querySelectorAll('.match-card').forEach(function(c) {
+    var b = c.dataset.badge || 'neutral';
+    counts.all++;
+    if (counts[b] !== undefined) counts[b]++;
+  });
+  var labels = {all:'Tous', value:'VALUE BET', edge:'Edge', neutral:'Neutres'};
+  document.querySelectorAll('.tp-filter-chip[data-fk]').forEach(function(chip) {
+    var k = chip.dataset.fk;
+    var n = counts[k] || 0;
+    chip.dataset.label = labels[k];
+    chip.textContent = labels[k] + (n > 0 ? ' · ' + n : '');
+  });
+}
+document.addEventListener('DOMContentLoaded', _updateFilterCounts);
+document.body.addEventListener('htmx:afterSwap', _updateFilterCounts);
 
 function toggleBetForm(btn, side) {
   const card = btn.closest('.match-card');
