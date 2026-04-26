@@ -227,11 +227,12 @@
   color: var(--fg-2);
   cursor: pointer;
   margin: 0 -10px;
+  text-decoration: none;
 }
-.tp-nav-item:hover { background: var(--bg-2); color: var(--fg); }
-.tp-nav-item.active { background: var(--bg-2); color: var(--lime); }
+.tp-nav-item:hover { background: var(--bg-2); color: var(--fg); text-decoration: none; }
+.tp-nav-item.active { background: var(--bg-2); color: var(--lime); text-decoration: none; }
 .tp-nav-item.active .ico { color: var(--lime); }
-.tp-nav-item .ico { color: var(--fg-3); width: 14px; display: inline-flex; }
+.tp-nav-item .ico { color: var(--fg-3); width: 16px; display: inline-flex; justify-content: center; font-style: normal; }
 
 .tp-bankroll {
   margin-top: auto;
