@@ -52,6 +52,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Odds Data Quirks
+
+- **2010-2012 xlsx = OLE format** : tennis-data.co.uk 2010-2012 sont du vrai `.xls` (Excel 97-2003, magic bytes `d0cf 11e0`) avec extension `.xlsx`. `openpyxl` les rejette. `_read_excel_auto()` dans `backtest_real.py` détecte le format et dispatche vers `xlrd` ou `openpyxl`.
+- **Couverture Pinnacle** : 0% avant 2010 (aucun fichier), 99%+ pour 2010-2012 (xlrd requis), 87-93% pour 2013+.
+- **xlrd** : installé dans le venv server, ajouté à `requirements.txt`.
+
+## Optuna / ML Best Practices
+
+- **Walk-forward CV** (3 folds : ≤2021/2022, ≤2022/2023, ≤2023/2024) évite l'overfitting sur une seule année de validation — utiliser `tune_optuna.py` avec `--n-trials 200` (sans `--no-walk-forward`).
+- **Single-fold Optuna** tend vers max_depth élevé + subsample=1.0 → bon val logloss mais mauvais test logloss.
+- **Après tout changement de données** : relancer dans l'ordre → `add_pinnacle_feature.py` → `prepare_ml_dataset.py` → `train_xgboost.py --optuna` → `recalibrate_platt.py` → `backtest_real.py` → restart webapp.
+
 ## Deployment
 
 - **SSH key**: `C:\Claude\tennispredict_ssh` (not in `~/.ssh/`)
