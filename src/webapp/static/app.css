@@ -37,28 +37,7 @@
   --sidebar-w: 220px;
 }
 
-:root {
-  --bg:        #07090E;
-  --surface:   #0D1117;
-  --surface2:  #131920;
-  --border:    #1C2330;
-  --border2:   #253040;
-  --text:      #E8EDF2;
-  --muted:     #5A6A7E;
-  --muted2:    #3D4F61;
-  --value:     #C8F243;
-  --value-bg:  rgba(200,242,67,.07);
-  --edge:      #4FA8FF;
-  --edge-bg:   rgba(79,168,255,.07);
-  --red:       #F06A6A;
-  --green:     #3DDC84;
-  --orange:    #FFAA33;
-  --blue:      #4FA8FF;
-  --mono: 'JetBrains Mono', monospace;
-  --cond: 'Barlow Condensed', sans-serif;
-  --sans: 'Barlow', sans-serif;
-  --sidebar-w: 200px;
-}
+/* Old :root block removed — tokens now come from tokens.css + bridge above */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -301,23 +280,25 @@ body {
 
 /* ─── MATCH CARD ─────────────────────────────────────────────── */
 .match-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  border-left: 3px solid var(--border2);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  border-left: 3px solid var(--line-2);
   overflow: visible;
   transition: border-color 0.15s;
   margin-bottom: 8px;
 }
+.match-card:hover { border-color: var(--line-2); }
 
 .match-card.value {
-  border-left-color: var(--value);
-  background: linear-gradient(135deg, rgba(200,242,67,.03) 0%, var(--surface) 40%);
+  border-left-color: var(--lime);
+  background: linear-gradient(135deg, var(--lime-bg) 0%, var(--bg-1) 40%);
 }
 
 .match-card.edge {
-  border-left-color: var(--edge);
-  background: linear-gradient(135deg, rgba(79,168,255,.04) 0%, var(--surface) 40%);
+  border-left-color: var(--lime);
+  background: linear-gradient(135deg, var(--lime-bg) 0%, var(--bg-1) 40%);
+  opacity: 0.9;
 }
 
 /* Result cards (hier mode) */
@@ -337,16 +318,18 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
   cursor: pointer;
 }
 
 .card-meta {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 0.03em;
+  color: var(--fg-3);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -362,7 +345,7 @@ body {
 /* Card 3-column grid */
 .card-grid {
   display: grid;
-  grid-template-columns: 1fr 52px 1fr;
+  grid-template-columns: 1fr 72px 1fr;
   align-items: stretch;
 }
 
@@ -381,15 +364,15 @@ body {
 }
 
 .player-name {
-  font-family: var(--cond);
-  font-size: 15px;
+  font-family: var(--font-sans);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--fg);
   cursor: pointer;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
-.player-name:hover { color: var(--edge); }
+.player-name:hover { color: var(--lime); }
 
 /* Player chips */
 .player-chips {
@@ -415,8 +398,8 @@ body {
 }
 
 .player-chip-rank {
-  background: rgba(79,168,255,.12);
-  color: var(--edge);
+  background: var(--lime-bg);
+  color: var(--lime);
   font-weight: 700;
 }
 
@@ -450,15 +433,15 @@ body {
 
 /* Probability number */
 .prob-number {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 22px;
   font-weight: 700;
-  color: var(--muted);
+  color: var(--fg-3);
   line-height: 1;
 }
 
-.prob-number.value-color { color: var(--value); }
-.prob-number.edge-color  { color: var(--edge); }
+.prob-number.value-color { color: var(--lime); }
+.prob-number.edge-color  { color: var(--lime); }
 
 /* Prob detail row */
 .prob-detail {
@@ -510,35 +493,36 @@ body {
 }
 
 .vs-h2h {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
-  color: var(--edge);
+  color: var(--fg-2);
   text-align: center;
   line-height: 1.5;
 }
 
 /* Bet button */
 .btn-bet {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 5px;
-  border: 1px solid var(--green);
-  background: rgba(61,220,132,.08);
-  color: var(--green);
+  padding: 5px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--lime-line);
+  background: var(--lime-bg);
+  color: var(--lime);
   cursor: pointer;
   transition: background 0.12s;
-  letter-spacing: 0.03em;
-  width: fit-content;      /* natural width, not stretched */
-  margin-top: auto;        /* push to bottom of column */
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  width: fit-content;
+  margin-top: auto;
 }
 .player-side.right .btn-bet {
-  align-self: flex-end;    /* right-anchored */
+  align-self: flex-end;
 }
 
-.btn-bet:hover { background: rgba(61,220,132,.2); }
+.btn-bet:hover { background: var(--lime-bg-2); }
 
 .bet-form {
   background: var(--surface2);
@@ -568,7 +552,7 @@ body {
 
 .badge-edge {
   color: var(--edge);
-  border-color: rgba(79,168,255,.35);
+  border-color: var(--lime-line);
   background: var(--edge-bg);
 }
 
