@@ -1,9 +1,12 @@
 {
-  "name": "TennisPredict",
-  "short_name": "Tennis",
+  "name": "Oddshift",
+  "short_name": "Oddshift",
   "start_url": "/today",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#3b82f6",
-  "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+  "background_color": "#0a0d10",
+  "theme_color": "#c8ff3d",
+  "icons": [
+    {"src": "/static/img/oddshift-icon.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/img/oddshift-favicon.png", "sizes": "512x512", "type": "image/png"}
+  ]
 }

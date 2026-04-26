@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Prédictions — TennisPredict{% endblock %}
+{% block title %}Prédictions — Oddshift{% endblock %}
 {% block page_title %}Prédictions{% endblock %}
-{% block page_meta %}Analyse manuelle d'un match{% endblock %}
+{% block page_meta %}Analyse manuelle · ML calibré sur cotes Pinnacle no-vig{% endblock %}
 
 {% block topbar_right %}
 <div class="tp-toggle-group">
@@ -10,126 +10,339 @@
 </div>
 {% endblock %}
 
+{% block head %}
+<style>
+/* ── Predictions 2-panel layout ── */
+.pred-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  min-height: calc(100vh - 120px);
+}
+.pred-panel {
+  padding: 20px 24px;
+  border-right: 1px solid var(--line);
+}
+.pred-panel:last-child { border-right: none; }
+
+/* Player card in setup */
+.pred-player-card {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px;
+}
+.pred-player-card .tp-input {
+  margin-top: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Tournament chips */
+.pred-tourney-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pred-tourney-chip {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 20px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg-2); color: var(--fg-3);
+  transition: all .15s;
+}
+.pred-tourney-chip:hover, .pred-tourney-chip.active {
+  border-color: var(--lime-line); background: var(--lime-bg); color: var(--lime);
+}
+
+/* Surface / Best-of toggles */
+.pred-toggle-row { display: flex; gap: 6px; }
+.pred-toggle-btn {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 6px 14px; border-radius: var(--r-sm); cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg-2); color: var(--fg-3);
+  transition: all .15s;
+}
+.pred-toggle-btn.active {
+  border-color: var(--lime-line); background: var(--lime-bg); color: var(--lime);
+}
+
+/* Right panel placeholder */
+.pred-placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 300px; gap: 12px; color: var(--fg-4);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.pred-placeholder-dot {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--line-2);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Sticky submit */
+.pred-submit-bar {
+  position: sticky; bottom: 0; left: 0; right: 0;
+  padding: 12px 24px;
+  background: var(--bg); border-top: 1px solid var(--line);
+  z-index: 10;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .pred-layout { grid-template-columns: 1fr; }
+  .pred-panel { border-right: none; border-bottom: 1px solid var(--line); padding: 16px; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="tp-content">
-
-<form hx-post="/predictions/run"
-      hx-target="#result-card"
-      hx-swap="innerHTML">
+<form id="pred-form"
+      hx-post="/predictions/run"
+      hx-target="#pred-result"
+      hx-swap="innerHTML"
+      hx-indicator="#pred-spinner">
   <input type="hidden" name="tour" value="{{ tour }}">
+  <input type="hidden" name="surface" id="surface-val" value="{{ prefill.surface if prefill else 'Hard' }}">
+  <input type="hidden" name="best_of" id="bestof-val" value="{{ prefill.best_of if prefill else 3 }}">
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-    {# Joueur 1 #}
-    <div class="tp-form-group autocomplete-wrapper">
-      <label class="tp-label">Joueur 1</label>
-      <input class="tp-input" id="p1_input" name="p1_name"
-             placeholder="Ex: Jannik Sinner"
-             value="{{ prefill.p1_name if prefill else '' }}"
-             autocomplete="off"
-             hx-get="/predictions/autocomplete"
-             hx-trigger="keyup changed delay:200ms"
-             hx-target="#p1-list"
-             hx-vals='{"tour": "{{ tour }}", "field": "p1"}'
-             oninput="this.setAttribute('name','q')"
-             onfocus="this.setAttribute('name','q')"
-             onblur="setTimeout(function(){ var el=document.getElementById('p1-list'); if(el) el.textContent=''; },200)">
-      <div id="p1-list" class="autocomplete-list"></div>
+  <div class="pred-layout">
+
+    {# ── LEFT PANEL — Setup ── #}
+    <div class="pred-panel">
+      <div class="tp-section-mark" style="margin-bottom:16px">// Setup match</div>
+
+      {# Player cards #}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+
+        {# Joueur 1 #}
+        <div class="pred-player-card autocomplete-wrapper">
+          <div class="tp-label" style="margin-bottom:6px">JOUEUR 1</div>
+          <div id="p1-info" style="min-height:64px"
+            {% if prefill and prefill.p1_name %}
+            hx-get="/predictions/player-info?name={{ prefill.p1_name | urlencode }}&tour={{ tour }}"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+            {% endif %}>
+            <div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono)">// rechercher un joueur</div>
+          </div>
+          <input class="tp-input" id="p1_input" name="p1_name"
+                 placeholder="Ex: Jannik Sinner"
+                 value="{{ prefill.p1_name if prefill else '' }}"
+                 autocomplete="off"
+                 hx-get="/predictions/autocomplete"
+                 hx-trigger="keyup changed delay:200ms"
+                 hx-target="#p1-list"
+                 hx-vals='{"tour": "{{ tour }}", "field": "p1"}'
+                 oninput="this.setAttribute('name','q')"
+                 onfocus="this.setAttribute('name','q')"
+                 onblur="setTimeout(function(){ var el=document.getElementById('p1-list'); if(el) el.textContent=''; },200)">
+          <div id="p1-list" class="autocomplete-list"></div>
+        </div>
+
+        {# Joueur 2 #}
+        <div class="pred-player-card autocomplete-wrapper">
+          <div class="tp-label" style="margin-bottom:6px">JOUEUR 2</div>
+          <div id="p2-info" style="min-height:64px"
+            {% if prefill and prefill.p2_name %}
+            hx-get="/predictions/player-info?name={{ prefill.p2_name | urlencode }}&tour={{ tour }}"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+            {% endif %}>
+            <div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono)">// rechercher un joueur</div>
+          </div>
+          <input class="tp-input" id="p2_input" name="p2_name"
+                 placeholder="Ex: Carlos Alcaraz"
+                 value="{{ prefill.p2_name if prefill else '' }}"
+                 autocomplete="off"
+                 hx-get="/predictions/autocomplete"
+                 hx-trigger="keyup changed delay:200ms"
+                 hx-target="#p2-list"
+                 hx-vals='{"tour": "{{ tour }}", "field": "p2"}'
+                 oninput="this.setAttribute('name','q')"
+                 onfocus="this.setAttribute('name','q')"
+                 onblur="setTimeout(function(){ var el=document.getElementById('p2-list'); if(el) el.textContent=''; },200)">
+          <div id="p2-list" class="autocomplete-list"></div>
+        </div>
+      </div>
+
+      {# Tournament #}
+      <div class="tp-form-group" style="margin-bottom:10px">
+        <label class="tp-label">TOURNOI</label>
+        <input class="tp-input" id="tournament-input" name="tournament"
+               placeholder="Ex: Australian Open"
+               value="{{ prefill.tournament if prefill else '' }}">
+        <div class="pred-tourney-chips" id="tourney-chips">
+          {% set quick_tourneys = [
+            ('Madrid', 'Clay'), ('Rome', 'Clay'), ('Roland-Garros', 'Clay'),
+            ('Wimbledon', 'Grass'), ('US Open', 'Hard'), ('Australian Open', 'Hard')
+          ] %}
+          {% for tname, tsurf in quick_tourneys %}
+          <button type="button"
+            class="pred-tourney-chip {% if prefill and prefill.tournament == tname %}active{% endif %}"
+            onclick="setTourney('{{ tname }}', '{{ tsurf }}', this)">
+            {{ tname }} · {{ tsurf }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Surface + Round + Best of #}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <div class="tp-label" style="margin-bottom:6px">SURFACE</div>
+          <div class="pred-toggle-row">
+            {% for s in ['Hard', 'Clay', 'Grass'] %}
+            <button type="button"
+              class="pred-toggle-btn {% if (prefill.surface if prefill else 'Hard') == s %}active{% endif %}"
+              onclick="setSurface('{{ s }}', this)">{{ s }}</button>
+            {% endfor %}
+          </div>
+        </div>
+        <div>
+          <div class="tp-label" style="margin-bottom:6px">BEST OF</div>
+          <div class="pred-toggle-row">
+            {% for bo in [3, 5] %}
+            <button type="button"
+              class="pred-toggle-btn {% if (prefill.best_of if prefill else 3) == bo %}active{% endif %}"
+              onclick="setBestOf({{ bo }}, this)">{{ bo }} SETS</button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="tp-form-group" style="margin-bottom:14px">
+        <label class="tp-label">ROUND</label>
+        <select class="tp-input" name="round" style="width:100%">
+          {% for r in rounds %}
+            <option value="{{ r }}" {% if prefill and prefill.round == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {# Odds #}
+      <div class="tp-section-mark" style="margin-bottom:10px">// Cotes bookmaker (optionnel)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px">
+        <div class="tp-form-group">
+          <label class="tp-label">COTE JOUEUR 1</label>
+          <input class="tp-input" name="odd_p1" id="odd_p1" type="number" step="0.01" min="1.01"
+                 placeholder="Ex: 1.45"
+                 value="{{ prefill.odd_p1 if prefill and prefill.odd_p1 else '' }}"
+                 hx-post="/predictions/run"
+                 hx-target="#pred-result"
+                 hx-swap="innerHTML"
+                 hx-include="#pred-form"
+                 hx-trigger="change">
+        </div>
+        <div class="tp-form-group">
+          <label class="tp-label">COTE JOUEUR 2</label>
+          <input class="tp-input" name="odd_p2" id="odd_p2" type="number" step="0.01" min="1.01"
+                 placeholder="Ex: 2.98"
+                 value="{{ prefill.odd_p2 if prefill and prefill.odd_p2 else '' }}"
+                 hx-post="/predictions/run"
+                 hx-target="#pred-result"
+                 hx-swap="innerHTML"
+                 hx-include="#pred-form"
+                 hx-trigger="change">
+        </div>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-5);letter-spacing:.08em">
+        ⓘ COTES PINNACLE CONSEILLÉES · MARGE BOOKMAKER LA PLUS BASSE
+      </div>
+    </div>{# end left panel #}
+
+    {# ── RIGHT PANEL — Result ── #}
+    <div class="pred-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="tp-section-mark">// Prédiction live</div>
+        <span id="pred-spinner" class="htmx-indicator"
+              style="font-family:var(--font-mono);font-size:10px;color:var(--lime);letter-spacing:.08em">
+          ANALYSE…
+        </span>
+      </div>
+      <div id="pred-result">
+        <div class="pred-placeholder">
+          <div class="pred-placeholder-dot">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--fg-4)" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div>Entrez les joueurs et lancez l'analyse</div>
+          <div style="color:var(--fg-5)">Le résultat apparaîtra ici</div>
+        </div>
+      </div>
     </div>
 
-    {# Joueur 2 #}
-    <div class="tp-form-group autocomplete-wrapper">
-      <label class="tp-label">Joueur 2</label>
-      <input class="tp-input" id="p2_input" name="p2_name"
-             placeholder="Ex: Carlos Alcaraz"
-             value="{{ prefill.p2_name if prefill else '' }}"
-             autocomplete="off"
-             hx-get="/predictions/autocomplete"
-             hx-trigger="keyup changed delay:200ms"
-             hx-target="#p2-list"
-             hx-vals='{"tour": "{{ tour }}", "field": "p2"}'
-             oninput="this.setAttribute('name','q')"
-             onfocus="this.setAttribute('name','q')"
-             onblur="setTimeout(function(){ var el=document.getElementById('p2-list'); if(el) el.textContent=''; },200)">
-      <div id="p2-list" class="autocomplete-list"></div>
-    </div>
+  </div>{# end pred-layout #}
+
+  {# Sticky submit bar #}
+  <div class="pred-submit-bar">
+    <button type="submit" class="tp-btn primary" style="width:100%;justify-content:center;padding:13px;font-size:12px;letter-spacing:.06em">
+      ⚡ LANCER L'ANALYSE XGBOOST
+    </button>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">
-    <div class="tp-form-group">
-      <label class="tp-label">Tournoi</label>
-      <input class="tp-input" name="tournament"
-             placeholder="Ex: Australian Open"
-             value="{{ prefill.tournament if prefill else 'Australian Open' }}">
-    </div>
-    <div class="tp-form-group">
-      <label class="tp-label">Surface</label>
-      <select class="tp-input" name="surface">
-        {% for s in surfaces %}
-          <option value="{{ s }}" {% if prefill and prefill.surface == s %}selected{% endif %}>{{ s }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="tp-form-group">
-      <label class="tp-label">Round</label>
-      <select class="tp-input" name="round">
-        {% for r in rounds %}
-          <option value="{{ r }}" {% if prefill and prefill.round == r %}selected{% endif %}>{{ r }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  </div>
-
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">
-    <div class="tp-form-group">
-      <label class="tp-label">Best of</label>
-      <select class="tp-input" name="best_of">
-        <option value="3" {% if not prefill or prefill.best_of == 3 %}selected{% endif %}>3 sets</option>
-        <option value="5" {% if prefill and prefill.best_of == 5 %}selected{% endif %}>5 sets</option>
-      </select>
-    </div>
-    <div class="tp-form-group">
-      <label class="tp-label">Cote Joueur 1 (optionnel)</label>
-      <input class="tp-input" name="odd_p1" type="number" step="0.01" min="1.01"
-             placeholder="Ex: 1.75"
-             value="{{ prefill.odd_p1 if prefill and prefill.odd_p1 else '' }}"
-             hx-post="/predictions/run"
-             hx-target="#result-card"
-             hx-swap="innerHTML"
-             hx-include="closest form"
-             hx-trigger="change">
-    </div>
-    <div class="tp-form-group">
-      <label class="tp-label">Cote Joueur 2 (optionnel)</label>
-      <input class="tp-input" name="odd_p2" type="number" step="0.01" min="1.01"
-             placeholder="Ex: 2.10"
-             value="{{ prefill.odd_p2 if prefill and prefill.odd_p2 else '' }}"
-             hx-post="/predictions/run"
-             hx-target="#result-card"
-             hx-swap="innerHTML"
-             hx-include="closest form"
-             hx-trigger="change">
-    </div>
-  </div>
-
-  <button type="submit" class="tp-btn primary" style="width:100%;justify-content:center;padding:12px">
-    ▸ Analyser
-  </button>
 </form>
 
-<div id="result-card" style="margin-top:16px"></div>
-
-</div><!-- end .tp-content -->
-
 <script>
+// ── Surface toggle ─────────────────────────────────────────────────
+function setSurface(val, btn) {
+  document.getElementById('surface-val').value = val;
+  btn.closest('.pred-toggle-row').querySelectorAll('.pred-toggle-btn').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+}
+
+// ── Best of toggle ─────────────────────────────────────────────────
+function setBestOf(val, btn) {
+  document.getElementById('bestof-val').value = val;
+  btn.closest('.pred-toggle-row').querySelectorAll('.pred-toggle-btn').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+}
+
+// ── Tournament chips ───────────────────────────────────────────────
+function setTourney(name, surface, btn) {
+  document.getElementById('tournament-input').value = name;
+  // Also update surface
+  document.getElementById('surface-val').value = surface;
+  document.querySelectorAll('.pred-toggle-btn').forEach(function(b) {
+    if (b.textContent.trim().toLowerCase().startsWith(surface.toLowerCase())) {
+      b.closest && b.closest('.pred-toggle-row') &&
+      b.closest('.pred-toggle-row').querySelectorAll('.pred-toggle-btn').forEach(function(x) { x.classList.remove('active'); });
+      b.classList.add('active');
+    }
+  });
+  document.querySelectorAll('.pred-tourney-chip').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+// ── Autocomplete player select ─────────────────────────────────────
 function selectPlayer(name, fieldName, inputId, listId) {
   var input = document.getElementById(inputId);
   input.setAttribute('name', fieldName);
   input.value = name;
   var list = document.getElementById(listId);
   if (list) list.textContent = '';
+  // Load player info card
+  var field = fieldName.replace('_name', ''); // 'p1' or 'p2'
+  var tour  = document.querySelector('input[name="tour"]').value;
+  var infoEl = document.getElementById(field + '-info');
+  if (infoEl) {
+    htmx.ajax('GET', '/predictions/player-info?name=' + encodeURIComponent(name) + '&tour=' + tour, {target: infoEl, swap: 'innerHTML'});
+  }
 }
 
-// Auto-run prediction if pre-filled from match card
+// ── Fix field names before HTMX POST ──────────────────────────────
+document.addEventListener('htmx:configRequest', function(e) {
+  var elt = e.detail.elt;
+  if (!elt) return;
+  var form = (elt.tagName === 'FORM') ? elt : (elt.closest ? elt.closest('form') : null);
+  if (!form) return;
+  var p1 = document.getElementById('p1_input');
+  var p2 = document.getElementById('p2_input');
+  if (p1) p1.setAttribute('name', 'p1_name');
+  if (p2) p2.setAttribute('name', 'p2_name');
+});
+
+// ── Auto-run if pre-filled from match card ─────────────────────────
 {% if auto_run %}
 document.addEventListener('DOMContentLoaded', function() {
   var p1 = document.getElementById('p1_input');
@@ -137,22 +350,10 @@ document.addEventListener('DOMContentLoaded', function() {
   if (p1) p1.setAttribute('name', 'p1_name');
   if (p2) p2.setAttribute('name', 'p2_name');
   setTimeout(function() {
-    var btn = document.querySelector('button[type="submit"]');
-    if (btn) btn.click();
-  }, 50);
+    var form = document.getElementById('pred-form');
+    if (form) htmx.trigger(form, 'submit');
+  }, 100);
 });
 {% endif %}
-
-// Ensure p1/p2 input names are correct before form submission
-document.addEventListener('htmx:configRequest', function(e) {
-  var elt = e.detail.elt;
-  if (!elt) return;
-  var form = (elt.tagName === 'FORM') ? elt : (elt.closest ? elt.closest('form[hx-post="/predictions/run"]') : null);
-  if (!form) return;
-  var p1 = document.getElementById('p1_input');
-  var p2 = document.getElementById('p2_input');
-  if (p1) p1.setAttribute('name', 'p1_name');
-  if (p2) p2.setAttribute('name', 'p2_name');
-});
 </script>
 {% endblock %}

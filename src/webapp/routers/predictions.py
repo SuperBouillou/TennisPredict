@@ -1,6 +1,7 @@
 """Router — Manual predictions."""
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from fastapi import APIRouter, Request, Form, Query
 from fastapi.responses import HTMLResponse
@@ -46,6 +47,73 @@ def _state():
     return APP_STATE
 
 
+def _safe(d: dict, key: str, default=0.0):
+    """Safe float extraction from player profile dict."""
+    try:
+        v = d.get(key)
+        if v is None:
+            return default
+        f = float(v)
+        return default if math.isnan(f) else f
+    except Exception:
+        return default
+
+
+def _build_context_items(artifacts: dict, p1_name: str, p2_name: str, surface: str) -> list[dict]:
+    """Build top-6 match context items for the feature bar display."""
+    items: list[dict] = []
+    try:
+        profiles = artifacts.get('profiles')
+        if profiles is None:
+            return items
+        p1 = ml_module._get_player(profiles, p1_name)
+        p2 = ml_module._get_player(profiles, p2_name)
+        if not p1 or not p2:
+            return items
+
+        elo1 = _safe(p1, 'elo', 1500.0)
+        elo2 = _safe(p2, 'elo', 1500.0)
+        elo_diff = int(elo1 - elo2)
+        sign = '+' if elo_diff >= 0 else ''
+        items.append({'label': f'ELO diff ({sign}{elo_diff})', 'raw': abs(elo_diff)})
+
+        wr10_1 = _safe(p1, 'winrate_10', 0.5) * 100
+        items.append({'label': 'Forme récente 10M', 'raw': wr10_1})
+
+        surf_elo_key = {'Clay': 'elo_clay', 'Grass': 'elo_grass', 'Hard': 'elo_hard'}.get(surface, 'elo')
+        elo_s1 = _safe(p1, surf_elo_key, elo1)
+        elo_s2 = _safe(p2, surf_elo_key, elo2)
+        surf_diff = int(elo_s1 - elo_s2)
+        sign_s = '+' if surf_diff >= 0 else ''
+        items.append({'label': f'ELO {surface.lower()} ({sign_s}{surf_diff})', 'raw': abs(surf_diff)})
+
+        rank1 = _safe(p1, 'rank', 200.0)
+        rank2 = _safe(p2, 'rank', 200.0)
+        rank_diff = abs(int(rank2 - rank1))
+        items.append({'label': f'Classement (#{int(rank1)} vs #{int(rank2)})', 'raw': rank_diff})
+
+        wr_surf_key = f'winrate_surf_{surface}'
+        wr_surf1 = _safe(p1, wr_surf_key, 0.5) * 100
+        items.append({'label': f'Win rate {surface}', 'raw': wr_surf1})
+
+        ds1 = _safe(p1, 'days_since', 7.0)
+        freshness = max(0.0, 100.0 - ds1 * 6)
+        items.append({'label': f'Repos P1 ({int(ds1)}j)', 'raw': freshness})
+
+    except Exception:
+        pass
+
+    if not items:
+        return items
+
+    # Normalize to 0-95 scale
+    max_raw = max(it['raw'] for it in items) or 1.0
+    for it in items:
+        it['pct'] = round(it['raw'] / max_raw * 95)
+        del it['raw']
+    return items
+
+
 @router.get("/predictions", response_class=HTMLResponse)
 async def predictions_page(
     request: Request,
@@ -77,6 +145,52 @@ async def predictions_page(
         "prefill": prefill,
         "auto_run": bool(p1_name and p2_name),
     })
+
+
+@router.get("/predictions/player-info", response_class=HTMLResponse)
+async def player_info(name: str = "", tour: str = "atp"):
+    """Return a small HTML fragment with player rank/ELO/form for the setup card."""
+    if not name:
+        return HTMLResponse("")
+    artifacts = _state().get('models', {}).get(tour)
+    if not artifacts:
+        return HTMLResponse("")
+    try:
+        p = ml_module._get_player(artifacts['profiles'], name)
+    except Exception:
+        p = None
+    if not p:
+        return HTMLResponse(
+            f'<span style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono)">Joueur introuvable</span>'
+        )
+
+    rank = p.get('rank')
+    elo  = p.get('elo')
+    ioc  = (p.get('ioc') or p.get('country') or '').upper()[:3]
+    wr10 = _safe(p, 'winrate_10', 0.5)
+
+    rank_str = f'#{int(rank)}' if rank and not math.isnan(float(rank)) else '—'
+    elo_str  = str(int(float(elo))) if elo and not math.isnan(float(elo)) else '—'
+
+    # Form dots: approximate from winrate_5 (last 5 matches)
+    wr5 = _safe(p, 'winrate_5', 0.5)
+    wins = round(wr5 * 5)
+    dots_html = ''.join(
+        f'<i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:3px;background:{"var(--lime)" if i < wins else "var(--loss)"};opacity:{1 if i < wins else 0.4}"></i>'
+        for i in range(5)
+    )
+
+    html = f'''<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--fg-3);letter-spacing:.08em">{ioc} · {rank_str}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">
+      <div><div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.08em;margin-bottom:2px">ELO</div>
+           <div style="font-family:var(--font-mono);font-size:14px;font-weight:600;color:var(--fg)">{elo_str}</div></div>
+      <div><div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.08em;margin-bottom:2px">FORME 10M</div>
+           <div style="font-family:var(--font-mono);font-size:14px;font-weight:600;color:{"var(--lime)" if wr10 >= 0.6 else "var(--fg)"}">{round(wr10*100)}%</div></div>
+    </div>
+    <div>{dots_html}</div>'''
+    return HTMLResponse(html)
 
 
 @router.get("/predictions/autocomplete", response_class=HTMLResponse)
@@ -164,12 +278,14 @@ async def run_prediction(
         bankroll=bankroll,
         kelly_fraction=kelly_fraction,
     )
+    context_items = _build_context_items(artifacts, p1_name, p2_name, surface)
     return templates.TemplateResponse(request, "partials/prediction_result.html", {
         "result": result,
         "p1_name": p1_name, "p2_name": p2_name,
         "tour": tour, "tournament": tournament, "surface": surface,
         "round": round_, "best_of": best_of,
         "odd_p1": odd_p1, "odd_p2": odd_p2,
+        "context_items": context_items,
     })
 
 

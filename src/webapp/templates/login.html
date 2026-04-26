@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TennisPredict — Connexion</title>
+  <title>Oddshift — Connexion</title>
+  <link rel="icon" type="image/png" href="/static/img/oddshift-favicon.png">
   <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/css/tokens.css">
   <style>
     body {
       display: flex;
@@ -86,7 +88,10 @@
 </head>
 <body>
   <div class="login-card">
-    <div class="login-logo">🎾 Tennis<span>Predict</span></div>
+    <div class="login-logo" style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:22px;font-weight:700;letter-spacing:-0.02em">
+      <span style="width:11px;height:11px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green);flex-shrink:0;display:inline-block"></span>
+      odd<span>shift</span>
+    </div>
 
     {% if flash %}
       <div class="flash-msg {% if 'reussi' in flash or 'Deconnexion' in flash %}success{% endif %}">
