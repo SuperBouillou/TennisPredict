@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 
 from src.webapp import ml as ml_module
 from src.webapp.db import get_bankroll, set_bankroll, get_setting, list_bets, log_signal
+from src.webapp.state import get_state
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +22,6 @@ router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 
 _SRC = str(Path(__file__).resolve().parents[3] / 'src')
-
-
-def _app_state() -> dict:
-    """Lazy import to avoid circular import at module load time."""
-    from src.webapp.main import APP_STATE  # noqa: PLC0415
-    return APP_STATE
 
 
 def _get_today_matches(tour: str, match_date: str) -> tuple[list[dict], bool]:
@@ -178,13 +173,13 @@ def _resolve_h2h(h2h_lookup: dict, p1_name: str, p2_name: str, surface: str) -> 
 
 def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, kelly_fraction: float = 0.25) -> list[dict]:
     """Add ML prediction + player display stats to each match."""
-    artifacts = _app_state().get('models', {}).get(tour)
+    artifacts = get_state().get('models', {}).get(tour)
     if not artifacts:
         return matches
     # Prefer O(1) dict lookup if built at startup
     profiles = artifacts.get('profiles_dict') or artifacts.get('profiles')
     enriched = []
-    h2h_lookup = _app_state().get('h2h', {}).get(tour, {})
+    h2h_lookup = get_state().get('h2h', {}).get(tour, {})
     for m in matches:
         surface = m.get('surface', 'Hard')
 
@@ -296,7 +291,7 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
         # ── Auto-log dans signal_log pour le track record ─────────────────────
         if m['badge'] == 'value':
             try:
-                db = _app_state().get('db')
+                db = get_state().get('db')
                 if db is not None:
                     bet_on   = m.get('p1_name') if ep1 >= ep2 else m.get('p2_name')
                     odd_snap = m.get('odd_p1') if ep1 >= ep2 else m.get('odd_p2')
@@ -388,7 +383,7 @@ def _bankroll_card_html(amount: float) -> str:
 
 @router.get("/bankroll/display", response_class=HTMLResponse)
 async def bankroll_display(card: int = 0, sidebar: int = 0):
-    db = _app_state()['db']
+    db = get_state()['db']
     amount = get_bankroll(db)
     if sidebar:
         return HTMLResponse(_bankroll_sidebar_html(amount))
@@ -397,7 +392,7 @@ async def bankroll_display(card: int = 0, sidebar: int = 0):
 
 @router.get("/bankroll/edit", response_class=HTMLResponse)
 async def bankroll_edit(card: int = 0, sidebar: int = 0):
-    db = _app_state()['db']
+    db = get_state()['db']
     amount = get_bankroll(db)
     if sidebar:
         cancel_url = "/bankroll/display?sidebar=1"
@@ -451,7 +446,7 @@ async def bankroll_edit(card: int = 0, sidebar: int = 0):
 
 @router.post("/bankroll/set", response_class=HTMLResponse)
 async def bankroll_set(amount: float = Form(...), card: int = Form(0), sidebar: int = Form(0)):
-    db = _app_state()['db']
+    db = get_state()['db']
     set_bankroll(db, amount=max(0.0, amount))
     new_amount = get_bankroll(db)
     if sidebar:
@@ -513,7 +508,7 @@ async def today_page(request: Request, tour: str = "atp",
     else:
         page_mode = "today"
 
-    state = _app_state()
+    state = get_state()
     db = state['db']
     bankroll = get_bankroll(db)
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
@@ -594,7 +589,7 @@ async def today_matches_partial(request: Request, tour: str = "atp",
         "demain" if match_date > ref_today_str else "today"
     )
 
-    db = _app_state()['db']
+    db = get_state()['db']
     bankroll = get_bankroll(db)
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
 
@@ -621,7 +616,7 @@ async def today_matches_partial(request: Request, tour: str = "atp",
 async def refresh_odds(request: Request, tour: str = "atp"):
     """Force re-fetch odds from API (deletes today's cache), then returns refreshed match list."""
     _delete_odds_cache(tour)
-    db = _app_state()['db']
+    db = get_state()['db']
     bankroll = get_bankroll(db)
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
     match_date = date.today().isoformat()
@@ -662,7 +657,7 @@ async def match_detail(
     odd_p2: float | None = None,
 ):
     """HTMX modal — detailed match prediction card."""
-    state = _app_state()
+    state = get_state()
     artifacts = state.get('models', {}).get(tour)
 
     # H2H lookup — done before predict() so it feeds into ML features

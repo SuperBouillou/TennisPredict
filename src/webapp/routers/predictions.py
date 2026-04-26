@@ -9,6 +9,8 @@ from fastapi.templating import Jinja2Templates
 
 from src.webapp import ml as ml_module
 from src.webapp.db import get_bankroll, get_setting, add_bet, list_bets
+from src.webapp.state import get_state
+from src.webapp.utils import safe_get
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -42,21 +44,6 @@ def _map_round(espn_round: str) -> str:
     return 'R64'
 
 
-def _state():
-    from src.webapp.main import APP_STATE
-    return APP_STATE
-
-
-def _safe(d: dict, key: str, default=0.0):
-    """Safe float extraction from player profile dict."""
-    try:
-        v = d.get(key)
-        if v is None:
-            return default
-        f = float(v)
-        return default if math.isnan(f) else f
-    except Exception:
-        return default
 
 
 def _build_context_items(artifacts: dict, p1_name: str, p2_name: str, surface: str) -> list[dict]:
@@ -71,32 +58,32 @@ def _build_context_items(artifacts: dict, p1_name: str, p2_name: str, surface: s
         if not p1 or not p2:
             return items
 
-        elo1 = _safe(p1, 'elo', 1500.0)
-        elo2 = _safe(p2, 'elo', 1500.0)
+        elo1 = safe_get(p1, 'elo', 1500.0)
+        elo2 = safe_get(p2, 'elo', 1500.0)
         elo_diff = int(elo1 - elo2)
         sign = '+' if elo_diff >= 0 else ''
         items.append({'label': f'ELO diff ({sign}{elo_diff})', 'raw': abs(elo_diff)})
 
-        wr10_1 = _safe(p1, 'winrate_10', 0.5) * 100
+        wr10_1 = safe_get(p1, 'winrate_10', 0.5) * 100
         items.append({'label': 'Forme récente 10M', 'raw': wr10_1})
 
         surf_elo_key = {'Clay': 'elo_clay', 'Grass': 'elo_grass', 'Hard': 'elo_hard'}.get(surface, 'elo')
-        elo_s1 = _safe(p1, surf_elo_key, elo1)
-        elo_s2 = _safe(p2, surf_elo_key, elo2)
+        elo_s1 = safe_get(p1, surf_elo_key, elo1)
+        elo_s2 = safe_get(p2, surf_elo_key, elo2)
         surf_diff = int(elo_s1 - elo_s2)
         sign_s = '+' if surf_diff >= 0 else ''
         items.append({'label': f'ELO {surface.lower()} ({sign_s}{surf_diff})', 'raw': abs(surf_diff)})
 
-        rank1 = _safe(p1, 'rank', 200.0)
-        rank2 = _safe(p2, 'rank', 200.0)
+        rank1 = safe_get(p1, 'rank', 200.0)
+        rank2 = safe_get(p2, 'rank', 200.0)
         rank_diff = abs(int(rank2 - rank1))
         items.append({'label': f'Classement (#{int(rank1)} vs #{int(rank2)})', 'raw': rank_diff})
 
         wr_surf_key = f'winrate_surf_{surface}'
-        wr_surf1 = _safe(p1, wr_surf_key, 0.5) * 100
+        wr_surf1 = safe_get(p1, wr_surf_key, 0.5) * 100
         items.append({'label': f'Win rate {surface}', 'raw': wr_surf1})
 
-        ds1 = _safe(p1, 'days_since', 7.0)
+        ds1 = safe_get(p1, 'days_since', 7.0)
         freshness = max(0.0, 100.0 - ds1 * 6)
         items.append({'label': f'Repos P1 ({int(ds1)}j)', 'raw': freshness})
 
@@ -127,7 +114,7 @@ async def predictions_page(
     odd_p1: float | None = None,
     odd_p2: float | None = None,
 ):
-    db = _state()['db']
+    db = get_state()['db']
     prefill = {
         "p1_name": p1_name,
         "p2_name": p2_name,
@@ -152,7 +139,7 @@ async def player_info(name: str = "", tour: str = "atp"):
     """Return a small HTML fragment with player rank/ELO/form for the setup card."""
     if not name:
         return HTMLResponse("")
-    artifacts = _state().get('models', {}).get(tour)
+    artifacts = get_state().get('models', {}).get(tour)
     if not artifacts:
         return HTMLResponse("")
     try:
@@ -167,13 +154,13 @@ async def player_info(name: str = "", tour: str = "atp"):
     rank = p.get('rank')
     elo  = p.get('elo')
     ioc  = (p.get('ioc') or p.get('country') or '').upper()[:3]
-    wr10 = _safe(p, 'winrate_10', 0.5)
+    wr10 = safe_get(p, 'winrate_10', 0.5)
 
     rank_str = f'#{int(rank)}' if rank and not math.isnan(float(rank)) else '—'
     elo_str  = str(int(float(elo))) if elo and not math.isnan(float(elo)) else '—'
 
     # Form dots: approximate from winrate_5 (last 5 matches)
-    wr5 = _safe(p, 'winrate_5', 0.5)
+    wr5 = safe_get(p, 'winrate_5', 0.5)
     wins = round(wr5 * 5)
     dots_html = ''.join(
         f'<i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:3px;background:{"var(--lime)" if i < wins else "var(--loss)"};opacity:{1 if i < wins else 0.4}"></i>'
@@ -202,7 +189,7 @@ async def autocomplete(
 ):
     if len(q) < 2:
         return HTMLResponse("")
-    artifacts = _state().get('models', {}).get(tour)
+    artifacts = get_state().get('models', {}).get(tour)
     if not artifacts:
         return HTMLResponse("")
     profiles = artifacts['profiles']
@@ -248,8 +235,8 @@ async def run_prediction(
     odd_p1: float | None = Form(None),
     odd_p2: float | None = Form(None),
 ):
-    artifacts = _state().get('models', {}).get(tour)
-    db = _state()['db']
+    artifacts = get_state().get('models', {}).get(tour)
+    db = get_state()['db']
     bankroll = get_bankroll(db)
     kelly_fraction = float(get_setting(db, 'kelly_fraction', '0.25'))
 
@@ -304,7 +291,7 @@ async def quick_bet(
     stake: float = Form(...),
     kelly_frac: float | None = Form(None),
 ):
-    db = _state()['db']
+    db = get_state()['db']
     bankroll = get_bankroll(db)
     if stake <= 0 or stake > bankroll:
         return HTMLResponse(
@@ -360,7 +347,7 @@ async def save_bet(
     stake: float = Form(...),
     kelly_frac: float | None = Form(None),
 ):
-    db = _state()['db']
+    db = get_state()['db']
     bankroll = get_bankroll(db)
     if stake <= 0 or stake > bankroll:
         return HTMLResponse(

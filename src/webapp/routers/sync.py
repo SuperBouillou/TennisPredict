@@ -10,6 +10,8 @@ import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import HTMLResponse
 
+from src.webapp.state import get_state
+
 router = APIRouter()
 
 _SRC = Path(__file__).resolve().parents[3] / "src"
@@ -17,16 +19,11 @@ if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 
-def _state():
-    from src.webapp.main import APP_STATE
-    return APP_STATE
-
-
 def _reload_profiles(tour: str) -> None:
     """Reload player profiles and ranking lookup into APP_STATE after a sync."""
     import json
     from src.config import get_paths
-    state = _state()
+    state = get_state()
     if state['models'].get(tour) is None:
         return
     paths = get_paths(tour)
@@ -48,7 +45,7 @@ def _reload_profiles(tour: str) -> None:
 
 
 async def _run_sync(tour: str, force: bool = False) -> None:
-    state = _state()
+    state = get_state()
     state['sync_status'][tour] = 'running'
     try:
         import fetch_live_data as fld
@@ -63,7 +60,7 @@ async def _run_sync(tour: str, force: bool = False) -> None:
 
 @router.post("/sync", response_class=HTMLResponse)
 async def trigger_sync(background_tasks: BackgroundTasks, tour: str = "atp"):
-    status = _state().get('sync_status', {}).get(tour, 'idle')
+    status = get_state().get('sync_status', {}).get(tour, 'idle')
     if status == 'running':
         return HTMLResponse(
             f'<span style="color:var(--orange)">Sync {tour.upper()} déjà en cours…</span>'
@@ -76,7 +73,7 @@ async def trigger_sync(background_tasks: BackgroundTasks, tour: str = "atp"):
 
 @router.get("/sync/status", response_class=HTMLResponse)
 async def sync_status():
-    ss = _state().get('sync_status', {})
+    ss = get_state().get('sync_status', {})
     atp_running = ss.get('atp') == 'running'
     wta_running = ss.get('wta') == 'running'
     running = atp_running or wta_running

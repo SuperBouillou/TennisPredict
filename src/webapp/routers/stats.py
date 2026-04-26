@@ -8,14 +8,10 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from src.webapp.db import get_bankroll, get_setting, set_setting, get_signal_stats, list_signals, get_signal_curve
+from src.webapp.state import get_state
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
-
-
-def _state():
-    from src.webapp.main import APP_STATE
-    return APP_STATE
 
 
 def _load_equity(tour: str, strategy: str) -> dict:
@@ -25,7 +21,7 @@ def _load_equity(tour: str, strategy: str) -> dict:
         'Percent': 'backtest_strat_Pct_2%.parquet',
     }
     fname = strat_map.get(strategy, 'backtest_kelly.parquet')
-    df = _state().get('backtest', {}).get(tour, {}).get(fname)
+    df = get_state().get('backtest', {}).get(tour, {}).get(fname)
     if df is None:
         return {'labels': [], 'values': []}
     # Find date and bankroll columns
@@ -52,7 +48,7 @@ def _load_equity(tour: str, strategy: str) -> dict:
 def _load_roi_bookmakers(tour: str) -> dict:
     bookmakers = ['Bet365', 'Pinnacle', 'Best', 'Avg']
     roi_list = []
-    bt_cache = _state().get('backtest', {}).get(tour, {})
+    bt_cache = get_state().get('backtest', {}).get(tour, {})
     for bk in bookmakers:
         df = bt_cache.get(f'backtest_real_{bk}.parquet')
         if df is None:
@@ -70,7 +66,7 @@ def _load_roi_bookmakers(tour: str) -> dict:
 
 
 def _load_feature_importance(tour: str) -> dict:
-    artifacts = _state().get('models', {}).get(tour)
+    artifacts = get_state().get('models', {}).get(tour)
     if not artifacts or not artifacts.get('model'):
         return {'features': [], 'values': [], 'groups': []}
     model    = artifacts['model']
@@ -103,7 +99,7 @@ def _load_feature_importance(tour: str) -> dict:
 
 def _kpis(tour: str) -> dict:
     """Compute summary KPIs — same source as the default (Kelly) equity curve."""
-    bt_cache = _state().get('backtest', {}).get(tour, {})
+    bt_cache = get_state().get('backtest', {}).get(tour, {})
     # Priority: Kelly strategy file (matches equity curve default) → Pinnacle real → Kelly raw
     df = bt_cache.get('backtest_strat_Kelly_1_4_cap2%.parquet')
     if df is None:
@@ -132,7 +128,7 @@ def _kpis(tour: str) -> dict:
 
 @router.get("/stats", response_class=HTMLResponse)
 async def stats_page(request: Request, tour: str = "atp"):
-    db = _state()['db']
+    db = get_state()['db']
     settings = {
         'min_edge':       get_setting(db, 'min_edge', '0.03'),
         'min_prob':       get_setting(db, 'min_prob', '0.55'),
@@ -167,7 +163,7 @@ async def features_data(tour: str = "atp"):
 @router.get("/stats/perf-by-edge")
 async def perf_by_edge(tour: str = "atp"):
     """Win rate + ROI bucketed by edge size (from backtest_real_Pinnacle)."""
-    bt_cache = _state().get('backtest', {}).get(tour, {})
+    bt_cache = get_state().get('backtest', {}).get(tour, {})
     df = bt_cache.get('backtest_real_Pinnacle.parquet')
     if df is None:
         df = bt_cache.get('backtest_all_candidates.parquet')
@@ -207,7 +203,7 @@ async def perf_by_edge(tour: str = "atp"):
 @router.get("/stats/perf-by-surface")
 async def perf_by_surface(tour: str = "atp"):
     """Win rate + ROI broken down by surface (from backtest_real_Pinnacle)."""
-    bt_cache = _state().get('backtest', {}).get(tour, {})
+    bt_cache = get_state().get('backtest', {}).get(tour, {})
     df = bt_cache.get('backtest_real_Pinnacle.parquet')
     if df is None:
         df = bt_cache.get('backtest_all_candidates.parquet')
@@ -240,7 +236,7 @@ async def perf_by_surface(tour: str = "atp"):
 @router.get("/stats/live-perf")
 async def live_perf(tour: str | None = None):
     """Real-bet performance stats from the bets SQLite table."""
-    db = _state()['db']
+    db = get_state()['db']
     q = "SELECT tour, odd, stake, pnl, status FROM bets WHERE status != 'pending'"
     rows = db.execute(q).fetchall()
     if not rows:
@@ -285,7 +281,7 @@ async def live_perf(tour: str | None = None):
 @router.get("/stats/monthly")
 async def monthly_breakdown(tour: str | None = Query(default=None)):
     """Monthly P&L breakdown: stacked wins/losses bar + ROI line."""
-    db = _state()['db']
+    db = get_state()['db']
     base_q = """
         SELECT substr(resolved_at, 1, 7) AS month,
                COUNT(*) AS n,
@@ -314,7 +310,7 @@ async def monthly_breakdown(tour: str | None = Query(default=None)):
 @router.get("/stats/calibration")
 async def calibration_curve(tour: str | None = Query(default=None)):
     """Predicted probability vs actual win rate, bucketed in 5% intervals."""
-    db = _state()['db']
+    db = get_state()['db']
     rows = db.execute(
         "SELECT prob, status FROM bets WHERE status != 'pending' AND prob IS NOT NULL"
         + (" AND tour = ?" if tour else ""),
@@ -349,14 +345,14 @@ async def calibration_curve(tour: str | None = Query(default=None)):
 @router.get("/stats/signals")
 async def signal_stats(tour: str | None = Query(default=None)):
     """KPIs du track record automatique."""
-    db = _state()['db']
+    db = get_state()['db']
     return JSONResponse(get_signal_stats(db, tour=tour))
 
 
 @router.get("/stats/signals/curve")
 async def signal_curve(tour: str | None = Query(default=None)):
     """Courbe P&L cumulative (en unités) pour le track record."""
-    db = _state()['db']
+    db = get_state()['db']
     return JSONResponse(get_signal_curve(db, tour=tour))
 
 
@@ -364,7 +360,7 @@ async def signal_curve(tour: str | None = Query(default=None)):
 async def signal_recent(tour: str | None = Query(default=None),
                         limit: int = Query(default=50)):
     """Derniers signaux VALUE pour le tableau du track record."""
-    db = _state()['db']
+    db = get_state()['db']
     signals = list_signals(db, tour=tour, limit=limit)
     return JSONResponse(signals)
 
@@ -375,7 +371,7 @@ async def save_settings(
     min_prob: str = Form(...),
     kelly_fraction: str = Form(...),
 ):
-    db = _state()['db']
+    db = get_state()['db']
     set_setting(db, 'min_edge', min_edge)
     set_setting(db, 'min_prob', min_prob)
     set_setting(db, 'kelly_fraction', kelly_fraction)

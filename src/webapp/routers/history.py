@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from src.webapp.db import get_bankroll, list_bets, resolve_bet, delete_bet, delete_resolved_bet, clear_bets, auto_resolve_pending
+from src.webapp.state import get_state
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -28,11 +29,6 @@ def _invalidate_pnl_cache() -> None:
 
 
 _SRC = str(Path(__file__).resolve().parents[3] / 'src')
-
-
-def _state():
-    from src.webapp.main import APP_STATE
-    return APP_STATE
 
 
 def _try_auto_resolve(db) -> int:
@@ -156,7 +152,7 @@ async def history_page(
     status: str | None = None,
     period: str | None = None,  # "7j" | "mois" | None (all)
 ):
-    db = _state()['db']
+    db = get_state()['db']
 
     # Auto-resolve pending bets against ESPN results (last 3 days)
     auto_resolved = _try_auto_resolve(db)
@@ -194,7 +190,7 @@ async def history_page(
 
 @router.post("/bets/{bet_id}/resolve", response_class=HTMLResponse)
 async def resolve(request: Request, bet_id: int, outcome: Literal['won', 'lost'] = Form(...)):
-    db = _state()['db']
+    db = get_state()['db']
     try:
         resolve_bet(db, bet_id, outcome)
     except ValueError as e:
@@ -209,7 +205,7 @@ async def resolve(request: Request, bet_id: int, outcome: Literal['won', 'lost']
 
 @router.post("/bets/{bet_id}/delete", response_class=HTMLResponse)
 async def delete(request: Request, bet_id: int):
-    db = _state()['db']
+    db = get_state()['db']
     try:
         delete_bet(db, bet_id)
     except ValueError as e:
@@ -223,7 +219,7 @@ async def delete(request: Request, bet_id: int):
 
 @router.post("/bets/{bet_id}/delete-resolved", response_class=HTMLResponse)
 async def delete_resolved(request: Request, bet_id: int):
-    db = _state()['db']
+    db = get_state()['db']
     try:
         delete_resolved_bet(db, bet_id)
     except ValueError as e:
@@ -237,7 +233,7 @@ async def delete_resolved(request: Request, bet_id: int):
 
 @router.post("/bets/clear", response_class=HTMLResponse)
 async def clear_history(request: Request, tour: str = Form("")):
-    db = _state()['db']
+    db = get_state()['db']
     n = clear_bets(db, tour=tour or None)
     _invalidate_pnl_cache()
     return HTMLResponse(
@@ -254,7 +250,7 @@ async def pnl_data(tour: str | None = Query(default=None)):
     if cached and (time.time() - cached[1]) < _PNL_TTL:
         return JSONResponse(cached[0])
 
-    db = _state()['db']
+    db = get_state()['db']
     if tour:
         rows = db.execute(
             "SELECT resolved_at, pnl FROM bets WHERE tour=? AND status!='pending' ORDER BY resolved_at",
@@ -276,7 +272,7 @@ async def pnl_data(tour: str | None = Query(default=None)):
 
 @router.get("/history/export")
 async def export_csv(tour: str | None = Query(default=None)):
-    db = _state()['db']
+    db = get_state()['db']
     bets = list_bets(db, tour=tour, limit=10000)
     output = io.StringIO()
     if bets:

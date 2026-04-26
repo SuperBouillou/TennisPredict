@@ -11,14 +11,11 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from src.webapp.players import search_players, get_profile
+from src.webapp.state import get_state
+from src.webapp.utils import safe_float
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
-
-
-def _state():
-    from src.webapp.main import APP_STATE
-    return APP_STATE
 
 
 # ── IOC country code → ISO-2 (for flag emoji) ─────────────────────────────────
@@ -80,27 +77,20 @@ def _age_from_dob(dob) -> int | None:
         return None
 
 
-def _safe_float(v, default: float = 0.0) -> float:
-    try:
-        f = float(v)
-        return default if (math.isnan(f) or math.isinf(f)) else f
-    except Exception:
-        return default
-
 
 def _best_surface(p: dict) -> str:
     return max(
         ('Hard', 'Clay', 'Grass'),
-        key=lambda s: _safe_float(p.get(f'elo_{s}'), 1500),
+        key=lambda s: safe_float(p.get(f'elo_{s}'), 1500),
     )
 
 
 def _build_radar(p: dict) -> dict:
     """8-axis radar data, values 0-100."""
-    elo   = _safe_float(p.get('elo'),       1500)
-    elo_h = _safe_float(p.get('elo_Hard'),  1500)
-    elo_c = _safe_float(p.get('elo_Clay'),  1500)
-    elo_g = _safe_float(p.get('elo_Grass'), 1500)
+    elo   = safe_float(p.get('elo'),       1500)
+    elo_h = safe_float(p.get('elo_Hard'),  1500)
+    elo_c = safe_float(p.get('elo_Clay'),  1500)
+    elo_g = safe_float(p.get('elo_Grass'), 1500)
 
     def norm_elo(v: float) -> float:
         return round(max(0.0, min(100.0, (v - 1200) / 900 * 100)), 1)
@@ -108,14 +98,14 @@ def _build_radar(p: dict) -> dict:
     return {
         'labels': ['FORME', 'ELO', 'CLAY', 'HARD', 'GRASS', 'FITNESS', 'ENDURANCE', 'MENTAL'],
         'values': [
-            round(_safe_float(p.get('winrate_10'), 0.5) * 100, 1),
+            round(safe_float(p.get('winrate_10'), 0.5) * 100, 1),
             norm_elo(elo),
             norm_elo(elo_c),
             norm_elo(elo_h),
             norm_elo(elo_g),
-            round(max(0.0, 100.0 - _safe_float(p.get('matches_14d'), 0) * 10), 1),
-            round(_safe_float(p.get('sets_ratio_10'), 0.5) * 100, 1),
-            round(_safe_float(p.get('tiebreak_winrate_10'), 0.5) * 100, 1),
+            round(max(0.0, 100.0 - safe_float(p.get('matches_14d'), 0) * 10), 1),
+            round(safe_float(p.get('sets_ratio_10'), 0.5) * 100, 1),
+            round(safe_float(p.get('tiebreak_winrate_10'), 0.5) * 100, 1),
         ],
     }
 
@@ -124,12 +114,12 @@ def _build_insights(p: dict) -> list[dict]:
     """Up to 4 dynamic insights derived from existing profile fields."""
     insights: list[dict] = []
 
-    elo_surf = {s: _safe_float(p.get(f'elo_{s}'), 1500) for s in ('Hard', 'Clay', 'Grass')}
+    elo_surf = {s: safe_float(p.get(f'elo_{s}'), 1500) for s in ('Hard', 'Clay', 'Grass')}
     best_surf  = max(elo_surf, key=elo_surf.get)
     worst_surf = min(elo_surf, key=elo_surf.get)
     best_elo   = elo_surf[best_surf]
     worst_elo  = elo_surf[worst_surf]
-    global_elo = _safe_float(p.get('elo'), 1500)
+    global_elo = safe_float(p.get('elo'), 1500)
     surf_adv   = best_elo - global_elo
     surf_gap   = best_elo - worst_elo
 
@@ -142,8 +132,8 @@ def _build_insights(p: dict) -> list[dict]:
         })
 
     # 2. Forme récente
-    streak = int(_safe_float(p.get('streak'), 0))
-    wr10   = _safe_float(p.get('winrate_10'), 0.5)
+    streak = int(safe_float(p.get('streak'), 0))
+    wr10   = safe_float(p.get('winrate_10'), 0.5)
     if streak >= 3:
         insights.append({
             'ok': True,
@@ -172,8 +162,8 @@ def _build_insights(p: dict) -> list[dict]:
         })
 
     # 4. Fatigue / rouille
-    matches_14d = int(_safe_float(p.get('matches_14d'), 0))
-    days_since  = int(_safe_float(p.get('days_since'), 0))
+    matches_14d = int(safe_float(p.get('matches_14d'), 0))
+    days_since  = int(safe_float(p.get('days_since'), 0))
     if matches_14d >= 6:
         insights.append({
             'ok': False,
@@ -222,7 +212,7 @@ def _build_splits(p: dict) -> list[dict] | None:
         return None
     rows = []
     for lbl, wr_key, rec_key in _SPLITS_LABELS:
-        wr  = _safe_float(p.get(wr_key), 0.0)
+        wr  = safe_float(p.get(wr_key), 0.0)
         rec = p.get(rec_key, '')
         rows.append({'label': lbl, 'wr': round(wr * 100, 1), 'rec': rec or ''})
     return rows
@@ -239,7 +229,7 @@ async def joueurs_page(request: Request, tour: str = "atp"):
 
 @router.get("/joueurs/search", response_class=HTMLResponse)
 async def joueurs_search(request: Request, q: str = "", tour: str = "atp"):
-    artifacts = _state().get('models', {}).get(tour)
+    artifacts = get_state().get('models', {}).get(tour)
     if not artifacts or len(q) < 2:
         return HTMLResponse("")
     results = search_players(artifacts['profiles'], artifacts['players'], q)
@@ -311,7 +301,7 @@ async def elo_history(player_name: str, tour: str = "atp"):
 
 @router.get("/joueurs/{player_name:path}", response_class=HTMLResponse)
 async def joueur_profile(request: Request, player_name: str, tour: str = "atp"):
-    artifacts = _state().get('models', {}).get(tour)
+    artifacts = get_state().get('models', {}).get(tour)
     if not artifacts:
         return HTMLResponse("Circuit non disponible.", status_code=503)
 
