@@ -4,23 +4,28 @@
 {% block page_meta %}Rechercher un joueur{% endblock %}
 
 {% block topbar_right %}
-<div class="toggle-group">
-  <a href="/joueurs?tour=atp"><button class="toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</button></a>
-  <a href="/joueurs?tour=wta"><button class="toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</button></a>
+<div class="tp-toggle-group">
+  <a href="/joueurs?tour=atp" class="tp-toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</a>
+  <a href="/joueurs?tour=wta" class="tp-toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</a>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="form-group" style="margin-bottom:12px">
-  <input class="form-input" id="search-input" placeholder="Rechercher un joueur (min. 2 lettres)..."
-         autocomplete="off"
-         hx-get="/joueurs/search"
-         hx-trigger="keyup changed delay:200ms"
-         hx-target="#search-results"
-         hx-include="this"
-         name="q"
-         hx-vals='{"tour": "{{ tour }}"}'>
-</div>
+<div class="tp-content">
 
-<div id="search-results"></div>
+  <div class="tp-form-group">
+    <label class="tp-label">Rechercher un joueur</label>
+    <input class="tp-input" id="search-input" placeholder="Rechercher un joueur (min. 2 lettres)…"
+           autocomplete="off"
+           hx-get="/joueurs/search"
+           hx-trigger="keyup changed delay:200ms"
+           hx-target="#search-results"
+           hx-include="this"
+           name="q"
+           hx-vals='{"tour": "{{ tour }}"}'>
+  </div>
+
+  <div id="search-results"></div>
+
+</div><!-- end .tp-content -->
 {% endblock %}

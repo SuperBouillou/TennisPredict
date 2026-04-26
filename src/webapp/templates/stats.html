@@ -4,279 +4,234 @@
 {% block page_meta %}Modèle · Backtest · Mes paris{% endblock %}
 
 {% block topbar_right %}
-<div class="toggle-group">
-  <a href="/stats?tour=atp"><button class="toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</button></a>
-  <a href="/stats?tour=wta"><button class="toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</button></a>
+<div class="tp-toggle-group">
+  <a href="/stats?tour=atp" class="tp-toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</a>
+  <a href="/stats?tour=wta" class="tp-toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</a>
 </div>
 {% endblock %}
 
 {% block content %}
 
-{# ═══════════════════════════════════════════════════════
-   BLOC 1 — MES PARIS (données réelles, bets enregistrés)
-   ═══════════════════════════════════════════════════════ #}
-<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:0 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
-  📊 Mes paris — résultats réels
+{# Sticky tab nav #}
+<div class="tp-tab-nav">
+  <button class="tp-tab-btn" data-tab="paris">// Mes paris</button>
+  <button class="tp-tab-btn" data-tab="modele">// Modèle</button>
+  <button class="tp-tab-btn" data-tab="backtest">// Backtest</button>
+  <button class="tp-tab-btn" data-tab="calibration">// Calibration</button>
 </div>
 
-<div id="live-perf-card" class="card" style="margin-bottom:8px;padding:14px">
-  <div style="color:var(--muted);font-size:12px">Chargement…</div>
-</div>
+<div class="tp-content">
 
-<!-- Monthly breakdown -->
-<div style="margin-bottom:4px">
-  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Évolution mois par mois</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Barres = nombre de paris gagnés (vert) et perdus (rouge) · Ligne bleue = ROI du mois</div>
-</div>
-<div class="chart-container" style="margin-bottom:8px" id="monthly-chart-wrap">
-  <canvas id="monthly-chart"></canvas>
-</div>
+{# ── TAB : MES PARIS ── #}
+<div class="tp-tab-panel" data-tab="paris">
 
+  <div class="tp-section-lbl">Performance réelle</div>
+  <div id="live-perf-card" class="tp-card-basic" style="margin-bottom:14px">
+    <div style="color:var(--fg-3);font-size:12px">Chargement…</div>
+  </div>
 
-{# ═══════════════════════════════════════════════════════
-   BLOC 2 — PERFORMANCE DU MODÈLE (backtest historique)
-   ═══════════════════════════════════════════════════════ #}
-<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
-  🤖 Performance du modèle — simulation historique
-</div>
-<div style="font-size:11px;color:var(--muted);margin-bottom:10px;padding:0 2px">
-  Ces chiffres sont calculés sur des données passées (2023–2025) que le modèle n'a jamais vues pendant l'entraînement.
-  Ils donnent une estimation réaliste de ce à quoi s'attendre — sans garantie sur le futur.
-</div>
+  <div class="tp-section-lbl">Évolution mois par mois</div>
+  <div style="font-size:11px;color:var(--fg-3);margin-bottom:10px">
+    Barres = paris gagnés (lime) et perdus (rouge) · Ligne = ROI du mois
+  </div>
+  <div class="tp-chart-wrap" id="monthly-chart-wrap">
+    <canvas id="monthly-chart"></canvas>
+  </div>
 
-<!-- KPIs backtest -->
-<div class="grid-4" style="margin-bottom:10px">
-  <div class="kpi-card tip" data-tip="ROI calculé sur la simulation Kelly (même source que la courbe d'équité ci-dessous)">
-    <div class="kpi-value {% if (kpis.get('roi') or 0) >= 0 %}text-green{% else %}text-red{% endif %}">
-      {% if kpis.get('roi') %}{{ "%.1f"|format(kpis.roi * 100) }}%{% else %}—{% endif %}
+  <div class="tp-section-lbl">Configuration</div>
+  <div class="tp-card-basic">
+    <div style="font-size:11px;color:var(--fg-3);margin-bottom:12px">Ces seuils filtrent les signaux affichés sur la page des matchs.</div>
+    <form hx-post="/settings" hx-target="#settings-result" hx-swap="innerHTML">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">
+        <div class="tp-form-group">
+          <label class="tp-label">Edge minimum</label>
+          <input class="tp-input" name="min_edge" type="number" step="0.01" min="0" max="0.2" value="{{ settings.min_edge }}">
+        </div>
+        <div class="tp-form-group">
+          <label class="tp-label">Probabilité minimum</label>
+          <input class="tp-input" name="min_prob" type="number" step="0.01" min="0.5" max="0.8" value="{{ settings.min_prob }}">
+        </div>
+        <div class="tp-form-group">
+          <label class="tp-label">Fraction Kelly</label>
+          <input class="tp-input" name="kelly_fraction" type="number" step="0.05" min="0.1" max="0.5" value="{{ settings.kelly_fraction }}">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button type="submit" class="tp-btn primary sm">Sauvegarder</button>
+        <span id="settings-result" style="font-family:var(--font-mono);font-size:11px;color:var(--lime)"></span>
+      </div>
+    </form>
+  </div>
+
+</div><!-- end tab paris -->
+
+{# ── TAB : MODÈLE ── #}
+<div class="tp-tab-panel" data-tab="modele">
+
+  <div class="tp-section-lbl">Performance du modèle — simulation historique</div>
+  <div style="font-size:11px;color:var(--fg-3);margin-bottom:12px">
+    Calculé sur des données 2023–2025 que le modèle n'a jamais vues pendant l'entraînement.
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+    <div class="tp-kpi" data-tip="ROI calculé sur la simulation Kelly">
+      <div class="v {% if (kpis.get('roi') or 0) >= 0 %}lime{% else %}loss{% endif %}">
+        {% if kpis.get('roi') %}{{ "%.1f"|format(kpis.roi * 100) }}%{% else %}—{% endif %}
+      </div>
+      <div class="l">ROI simulé (Kelly)</div>
     </div>
-    <div class="kpi-label">ROI simulé (Kelly)</div>
-  </div>
-  <div class="kpi-card tip" data-tip="Nombre de paris sélectionnés par le modèle sur la période de test">
-    <div class="kpi-value">{{ kpis.get('n_bets', '—') }}</div>
-    <div class="kpi-label">Paris simulés</div>
-  </div>
-  <div class="kpi-card tip" data-tip="Pourcentage de paris gagnants parmi les signaux retenus">
-    <div class="kpi-value">
-      {% if kpis.get('win_rate') %}{{ "%.1f"|format(kpis.win_rate * 100) }}%{% else %}—{% endif %}
+    <div class="tp-kpi" data-tip="Nombre de paris sélectionnés sur la période de test">
+      <div class="v">{{ kpis.get('n_bets', '—') }}</div>
+      <div class="l">Paris simulés</div>
     </div>
-    <div class="kpi-label">Taux de réussite</div>
-  </div>
-  <div class="kpi-card tip" data-tip="P&L total cumulé en euros sur la simulation Kelly (bankroll initiale 1000€)">
-    <div class="kpi-value {% if (kpis.get('pnl') or 0) >= 0 %}text-green{% else %}text-red{% endif %}">
-      {% if kpis.get('pnl') is not none %}{{ "%+.0f"|format(kpis.pnl) }}€{% else %}—{% endif %}
+    <div class="tp-kpi" data-tip="Pourcentage de paris gagnants">
+      <div class="v">
+        {% if kpis.get('win_rate') %}{{ "%.1f"|format(kpis.win_rate * 100) }}%{% else %}—{% endif %}
+      </div>
+      <div class="l">Taux de réussite</div>
     </div>
-    <div class="kpi-label">P&amp;L simulé</div>
-  </div>
-  {% if kpis.get('final_bankroll') %}
-  <div class="kpi-card tip" data-tip="Bankroll finale après la simulation Kelly (départ 1000€) — correspond au dernier point de la courbe d'équité">
-    <div class="kpi-value {% if kpis.final_bankroll >= 1000 %}text-green{% else %}text-red{% endif %}">
-      {{ kpis.final_bankroll | int }}€
+    <div class="tp-kpi" data-tip="P&L cumulé en euros (bankroll initiale 1000€)">
+      <div class="v {% if (kpis.get('pnl') or 0) >= 0 %}lime{% else %}loss{% endif %}">
+        {% if kpis.get('pnl') is not none %}{{ "%+.0f"|format(kpis.pnl) }}€{% else %}—{% endif %}
+      </div>
+      <div class="l">P&L simulé</div>
     </div>
-    <div class="kpi-label">Bankroll finale</div>
+    {% if kpis.get('final_bankroll') %}
+    <div class="tp-kpi" data-tip="Bankroll finale simulation Kelly (départ 1000€)">
+      <div class="v {% if kpis.final_bankroll >= 1000 %}lime{% else %}loss{% endif %}">
+        {{ kpis.final_bankroll | int }}€
+      </div>
+      <div class="l">Bankroll finale</div>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
-</div>
 
-<!-- Equity Curve — desktop only -->
-<div class="stats-desktop">
-<div style="margin-bottom:4px">
-  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Évolution de la bankroll simulée</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Simulation avec 3 stratégies de mise (cotes ELO simulées, bankroll initiale 1000€). Les KPIs ci-dessus sont calculés sur la stratégie <strong style="color:var(--text)">Kelly</strong> sélectionnée par défaut. <strong style="color:var(--text)">Flat</strong> = mise fixe · <strong style="color:var(--text)">% Bankroll</strong> = pourcentage constant</div>
-</div>
-<div class="chart-container" style="margin-bottom:10px">
-  <div style="display:flex;gap:8px;margin-bottom:12px">
-    <button class="btn btn-sm strategy-btn active" data-strategy="Kelly"
-            onclick="loadEquity('{{ tour }}', 'Kelly', this)">Kelly</button>
-    <button class="btn btn-sm strategy-btn" data-strategy="Flat"
-            onclick="loadEquity('{{ tour }}', 'Flat', this)">Flat</button>
-    <button class="btn btn-sm strategy-btn" data-strategy="Percent"
-            onclick="loadEquity('{{ tour }}', 'Percent', this)">% Bankroll</button>
+  <div class="tp-section-lbl">Quels facteurs guident les prédictions ?</div>
+  <div style="font-size:11px;color:var(--fg-3);margin-bottom:10px">Les 15 variables les plus influentes dans le modèle XGBoost.</div>
+  <div class="tp-chart-wrap">
+    <canvas id="feat-chart"></canvas>
   </div>
-  <canvas id="equity-chart"></canvas>
-</div>
-</div>
 
-<!-- ROI par bookmaker — desktop only -->
-<div class="stats-desktop">
-<div style="margin-bottom:4px">
-  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">ROI selon le bookmaker utilisé</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Comparer les cotes de différents bookmakers avec les mêmes prédictions. Pinnacle est la référence — marges les plus basses du marché.</div>
-</div>
-<div class="chart-container" style="margin-bottom:10px">
-  <canvas id="roi-chart"></canvas>
-</div>
-</div>
-
-<!-- Performance by surface -->
-<div style="margin-bottom:4px">
-  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Résultats par surface</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Le modèle utilise des ratings ELO spécifiques à chaque surface. Vérifie s'il performe mieux sur un type de terrain en particulier.</div>
-</div>
-<div class="card" style="padding:12px;margin-bottom:10px">
-  <table id="surface-table">
-    <thead>
-      <tr>
-        <th>Surface</th>
-        <th>Paris</th>
-        <th>Win %</th>
-        <th>ROI</th>
-      </tr>
-    </thead>
-    <tbody id="surface-tbody">
-      <tr><td colspan="4" style="color:var(--muted);text-align:center">Chargement...</td></tr>
-    </tbody>
-  </table>
-</div>
-
-
-{# ═══════════════════════════════════════════════════════
-   BLOC 3 — ANALYSE DU MODÈLE (internals, calibration)
-   ═══════════════════════════════════════════════════════ #}
-<div class="stats-desktop" style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
-  🔬 Analyse du modèle — fonctionnement interne
-</div>
-
-<!-- Win rate by edge bucket — desktop only -->
-<div class="stats-desktop">
-<div style="margin-bottom:4px">
-  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">L'edge prédit est-il fiable ?</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">L'<strong style="color:var(--text)">edge</strong> mesure l'écart entre la probabilité du modèle et la cote du bookmaker. Plus il est élevé, plus le pari est censé être rentable. Ce graphique vérifie que c'est bien le cas en pratique.</div>
-</div>
-<div class="chart-container" style="margin-bottom:10px">
-  <canvas id="edge-chart"></canvas>
-</div>
-</div>
-
-<!-- Feature importance — desktop only -->
-<div class="stats-desktop">
-<div style="margin-bottom:4px">
-  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Quels facteurs guident les prédictions ?</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Les 15 variables les plus influentes dans le modèle XGBoost. <span style="color:var(--blue)">■</span> ELO/classement · <span style="color:var(--green)">■</span> Forme récente · <span style="color:var(--orange)">■</span> Fatigue · <span style="color:var(--muted)">■</span> Contexte du match</div>
-</div>
-<div class="chart-container" style="margin-bottom:10px">
-  <canvas id="feat-chart"></canvas>
-</div>
-</div>
-
-<!-- Calibration curve — desktop only -->
-<div class="stats-desktop">
-<div style="margin-bottom:4px">
-  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Les probabilités annoncées sont-elles réalistes ?</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Quand le modèle dit "70% de chances de gagner", le joueur gagne-t-il vraiment 7 fois sur 10 ? Les points <span style="color:var(--green)">■ verts</span> sont bien calibrés (écart ≤ 5%) · les <span style="color:var(--red)">■ rouges</span> sont sur- ou sous-estimés. La taille = nombre de paris dans ce bucket.</div>
-</div>
-<div class="chart-container" style="margin-bottom:10px" id="calib-chart-wrap">
-  <canvas id="calib-chart" height="160"></canvas>
-</div>
-</div>
-
-<!-- Notice mobile : graphiques disponibles sur desktop -->
-<div class="stats-mobile-notice card" style="margin:4px 0 16px;padding:12px 14px;border-color:var(--border2);text-align:center">
-  <div style="font-size:13px;color:var(--muted)">📊 Les graphiques d'analyse (courbe d'équité, feature importance, calibration…) sont disponibles sur la <strong style="color:var(--text)">version bureau</strong>.</div>
-</div>
-
-
-{# ═══════════════════════════════════════════════════════
-   BLOC 4 — TRACK RECORD AUTOMATIQUE
-   ═══════════════════════════════════════════════════════ #}
-<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
-  📈 Track Record — Signaux VALUE automatiques
-</div>
-
-{# KPI strip #}
-<div id="tr-kpis" class="card" style="margin-bottom:8px">
-  <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
-    <div style="font-size:11px;color:var(--muted)">Chargement…</div>
+  <div class="tp-section-lbl">L'edge prédit est-il fiable ?</div>
+  <div style="font-size:11px;color:var(--fg-3);margin-bottom:10px">Win rate réel par bucket d'edge prédit.</div>
+  <div class="tp-chart-wrap">
+    <canvas id="edge-chart"></canvas>
   </div>
-</div>
 
-{# Courbe P&L cumulative #}
-<div class="stats-desktop">
-<div style="margin-bottom:4px">
-  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Courbe P&amp;L cumulative (1 unité flat par signal VALUE)</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Chaque signal VALUE génère automatiquement un pari virtuel de 1 unité. La courbe montre l'évolution des gains/pertes cumulés au fil du temps.</div>
-</div>
-<div class="chart-container" style="margin-bottom:10px" id="tr-chart-wrap">
-  <canvas id="tr-chart" height="120"></canvas>
-</div>
-</div>
-
-{# Tableau des derniers signaux #}
-<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden">
-  <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-    <span style="font-size:12px;font-weight:600">Derniers signaux VALUE</span>
-    <span id="tr-pending-badge" style="font-size:10px;color:var(--muted)"></span>
-  </div>
-  <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:11px" id="tr-table">
+  <div class="tp-section-lbl">Résultats par surface</div>
+  <div class="tp-card-basic" style="padding:0;overflow:hidden">
+    <table class="tp-table" id="surface-table">
       <thead>
-        <tr style="background:var(--surface2);color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">
-          <th style="padding:6px 10px;text-align:left">Date</th>
-          <th style="padding:6px 10px;text-align:left">Match</th>
-          <th style="padding:6px 10px;text-align:left">Surface</th>
-          <th style="padding:6px 10px;text-align:left">Pari sur</th>
-          <th style="padding:6px 6px;text-align:right">Cote</th>
-          <th style="padding:6px 6px;text-align:right">Edge</th>
-          <th style="padding:6px 10px;text-align:center">Résultat</th>
-          <th style="padding:6px 10px;text-align:right">P&amp;L</th>
+        <tr>
+          <th>Surface</th>
+          <th>Paris</th>
+          <th>Win %</th>
+          <th>ROI</th>
         </tr>
       </thead>
-      <tbody id="tr-tbody">
-        <tr><td colspan="8" style="padding:16px;text-align:center;color:var(--muted)">Chargement…</td></tr>
+      <tbody id="surface-tbody">
+        <tr><td colspan="4" style="color:var(--fg-3);text-align:center;padding:16px">Chargement...</td></tr>
       </tbody>
     </table>
   </div>
-</div>
 
-{# ═══════════════════════════════════════════════════════
-   BLOC 5 — CONFIGURATION
-   ═══════════════════════════════════════════════════════ #}
-<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 10px;padding:6px 10px;background:var(--surface2);border-radius:6px">
-  ⚙️ Configuration
-</div>
+</div><!-- end tab modele -->
 
-<div class="card">
-  <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Ces seuils filtrent les signaux affichés sur la page des matchs. Abaisser les valeurs = plus de signaux, moins sélectifs.</div>
-  <form hx-post="/settings" hx-target="#settings-result" hx-swap="innerHTML">
-    <div class="grid-3" style="margin-bottom:12px">
-      <div class="form-group">
-        <label class="form-label">Edge minimum <span style="color:var(--muted)">(avantage vs bookmaker)</span></label>
-        <input class="form-input" name="min_edge" type="number" step="0.01" min="0" max="0.2"
-               value="{{ settings.min_edge }}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Probabilité minimum <span style="color:var(--muted)">(confiance du modèle)</span></label>
-        <input class="form-input" name="min_prob" type="number" step="0.01" min="0.5" max="0.8"
-               value="{{ settings.min_prob }}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Fraction Kelly <span style="color:var(--muted)">(fraction de la mise optimale)</span></label>
-        <input class="form-input" name="kelly_fraction" type="number" step="0.05" min="0.1" max="0.5"
-               value="{{ settings.kelly_fraction }}">
-      </div>
+{# ── TAB : BACKTEST ── #}
+<div class="tp-tab-panel" data-tab="backtest">
+
+  <div class="tp-section-lbl">Évolution de la bankroll simulée</div>
+  <div style="font-size:11px;color:var(--fg-3);margin-bottom:10px">
+    Simulation avec 3 stratégies de mise (bankroll initiale 1000€).
+    <strong style="color:var(--fg)">Flat</strong> = mise fixe ·
+    <strong style="color:var(--fg)">Kelly</strong> = fraction Kelly ·
+    <strong style="color:var(--fg)">% Bankroll</strong> = pourcentage constant
+  </div>
+  <div class="tp-chart-wrap">
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="tp-btn sm strategy-btn active" data-strategy="Kelly"
+              onclick="loadEquity('{{ tour }}', 'Kelly', this)">Kelly</button>
+      <button class="tp-btn sm strategy-btn" data-strategy="Flat"
+              onclick="loadEquity('{{ tour }}', 'Flat', this)">Flat</button>
+      <button class="tp-btn sm strategy-btn" data-strategy="Percent"
+              onclick="loadEquity('{{ tour }}', 'Percent', this)">% Bankroll</button>
     </div>
-    <button type="submit" class="btn btn-primary btn-sm">Sauvegarder</button>
-    <span id="settings-result" style="margin-left:8px"></span>
-  </form>
-</div>
+    <canvas id="equity-chart"></canvas>
+  </div>
 
+  <div class="tp-section-lbl">ROI selon le bookmaker</div>
+  <div style="font-size:11px;color:var(--fg-3);margin-bottom:10px">Pinnacle = référence (marges les plus basses).</div>
+  <div class="tp-chart-wrap">
+    <canvas id="roi-chart"></canvas>
+  </div>
+
+  {# Track Record #}
+  <div class="tp-section-lbl">Track Record — Signaux VALUE automatiques</div>
+  <div id="tr-kpis" class="tp-card-basic" style="margin-bottom:14px">
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+      <div style="font-size:11px;color:var(--fg-3)">Chargement…</div>
+    </div>
+  </div>
+  <div class="tp-section-lbl">Courbe P&L cumulative (1 unité flat par signal VALUE)</div>
+  <div class="tp-chart-wrap" id="tr-chart-wrap">
+    <canvas id="tr-chart" height="120"></canvas>
+  </div>
+
+  <div class="tp-card-basic" style="padding:0;overflow:hidden;margin-bottom:14px">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);letter-spacing:.08em;text-transform:uppercase">Derniers signaux VALUE</span>
+      <span id="tr-pending-badge" style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono)"></span>
+    </div>
+    <div class="tp-table-wrap">
+      <table class="tp-table" id="tr-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Match</th>
+            <th>Surface</th>
+            <th>Pari sur</th>
+            <th style="text-align:right">Cote</th>
+            <th style="text-align:right">Edge</th>
+            <th style="text-align:center">Résultat</th>
+            <th style="text-align:right">P&L</th>
+          </tr>
+        </thead>
+        <tbody id="tr-tbody">
+          <tr><td colspan="8" style="padding:16px;text-align:center;color:var(--fg-3)">Chargement…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- end tab backtest -->
+
+{# ── TAB : CALIBRATION ── #}
+<div class="tp-tab-panel" data-tab="calibration">
+
+  <div class="tp-section-lbl">Les probabilités annoncées sont-elles réalistes ?</div>
+  <div style="font-size:11px;color:var(--fg-3);margin-bottom:10px">
+    Quand le modèle dit "70%", le joueur gagne-t-il vraiment 7 fois sur 10 ?
+    Points <span style="color:var(--lime)">■ verts</span> : bien calibrés (écart ≤ 5%) ·
+    <span style="color:var(--loss)">■ rouges</span> : sur/sous-estimés. Taille = nombre de paris dans ce bucket.
+  </div>
+  <div class="tp-chart-wrap" id="calib-chart-wrap">
+    <canvas id="calib-chart" height="160"></canvas>
+  </div>
+
+</div><!-- end tab calibration -->
+
+</div><!-- end .tp-content -->
 {% endblock %}
 
 {% block scripts %}
 <script>
 // ── Chart defaults ──────────────────────────────────────────────────────────
-const CHART_DEFAULTS = {
-  color: '#f1f5f9',
-  font: { family: 'system-ui', size: 11 },
-};
-Chart.defaults.color = CHART_DEFAULTS.color;
+Chart.defaults.color = '#7a848c';
 
 function chartScales() {
   return {
-    x: { ticks: { color: '#64748b', maxTicksLimit: 12 },
-         grid: { color: 'rgba(51,65,85,0.5)' } },
-    y: { ticks: { color: '#64748b' },
-         grid: { color: 'rgba(51,65,85,0.5)' } },
+    x: { ticks: { color: '#515961', maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,.04)' } },
+    y: { ticks: { color: '#515961' }, grid: { color: 'rgba(255,255,255,.04)' } },
   };
 }
 
@@ -284,17 +239,10 @@ function chartScales() {
 let _equityChart = null;
 
 async function loadEquity(tour, strategy, btn) {
-  // Update active button style
-  document.querySelectorAll('.strategy-btn').forEach(b => {
+  document.querySelectorAll('.strategy-btn').forEach(function(b) {
     b.classList.remove('active');
-    b.style.background = 'var(--surface)';
-    b.style.color = 'var(--text)';
   });
-  if (btn) {
-    btn.classList.add('active');
-    btn.style.background = 'var(--blue)';
-    btn.style.color = 'white';
-  }
+  if (btn) btn.classList.add('active');
 
   const r = await fetch(`/stats/equity?tour=${tour}&strategy=${strategy}`);
   const d = await r.json();
@@ -307,8 +255,8 @@ async function loadEquity(tour, strategy, btn) {
       datasets: [{
         label: `Bankroll (${strategy})`,
         data: d.values,
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,0.08)',
+        borderColor: '#c8ff3d',
+        backgroundColor: 'rgba(200,255,61,.08)',
         fill: true,
         tension: 0.3,
         pointRadius: 0,
@@ -316,7 +264,7 @@ async function loadEquity(tour, strategy, btn) {
       }, {
         label: 'Baseline 1000€',
         data: d.labels.map(() => 1000),
-        borderColor: 'rgba(100,116,139,0.4)',
+        borderColor: 'rgba(255,255,255,.12)',
         borderDash: [5, 5],
         pointRadius: 0,
         fill: false,
@@ -325,7 +273,7 @@ async function loadEquity(tour, strategy, btn) {
     options: {
       responsive: true,
       plugins: {
-        legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
+        legend: { labels: { color: '#b6bfc6', font: { size: 11 } } },
         tooltip: { mode: 'index', intersect: false },
       },
       scales: chartScales(),
@@ -338,28 +286,17 @@ async function loadROI(tour) {
   const r = await fetch(`/stats/roi-bookmakers?tour=${tour}`);
   const d = await r.json();
   const ctx = document.getElementById('roi-chart').getContext('2d');
-  const colors = d.roi.map(v => v === null ? '#334155' : v >= 0 ? '#22c55e' : '#ef4444');
+  const colors = d.roi.map(function(v) { return v === null ? '#363c42' : v >= 0 ? '#c8ff3d' : '#ff5b5b'; });
   new Chart(ctx, {
     type: 'bar',
     data: {
       labels: d.bookmakers,
-      datasets: [{
-        label: 'ROI',
-        data: d.roi.map(v => v === null ? 0 : +(v * 100).toFixed(2)),
-        backgroundColor: colors,
-        borderRadius: 6,
-      }]
+      datasets: [{ label: 'ROI', data: d.roi.map(function(v) { return v === null ? 0 : +(v * 100).toFixed(2); }), backgroundColor: colors, borderRadius: 6 }]
     },
     options: {
       responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => `${ctx.raw.toFixed(1)}%` } },
-      },
-      scales: {
-        ...chartScales(),
-        y: { ...chartScales().y, ticks: { ...chartScales().y.ticks, callback: v => v + '%' } }
-      },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return ctx.raw.toFixed(1) + '%'; } } } },
+      scales: { ...chartScales(), y: { ...chartScales().y, ticks: { ...chartScales().y.ticks, callback: function(v) { return v + '%'; } } } },
     }
   });
 }
@@ -374,24 +311,12 @@ async function loadFeatures(tour) {
     type: 'bar',
     data: {
       labels: d.features,
-      datasets: [{
-        label: 'Importance',
-        data: d.values,
-        backgroundColor: d.groups,
-        borderRadius: 4,
-      }]
+      datasets: [{ label: 'Importance', data: d.values, backgroundColor: d.groups, borderRadius: 4 }]
     },
     options: {
-      indexAxis: 'y',
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ctx.raw.toFixed(4) } },
-      },
-      scales: {
-        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(51,65,85,0.5)' } },
-        y: { ticks: { color: '#f1f5f9', font: { size: 11 } }, grid: { display: false } },
-      },
+      indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return ctx.raw.toFixed(4); } } } },
+      scales: { x: { ticks: { color: '#515961' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#b6bfc6', font: { size: 11 } }, grid: { display: false } } },
     }
   });
 }
@@ -402,41 +327,20 @@ async function loadEdgePerf(tour) {
   const d = await r.json();
   if (!d.buckets.length) return;
   const ctx = document.getElementById('edge-chart').getContext('2d');
-  const winColors = d.win_rates.map(v =>
-    v === null ? '#334155' : v >= 0.55 ? '#22c55e' : v >= 0.50 ? '#f97316' : '#ef4444'
-  );
+  const winColors = d.win_rates.map(function(v) { return v === null ? '#363c42' : v >= 0.55 ? '#c8ff3d' : v >= 0.50 ? '#ffc857' : '#ff5b5b'; });
   new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: d.buckets.map((b, i) => b + ' (n=' + d.counts[i] + ')'),
-      datasets: [{
-        label: 'Win Rate',
-        data: d.win_rates.map(v => v === null ? null : +(v * 100).toFixed(1)),
-        backgroundColor: winColors,
-        borderRadius: 6,
-      }, {
-        label: 'Ligne 50%',
-        type: 'line',
-        data: d.buckets.map(() => 50),
-        borderColor: 'rgba(100,116,139,0.5)',
-        borderDash: [5, 5],
-        pointRadius: 0,
-        fill: false,
-      }]
+      labels: d.buckets.map(function(b, i) { return b + ' (n=' + d.counts[i] + ')'; }),
+      datasets: [
+        { label: 'Win Rate', data: d.win_rates.map(function(v) { return v === null ? null : +(v * 100).toFixed(1); }), backgroundColor: winColors, borderRadius: 6 },
+        { label: 'Ligne 50%', type: 'line', data: d.buckets.map(() => 50), borderColor: 'rgba(255,255,255,.2)', borderDash: [5,5], pointRadius: 0, fill: false }
+      ]
     },
     options: {
       responsive: true,
-      plugins: {
-        legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
-        tooltip: { callbacks: {
-          label: function(c) { return c.datasetIndex === 0 ? c.raw + '%' : '50%'; }
-        }},
-      },
-      scales: {
-        ...chartScales(),
-        y: { ...chartScales().y, min: 40, max: 75,
-             ticks: { ...chartScales().y.ticks, callback: function(v) { return v + '%'; } } },
-      },
+      plugins: { legend: { labels: { color: '#b6bfc6', font: { size: 11 } } } },
+      scales: { ...chartScales(), y: { ...chartScales().y, min: 40, max: 75, ticks: { ...chartScales().y.ticks, callback: function(v) { return v + '%'; } } } },
     }
   });
 }
@@ -451,33 +355,28 @@ async function loadSurfacePerf(tour) {
     const tr = tbody.insertRow();
     const td = tr.insertCell();
     td.colSpan = 4;
-    td.style.cssText = 'color:var(--muted);text-align:center';
+    td.style.cssText = 'color:var(--fg-3);text-align:center;padding:16px';
     td.textContent = 'Aucune donnée';
     return;
   }
-  const surfColors = { Hard: '#3b82f6', Clay: '#f97316', Grass: '#22c55e' };
+  const surfColors = { Hard: '#7a848c', Clay: '#ffc857', Grass: '#c8ff3d' };
   d.surfaces.forEach(function(surf, i) {
     const wr = d.win_rates[i], roi = d.rois[i], n = d.counts[i];
     const tr = tbody.insertRow();
-
     const tdSurf = tr.insertCell();
     const dot = document.createElement('span');
-    dot.style.cssText = 'display:inline-block;width:8px;height:8px;border-radius:50%;background:' +
-      (surfColors[surf] || '#64748b') + ';margin-right:5px';
+    dot.style.cssText = 'display:inline-block;width:7px;height:7px;border-radius:50%;background:' + (surfColors[surf] || '#515961') + ';margin-right:6px';
     tdSurf.appendChild(dot);
     tdSurf.appendChild(document.createTextNode(surf));
-
     const tdN = tr.insertCell();
-    tdN.style.color = 'var(--muted)';
+    tdN.style.color = 'var(--fg-3)';
     tdN.textContent = n;
-
     const tdWr = tr.insertCell();
-    tdWr.className = wr === null ? '' : wr >= 0.55 ? 'text-green' : wr >= 0.50 ? 'text-orange' : 'text-red';
-    tdWr.textContent = wr === null ? '\u2014' : (wr * 100).toFixed(1) + '%';
-
+    tdWr.className = wr === null ? '' : wr >= 0.55 ? 'win' : wr >= 0.50 ? '' : 'loss-text';
+    tdWr.textContent = wr === null ? '—' : (wr * 100).toFixed(1) + '%';
     const tdRoi = tr.insertCell();
-    tdRoi.className = roi === null ? '' : roi >= 0 ? 'text-green' : 'text-red';
-    tdRoi.textContent = roi === null ? '\u2014' : (roi >= 0 ? '+' : '') + (roi * 100).toFixed(1) + '%';
+    tdRoi.className = roi === null ? '' : roi >= 0 ? 'win' : 'loss-text';
+    tdRoi.textContent = roi === null ? '—' : (roi >= 0 ? '+' : '') + (roi * 100).toFixed(1) + '%';
   });
 }
 
@@ -487,43 +386,30 @@ async function loadLivePerf() {
   const d = await r.json();
   const card = document.getElementById('live-perf-card');
   if (!d.n) {
-    card.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center">Aucun pari résolu pour l\'instant — les stats apparaîtront ici.</div>';
+    card.innerHTML = '<div style="color:var(--fg-3);font-size:12px;text-align:center">Aucun pari résolu pour l\'instant.</div>';
     return;
   }
-  const roiColor = d.roi >= 0 ? 'var(--green)' : 'var(--red)';
-  const pnlColor = d.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  const roiColor = d.roi >= 0 ? 'var(--lime)' : 'var(--loss)';
+  const pnlColor = d.pnl >= 0 ? 'var(--lime)' : 'var(--loss)';
   const roiSign  = d.roi >= 0 ? '+' : '';
   const pnlSign  = d.pnl >= 0 ? '+' : '';
 
   let tourHtml = '';
   for (const [t, v] of Object.entries(d.by_tour || {})) {
-    const tc = t === 'atp' ? 'var(--blue)' : '#a855f7';
-    const rc = v.roi >= 0 ? 'var(--green)' : 'var(--red)';
+    const rc = v.roi >= 0 ? 'var(--lime)' : 'var(--loss)';
     const rs = v.roi >= 0 ? '+' : '';
-    tourHtml += `<span class="badge" style="background:rgba(100,116,139,.12);color:var(--text);font-size:11px;font-weight:400">
-      <span style="color:${tc};font-weight:700">${t.toUpperCase()}</span>
+    tourHtml += `<span class="tp-badge ghost" style="font-size:11px;font-weight:400">
+      <span style="color:var(--lime);font-weight:700">${t.toUpperCase()}</span>
       &nbsp;${v.n} paris · ${v.won}W/${v.n-v.won}L · ROI <span style="color:${rc}">${rs}${(v.roi*100).toFixed(1)}%</span>
     </span> `;
   }
 
   card.innerHTML = `
     <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
-      <div>
-        <div style="font-size:22px;font-weight:800;color:${roiColor}">${roiSign}${(d.roi*100).toFixed(1)}%</div>
-        <div style="font-size:11px;color:var(--muted)">ROI réel</div>
-      </div>
-      <div>
-        <div style="font-size:22px;font-weight:800">${d.n}</div>
-        <div style="font-size:11px;color:var(--muted)">Paris résolus</div>
-      </div>
-      <div>
-        <div style="font-size:22px;font-weight:800">${(d.win_rate*100).toFixed(1)}%</div>
-        <div style="font-size:11px;color:var(--muted)">Win Rate</div>
-      </div>
-      <div>
-        <div style="font-size:22px;font-weight:800;color:${pnlColor}">${pnlSign}${d.pnl.toFixed(0)}€</div>
-        <div style="font-size:11px;color:var(--muted)">P&L</div>
-      </div>
+      <div><div style="font-size:22px;font-weight:700;font-family:var(--font-mono);color:${roiColor}">${roiSign}${(d.roi*100).toFixed(1)}%</div><div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">ROI réel</div></div>
+      <div><div style="font-size:22px;font-weight:700;font-family:var(--font-mono)">${d.n}</div><div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">Paris résolus</div></div>
+      <div><div style="font-size:22px;font-weight:700;font-family:var(--font-mono)">${(d.win_rate*100).toFixed(1)}%</div><div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">Win Rate</div></div>
+      <div><div style="font-size:22px;font-weight:700;font-family:var(--font-mono);color:${pnlColor}">${pnlSign}${d.pnl.toFixed(0)}€</div><div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">P&L</div></div>
       <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">${tourHtml}</div>
     </div>`;
 }
@@ -542,33 +428,21 @@ async function loadMonthly(tour) {
     data: {
       labels: d.months,
       datasets: [
-        { label: 'Gagnés', data: d.won, backgroundColor: 'rgba(61,220,132,.75)', stack: 'bets', borderRadius: 3, order: 2 },
-        { label: 'Perdus', data: d.lost, backgroundColor: 'rgba(240,106,106,.75)', stack: 'bets', borderRadius: 3, order: 2 },
-        { label: 'ROI %', type: 'line', data: d.roi, borderColor: '#4FA8FF',
-          backgroundColor: 'transparent', pointRadius: 4, borderWidth: 2, yAxisID: 'y2', order: 1 },
+        { label: 'Gagnés', data: d.won, backgroundColor: 'rgba(200,255,61,.75)', stack: 'bets', borderRadius: 3, order: 2 },
+        { label: 'Perdus', data: d.lost, backgroundColor: 'rgba(255,91,91,.75)', stack: 'bets', borderRadius: 3, order: 2 },
+        { label: 'ROI %', type: 'line', data: d.roi, borderColor: '#c8ff3d', backgroundColor: 'transparent', pointRadius: 4, borderWidth: 2, yAxisID: 'y2', order: 1 },
       ]
     },
     options: {
       responsive: true,
       plugins: {
-        legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
-        tooltip: {
-          mode: 'index', intersect: false,
-          callbacks: {
-            afterBody: function(items) {
-              const i = items[0].dataIndex;
-              return ['P&L: ' + (d.pnl[i] >= 0 ? '+' : '') + d.pnl[i] + '€'];
-            }
-          }
-        }
+        legend: { labels: { color: '#b6bfc6', font: { size: 11 } } },
+        tooltip: { mode: 'index', intersect: false, callbacks: { afterBody: function(items) { const i = items[0].dataIndex; return ['P&L: ' + (d.pnl[i] >= 0 ? '+' : '') + d.pnl[i] + '€']; } } }
       },
       scales: {
-        x: { stacked: true, ticks: { color: '#64748b' }, grid: { color: 'rgba(51,65,85,.5)' } },
-        y: { stacked: true, ticks: { color: '#64748b', stepSize: 1 }, grid: { color: 'rgba(51,65,85,.5)' },
-             title: { display: true, text: 'Paris', color: '#64748b', font: { size: 10 } } },
-        y2: { position: 'right', grid: { display: false },
-              ticks: { color: '#4FA8FF', callback: function(v) { return v + '%'; } },
-              title: { display: true, text: 'ROI %', color: '#4FA8FF', font: { size: 10 } } },
+        x: { stacked: true, ticks: { color: '#515961' }, grid: { color: 'rgba(255,255,255,.04)' } },
+        y: { stacked: true, ticks: { color: '#515961', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.04)' }, title: { display: true, text: 'Paris', color: '#515961', font: { size: 10 } } },
+        y2: { position: 'right', grid: { display: false }, ticks: { color: '#c8ff3d', callback: function(v) { return v + '%'; } }, title: { display: true, text: 'ROI %', color: '#c8ff3d', font: { size: 10 } } },
       }
     }
   });
@@ -590,9 +464,7 @@ async function loadCalibration(tour) {
         {
           label: 'Calibration réelle',
           data: d.predicted.map(function(p, i) { return { x: p, y: d.actual[i] }; }),
-          backgroundColor: d.actual.map(function(a, i) {
-            return Math.abs(a - d.predicted[i]) <= 5 ? '#3DDC84' : '#F06A6A';
-          }),
+          backgroundColor: d.actual.map(function(a, i) { return Math.abs(a - d.predicted[i]) <= 5 ? '#c8ff3d' : '#ff5b5b'; }),
           pointRadius: d.counts.map(function(c) { return Math.max(5, Math.min(14, c / 1.5)); }),
           pointHoverRadius: 8,
         },
@@ -600,7 +472,7 @@ async function loadCalibration(tour) {
           label: 'Calibration parfaite',
           type: 'line',
           data: [{ x: 50, y: 50 }, { x: 100, y: 100 }],
-          borderColor: 'rgba(100,116,139,.5)',
+          borderColor: 'rgba(255,255,255,.15)',
           borderDash: [5, 5],
           pointRadius: 0,
           fill: false,
@@ -611,33 +483,18 @@ async function loadCalibration(tour) {
     options: {
       responsive: true,
       plugins: {
-        legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
-        tooltip: {
-          callbacks: {
-            label: function(item) {
-              if (item.datasetIndex === 0) {
-                const i = item.dataIndex;
-                return [
-                  'Bucket: ' + d.buckets[i],
-                  'Prédit: ' + d.predicted[i] + '%',
-                  'Réel: ' + d.actual[i] + '%',
-                  'n = ' + d.counts[i] + ' paris',
-                ];
-              }
-              return 'Calibration parfaite (y = x)';
-            }
+        legend: { labels: { color: '#b6bfc6', font: { size: 11 } } },
+        tooltip: { callbacks: { label: function(item) {
+          if (item.datasetIndex === 0) {
+            const i = item.dataIndex;
+            return ['Bucket: ' + d.buckets[i], 'Prédit: ' + d.predicted[i] + '%', 'Réel: ' + d.actual[i] + '%', 'n = ' + d.counts[i] + ' paris'];
           }
-        }
+          return 'Calibration parfaite (y = x)';
+        }}}
       },
       scales: {
-        x: { min: 48, max: 102,
-             title: { display: true, text: 'Probabilité prédite (%)', color: '#64748b', font: { size: 10 } },
-             ticks: { color: '#64748b', callback: function(v) { return v + '%'; } },
-             grid: { color: 'rgba(51,65,85,.5)' } },
-        y: { min: 0, max: 105,
-             title: { display: true, text: 'Win rate réel (%)', color: '#64748b', font: { size: 10 } },
-             ticks: { color: '#64748b', callback: function(v) { return v + '%'; } },
-             grid: { color: 'rgba(51,65,85,.5)' } },
+        x: { min: 48, max: 102, title: { display: true, text: 'Probabilité prédite (%)', color: '#515961', font: { size: 10 } }, ticks: { color: '#515961', callback: function(v) { return v + '%'; } }, grid: { color: 'rgba(255,255,255,.04)' } },
+        y: { min: 0, max: 105, title: { display: true, text: 'Win rate réel (%)', color: '#515961', font: { size: 10 } }, ticks: { color: '#515961', callback: function(v) { return v + '%'; } }, grid: { color: 'rgba(255,255,255,.04)' } },
       }
     }
   });
@@ -649,47 +506,32 @@ let _trChart = null;
 async function loadTrackRecord(tour) {
   const qs = tour ? '?tour=' + tour : '';
 
-  // 1. KPIs
+  // KPIs
   const kpiResp = await fetch('/stats/signals' + qs);
   const kpi = await kpiResp.json();
   const kpiEl = document.getElementById('tr-kpis');
   if (!kpi.resolved) {
-    kpiEl.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center">Aucun signal résolu pour l\'instant — les stats apparaîtront ici au fur et à mesure.</div>';
+    kpiEl.innerHTML = '<div style="color:var(--fg-3);font-size:12px;text-align:center">Aucun signal résolu pour l\'instant.</div>';
   } else {
-    const roiColor  = (kpi.roi  || 0) >= 0 ? 'var(--green)' : 'var(--red)';
-    const pnlColor  = (kpi.pnl_units || 0) >= 0 ? 'var(--green)' : 'var(--red)';
-    const roiSign   = (kpi.roi  || 0) >= 0 ? '+' : '';
-    const pnlSign   = (kpi.pnl_units || 0) >= 0 ? '+' : '';
+    const roiColor = (kpi.roi || 0) >= 0 ? 'var(--lime)' : 'var(--loss)';
+    const pnlColor = (kpi.pnl_units || 0) >= 0 ? 'var(--lime)' : 'var(--loss)';
+    const roiSign = (kpi.roi || 0) >= 0 ? '+' : '';
+    const pnlSign = (kpi.pnl_units || 0) >= 0 ? '+' : '';
     kpiEl.innerHTML = `
       <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;padding:4px 0">
-        <div>
-          <div style="font-size:20px;font-weight:800;color:${roiColor}">${roiSign}${kpi.roi !== null ? (kpi.roi * 100).toFixed(1) + '%' : '—'}</div>
-          <div style="font-size:11px;color:var(--muted)">ROI / signal</div>
-        </div>
-        <div>
-          <div style="font-size:20px;font-weight:800">${kpi.total}</div>
-          <div style="font-size:11px;color:var(--muted)">Signaux totaux</div>
-        </div>
-        <div>
-          <div style="font-size:20px;font-weight:800">${kpi.win_rate !== null ? (kpi.win_rate * 100).toFixed(1) + '%' : '—'}</div>
-          <div style="font-size:11px;color:var(--muted)">Win Rate</div>
-        </div>
-        <div>
-          <div style="font-size:20px;font-weight:800;color:${pnlColor}">${pnlSign}${kpi.pnl_units !== null ? kpi.pnl_units.toFixed(2) + 'u' : '—'}</div>
-          <div style="font-size:11px;color:var(--muted)">P&L (unités)</div>
-        </div>
-        <div>
-          <div style="font-size:20px;font-weight:800">${kpi.won}W / ${kpi.lost}L</div>
-          <div style="font-size:11px;color:var(--muted)">Bilan</div>
-        </div>
-        ${kpi.pending > 0 ? `<div style="margin-left:auto"><span class="badge" style="background:rgba(251,191,36,.12);color:#fbbf24;font-size:11px">${kpi.pending} en attente</span></div>` : ''}
+        <div><div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:${roiColor}">${roiSign}${kpi.roi !== null ? (kpi.roi * 100).toFixed(1) + '%' : '—'}</div><div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">ROI / signal</div></div>
+        <div><div style="font-size:20px;font-weight:700;font-family:var(--font-mono)">${kpi.total}</div><div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">Signaux totaux</div></div>
+        <div><div style="font-size:20px;font-weight:700;font-family:var(--font-mono)">${kpi.win_rate !== null ? (kpi.win_rate * 100).toFixed(1) + '%' : '—'}</div><div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">Win Rate</div></div>
+        <div><div style="font-size:20px;font-weight:700;font-family:var(--font-mono);color:${pnlColor}">${pnlSign}${kpi.pnl_units !== null ? kpi.pnl_units.toFixed(2) + 'u' : '—'}</div><div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">P&L (unités)</div></div>
+        <div><div style="font-size:20px;font-weight:700;font-family:var(--font-mono)">${kpi.won}W / ${kpi.lost}L</div><div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.12em;margin-top:3px">Bilan</div></div>
+        ${kpi.pending > 0 ? `<div style="margin-left:auto"><span class="tp-badge" style="background:rgba(255,200,87,.1);color:var(--warn);border-color:rgba(255,200,87,.3);font-size:11px">${kpi.pending} en attente</span></div>` : ''}
       </div>`;
   }
-  // Update pending badge in table header
+
   const pb = document.getElementById('tr-pending-badge');
   if (pb && kpi.pending > 0) pb.textContent = kpi.pending + ' en attente';
 
-  // 2. P&L curve
+  // P&L curve
   const curveResp = await fetch('/stats/signals/curve' + qs);
   const curve = await curveResp.json();
   if (curve.labels && curve.labels.length) {
@@ -703,8 +545,8 @@ async function loadTrackRecord(tour) {
         datasets: [{
           label: 'P&L cumulé (unités)',
           data: curve.values,
-          borderColor: isPositive ? '#3DDC84' : '#F06A6A',
-          backgroundColor: isPositive ? 'rgba(61,220,132,.08)' : 'rgba(240,106,106,.08)',
+          borderColor: isPositive ? '#c8ff3d' : '#ff5b5b',
+          backgroundColor: isPositive ? 'rgba(200,255,61,.08)' : 'rgba(255,91,91,.08)',
           fill: true,
           tension: 0.3,
           pointRadius: 0,
@@ -712,7 +554,7 @@ async function loadTrackRecord(tour) {
         }, {
           label: 'Baseline 0',
           data: curve.labels.map(() => 0),
-          borderColor: 'rgba(100,116,139,0.4)',
+          borderColor: 'rgba(255,255,255,.12)',
           borderDash: [5, 5],
           pointRadius: 0,
           fill: false,
@@ -720,13 +562,7 @@ async function loadTrackRecord(tour) {
       },
       options: {
         responsive: true,
-        plugins: {
-          legend: { labels: { color: '#f1f5f9', font: { size: 11 } } },
-          tooltip: {
-            mode: 'index', intersect: false,
-            callbacks: { label: c => (c.datasetIndex === 0 ? (c.raw >= 0 ? '+' : '') + c.raw.toFixed(2) + 'u' : '0') }
-          },
-        },
+        plugins: { legend: { labels: { color: '#b6bfc6', font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: function(c) { return c.datasetIndex === 0 ? (c.raw >= 0 ? '+' : '') + c.raw.toFixed(2) + 'u' : '0'; } } } },
         scales: chartScales(),
       }
     });
@@ -734,7 +570,7 @@ async function loadTrackRecord(tour) {
     document.getElementById('tr-chart-wrap').style.display = 'none';
   }
 
-  // 3. Signals table
+  // Signals table
   const recResp = await fetch('/stats/signals/recent' + qs + (qs ? '&' : '?') + 'limit=50');
   const signals = await recResp.json();
   const tbody = document.getElementById('tr-tbody');
@@ -743,71 +579,52 @@ async function loadTrackRecord(tour) {
     const tr = tbody.insertRow();
     const td = tr.insertCell();
     td.colSpan = 8;
-    td.style.cssText = 'padding:16px;text-align:center;color:var(--muted)';
+    td.style.cssText = 'padding:16px;text-align:center;color:var(--fg-3)';
     td.textContent = 'Aucun signal enregistré pour l\'instant.';
     return;
   }
   const statusMap = {
-    won:     { label: '✓ Gagné',   cls: 'text-green' },
-    lost:    { label: '✗ Perdu',   cls: 'text-red'   },
-    pending: { label: '⏳ Attente', cls: ''            },
-    void:    { label: '—',         cls: 'text-muted'  },
+    won:     { label: '✓ Gagné',   cls: 'win' },
+    lost:    { label: '✗ Perdu',   cls: 'loss-text' },
+    pending: { label: '⋯ Attente', cls: '' },
+    void:    { label: '—',         cls: '' },
   };
-  const surfColors = { Hard: '#3b82f6', Clay: '#f97316', Grass: '#22c55e' };
+  const surfColors = { Hard: '#7a848c', Clay: '#ffc857', Grass: '#c8ff3d' };
   for (const s of signals) {
     const tr = tbody.insertRow();
-    tr.style.borderBottom = '1px solid var(--border)';
-
-    // Date
     const tdDate = tr.insertCell();
-    tdDate.style.cssText = 'padding:6px 10px;color:var(--muted);white-space:nowrap';
+    tdDate.style.cssText = 'color:var(--fg-4);white-space:nowrap;font-family:var(--font-mono)';
     tdDate.textContent = (s.created_at || '').slice(0, 10);
-
-    // Match
     const tdMatch = tr.insertCell();
-    tdMatch.style.cssText = 'padding:6px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    tdMatch.style.cssText = 'max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
     tdMatch.textContent = `${s.p1_name} vs ${s.p2_name}`;
     tdMatch.title = `${s.tournament || ''} · ${s.p1_name} vs ${s.p2_name}`;
-
-    // Surface
     const tdSurf = tr.insertCell();
-    tdSurf.style.cssText = 'padding:6px 10px';
     const dot = document.createElement('span');
-    dot.style.cssText = 'display:inline-block;width:8px;height:8px;border-radius:50%;background:' +
-      (surfColors[s.surface] || '#64748b') + ';margin-right:4px';
+    dot.style.cssText = 'display:inline-block;width:7px;height:7px;border-radius:50%;background:' + (surfColors[s.surface] || '#515961') + ';margin-right:4px';
     tdSurf.appendChild(dot);
     tdSurf.appendChild(document.createTextNode(s.surface || '—'));
-
-    // Bet on
     const tdBet = tr.insertCell();
-    tdBet.style.cssText = 'padding:6px 10px;font-weight:600;color:var(--blue)';
+    tdBet.style.cssText = 'font-weight:600;color:var(--lime);font-size:12px';
     tdBet.textContent = s.bet_on || '—';
-
-    // Odds
     const tdOdd = tr.insertCell();
-    tdOdd.style.cssText = 'padding:6px 6px;text-align:right;font-family:var(--mono)';
+    tdOdd.style.cssText = 'text-align:right;font-family:var(--font-mono)';
     tdOdd.textContent = s.odd_snapshot ? s.odd_snapshot.toFixed(2) : '—';
-
-    // Edge
     const tdEdge = tr.insertCell();
-    tdEdge.style.cssText = 'padding:6px 6px;text-align:right;font-family:var(--mono)';
+    tdEdge.style.cssText = 'text-align:right;font-family:var(--font-mono);color:var(--lime)';
     tdEdge.textContent = s.edge ? '+' + (s.edge * 100).toFixed(1) + '%' : '—';
-
-    // Result
     const info = statusMap[s.result] || { label: s.result, cls: '' };
     const tdRes = tr.insertCell();
-    tdRes.style.cssText = 'padding:6px 10px;text-align:center';
+    tdRes.style.cssText = 'text-align:center;font-family:var(--font-mono)';
     tdRes.className = info.cls;
     tdRes.textContent = info.label;
-
-    // P&L
     const tdPnl = tr.insertCell();
-    tdPnl.style.cssText = 'padding:6px 10px;text-align:right;font-family:var(--mono)';
+    tdPnl.style.cssText = 'text-align:right;font-family:var(--font-mono)';
     if (s.pnl_units !== null && s.pnl_units !== undefined && s.result !== 'pending') {
-      tdPnl.className = s.pnl_units >= 0 ? 'text-green' : 'text-red';
+      tdPnl.className = s.pnl_units >= 0 ? 'win' : 'loss-text';
       tdPnl.textContent = (s.pnl_units >= 0 ? '+' : '') + s.pnl_units.toFixed(2) + 'u';
     } else {
-      tdPnl.style.color = 'var(--muted)';
+      tdPnl.style.color = 'var(--fg-4)';
       tdPnl.textContent = '—';
     }
   }
@@ -826,7 +643,6 @@ function _initCharts() {
   loadCalibration(tour);
   loadTrackRecord(tour);
 }
-// Run when Chart.js is ready — handle both defer timing scenarios
 if (typeof Chart !== 'undefined') {
   _initCharts();
 } else {

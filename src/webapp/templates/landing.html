@@ -7,1376 +7,518 @@
   <meta name="description" content="Prédictions tennis basées sur XGBoost, calibrées sur les cotes Pinnacle. Pas de tips, pas de feeling. Des probabilités.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800;900&family=Barlow:wght@300;400;500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/mobile.css">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:      #07090E;
-      --surface: #0D1117;
-      --surface2:#131920;
-      --border:  #1C2330;
-      --text:    #E8EDF2;
-      --muted:   #5A6A7E;
-      --value:   #C8F243;
-      --edge:    #4FA8FF;
-      --green:   #3DDC84;
-      --red:     #F06A6A;
-      --mono: 'JetBrains Mono', monospace;
-      --cond: 'Barlow Condensed', sans-serif;
-      --sans: 'Barlow', sans-serif;
-    }
-
     html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 14px; line-height: 1.6; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      font-weight: 400;
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
-    /* Grain overlay */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-      opacity: .025;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-      background-size: 256px 256px;
-    }
-
-    /* ─── Scroll-reveal ──────────────────────────────────── */
-    .reveal {
-      opacity: 0;
-      transform: translateY(24px);
-      transition: opacity .55s ease, transform .55s ease;
-    }
+    /* Reveal animation */
+    .reveal { opacity: 0; transform: translateY(20px); transition: opacity .5s ease, transform .5s ease; }
     .reveal.visible { opacity: 1; transform: translateY(0); }
     .reveal-delay-1 { transition-delay: .1s; }
     .reveal-delay-2 { transition-delay: .2s; }
     .reveal-delay-3 { transition-delay: .3s; }
-    .reveal-delay-4 { transition-delay: .4s; }
 
-    /* ─── Live ticker ────────────────────────────────────── */
-    .ticker-bar {
-      position: relative;
-      z-index: 101;
-      height: 32px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      overflow: hidden;
-    }
+    /* Nav */
+    .landing-nav { position: sticky; top: 0; z-index: 100; background: rgba(10,13,16,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    .landing-nav-inner { display: flex; align-items: center; justify-content: space-between; padding: 0 48px; height: 60px; border-bottom: 1px solid var(--line); }
+    .landing-logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+    .landing-logo-dot { width: 9px; height: 9px; background: var(--lime); border-radius: 50%; box-shadow: 0 0 8px var(--lime); }
+    .landing-logo-text { font-family: var(--font-mono); font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--fg); }
+    .nav-links { display: flex; gap: 28px; }
+    .nav-link-item { font-family: var(--font-mono); font-size: 11px; color: var(--fg-2); letter-spacing: .10em; text-transform: uppercase; cursor: pointer; text-decoration: none; transition: color .15s; }
+    .nav-link-item:hover { color: var(--lime); }
+
+    /* Hero */
+    .hero-section { position: relative; overflow: hidden; }
+    .hero-section::after { content:''; position: absolute; inset: 0; pointer-events: none; z-index: 0; background-image: radial-gradient(circle, rgba(200,255,61,.07) 1px, transparent 1px); background-size: 36px 36px; mask-image: radial-gradient(ellipse 70% 80% at 60% 40%, black 30%, transparent 80%); -webkit-mask-image: radial-gradient(ellipse 70% 80% at 60% 40%, black 30%, transparent 80%); }
+    .hero-inner { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; }
+    .landing-hero { padding: 80px 48px 100px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
+    .landing-headline { font-size: clamp(56px, 7vw, 96px); font-weight: 800; line-height: 0.95; letter-spacing: -0.04em; text-transform: uppercase; margin: 0 0 28px; font-family: var(--font-sans); }
+    .hero-sub { font-size: 15px; color: var(--fg-3); line-height: 1.65; max-width: 480px; margin-bottom: 32px; }
+    .hero-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .hero-note { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); letter-spacing: .08em; }
+
+    /* Hero mock card */
+    .hero-card-wrap { display: flex; justify-content: center; align-items: center; }
+    .hero-card-float { animation: float 5s ease-in-out infinite; filter: drop-shadow(0 24px 48px rgba(200,255,61,.08)); }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+    .hero-mock-card { background: var(--bg-1); border: 1px solid var(--lime-line); border-radius: var(--r-xl); padding: 0; overflow: hidden; width: 360px; box-shadow: 0 0 0 1px rgba(200,255,61,.08), 0 0 40px rgba(200,255,61,.06); }
+    .hero-mock-stack { position: absolute; top: -10px; left: -10px; right: 10px; bottom: 10px; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-xl); z-index: -1; }
+    .hero-card-container { position: relative; }
+
+    /* Metrics strip */
+    .landing-metrics { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, 1fr); }
+    .landing-metric { text-align: center; padding: 28px 16px; }
+    .landing-metric:not(:last-child) { border-right: 1px solid var(--line); }
+    .landing-metric-val { font-family: var(--font-mono); font-size: 42px; font-weight: 600; color: var(--lime); letter-spacing: -0.02em; line-height: 1; }
+    .landing-metric-lbl { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); letter-spacing: .14em; text-transform: uppercase; margin-top: 8px; }
+
+    /* Sections */
+    .landing-section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
+    .landing-section-bg { background: var(--bg-1); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+
+    /* Steps */
+    .step-row { display: grid; grid-template-columns: 80px 1fr; gap: 24px; padding: 22px 0; border-bottom: 1px solid var(--line); align-items: flex-start; max-width: 880px; }
+    .step-num { font-family: var(--font-mono); font-size: 24px; font-weight: 600; color: var(--lime); letter-spacing: -0.02em; line-height: 1; }
+    .step-title { font-size: 15px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.01em; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .step-desc { font-size: 13px; color: var(--fg-3); line-height: 1.6; max-width: 560px; }
+
+    /* FAQ */
+    .faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; max-width: 1100px; }
+    .tp-faq-item { padding: 18px 0; }
+
+    /* CTA section */
+    .cta-section { text-align: center; padding: 80px 48px; border-top: 1px solid var(--line); }
+    .cta-headline { font-size: clamp(32px, 5vw, 56px); font-weight: 800; letter-spacing: -0.03em; text-transform: uppercase; margin: 0 0 16px; line-height: 1.05; }
+
+    /* Footer */
+    .landing-footer { border-top: 1px solid var(--line); padding: 32px 48px 24px; }
+    .landing-footer-anj { padding: 14px 16px; border: 1px solid rgba(255,200,87,.3); background: rgba(255,200,87,.06); border-radius: var(--r-md); display: flex; gap: 14px; align-items: flex-start; margin-bottom: 20px; }
+    .landing-anj-badge { width: 32px; height: 32px; flex-shrink: 0; border: 1.5px solid var(--warn); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--warn); }
+    .landing-footer-bottom { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); letter-spacing: .10em; text-transform: uppercase; padding-top: 14px; border-top: 1px solid var(--line); }
 
-    .ticker-label {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 0 16px;
-      height: 100%;
-      background: rgba(200,242,67,.08);
-      border-right: 1px solid var(--border);
-      font-family: var(--mono);
-      font-size: .65rem;
-      font-weight: 700;
-      letter-spacing: .12em;
-      color: var(--value);
-      white-space: nowrap;
-    }
-
-    .ticker-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--value);
-      box-shadow: 0 0 6px var(--value);
-      animation: pulse-dot 1.4s ease-in-out infinite;
-    }
-
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; }
-      50% { opacity: .3; }
-    }
-
-    .ticker-track {
-      display: flex;
-      gap: 0;
-      animation: ticker-scroll 28s linear infinite;
-      white-space: nowrap;
-    }
-
-    .ticker-track:hover { animation-play-state: paused; }
-
-    @keyframes ticker-scroll {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
-
-    .ticker-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0 28px;
-      font-family: var(--mono);
-      font-size: .68rem;
-      color: var(--muted);
-    }
-
-    .ticker-item .t-badge {
-      font-weight: 700;
-      font-size: .6rem;
-      letter-spacing: .08em;
-      padding: 2px 6px;
-      border-radius: 2px;
-    }
-    .t-badge.value { background: rgba(200,242,67,.15); color: var(--value); }
-    .t-badge.edge  { background: rgba(79,168,255,.12); color: var(--edge); }
-
-    .ticker-item .t-edge  { color: var(--value); font-weight: 700; }
-    .ticker-item .t-match { color: var(--text); }
-    .ticker-sep { color: var(--border); padding: 0 4px; }
-
-    /* ─── Navbar ─────────────────────────────────────────── */
-    nav {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 clamp(20px, 5vw, 80px);
-      height: 60px;
-      background: rgba(7,9,14,.92);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-family: var(--cond);
-      font-weight: 700;
-      font-size: 1.2rem;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      color: var(--text);
-      text-decoration: none;
-    }
-
-    .nav-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 8px var(--green), 0 0 16px rgba(61,220,132,.35);
-      flex-shrink: 0;
-    }
-
-    .nav-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .nav-link {
-      font-family: var(--mono);
-      font-size: .72rem;
-      font-weight: 500;
-      letter-spacing: .06em;
-      color: var(--muted);
-      text-decoration: none;
-      padding: 7px 14px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      transition: color .2s, border-color .2s;
-    }
-    .nav-link:hover { color: var(--text); border-color: var(--muted); }
-
-    .nav-cta {
-      font-family: var(--cond);
-      font-weight: 700;
-      font-size: .9rem;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: var(--bg);
-      background: var(--value);
-      border: none;
-      padding: 9px 22px;
-      border-radius: 4px;
-      text-decoration: none;
-      transition: opacity .2s, transform .15s;
-      white-space: nowrap;
-    }
-    .nav-cta:hover { opacity: .88; transform: translateY(-1px); }
-
-    /* ─── Hero ───────────────────────────────────────────── */
-    .hero-wrapper {
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Dot-grid background */
-    .hero-wrapper::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-      background-image: radial-gradient(circle, rgba(200,242,67,.10) 1px, transparent 1px);
-      background-size: 36px 36px;
-      mask-image: radial-gradient(ellipse 70% 80% at 60% 40%, black 30%, transparent 80%);
-      -webkit-mask-image: radial-gradient(ellipse 70% 80% at 60% 40%, black 30%, transparent 80%);
-    }
-
-    .hero {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      align-items: center;
-      gap: 48px;
-      min-height: calc(100vh - 92px);
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 80px clamp(20px, 5vw, 80px);
-    }
-
-    .hero-eyebrow {
-      font-family: var(--mono);
-      font-size: .72rem;
-      font-weight: 500;
-      color: var(--value);
-      letter-spacing: .18em;
-      text-transform: uppercase;
-      margin-bottom: 24px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .eyebrow-cursor {
-      display: inline-block;
-      width: 8px;
-      height: 14px;
-      background: var(--value);
-      animation: blink .9s step-end infinite;
-      vertical-align: middle;
-    }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-
-    .hero-headline {
-      font-family: var(--cond);
-      font-weight: 900;
-      font-size: clamp(3rem, 6.5vw, 6.5rem);
-      line-height: .93;
-      text-transform: uppercase;
-      letter-spacing: -.01em;
-      color: var(--text);
-      margin-bottom: 28px;
-    }
-
-    .hero-headline .accent { color: var(--value); }
-
-    .hero-sub {
-      font-family: var(--sans);
-      font-weight: 300;
-      font-size: clamp(.95rem, 1.5vw, 1.1rem);
-      color: var(--muted);
-      max-width: 440px;
-      margin-bottom: 40px;
-      line-height: 1.75;
-    }
-
-    .hero-cta-row {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-
-    .hero-cta {
-      display: inline-block;
-      font-family: var(--cond);
-      font-weight: 800;
-      font-size: 1rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--bg);
-      background: var(--value);
-      padding: 14px 36px;
-      border-radius: 4px;
-      text-decoration: none;
-      transition: opacity .2s, transform .15s, box-shadow .2s;
-      box-shadow: 0 0 0 rgba(200,242,67,0);
-    }
-    .hero-cta:hover {
-      opacity: .9;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 32px rgba(200,242,67,.22);
-    }
-
-    .hero-note {
-      font-family: var(--mono);
-      font-size: .7rem;
-      color: var(--muted);
-      letter-spacing: .04em;
-    }
-
-    /* ─── Mock match card ────────────────────────────────── */
-    .hero-right {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .mock-card-wrap {
-      position: relative;
-      animation: float 5s ease-in-out infinite;
-      filter: drop-shadow(0 24px 48px rgba(200,242,67,.08));
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50%       { transform: translateY(-10px); }
-    }
-
-    .mock-card {
-      background: var(--surface);
-      border: 1px solid rgba(200,242,67,.35);
-      border-radius: 10px;
-      padding: 16px;
-      width: 360px;
-      box-shadow: 0 0 0 1px rgba(200,242,67,.08), 0 0 40px rgba(200,242,67,.06), inset 0 1px 0 rgba(200,242,67,.06);
-      position: relative;
-    }
-
-    /* Glow behind card */
-    .mock-card-wrap::before {
-      content: '';
-      position: absolute;
-      inset: -20px;
-      background: radial-gradient(ellipse at center, rgba(200,242,67,.06) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: -1;
-    }
-
-    .mock-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .mock-meta {
-      font-family: var(--mono);
-      font-size: .62rem;
-      color: var(--muted);
-      letter-spacing: .04em;
-    }
-
-    .mock-badges { display: flex; gap: 5px; align-items: center; }
-
-    .mock-badge {
-      font-family: var(--mono);
-      font-size: .58rem;
-      font-weight: 700;
-      letter-spacing: .08em;
-      padding: 3px 7px;
-      border-radius: 3px;
-    }
-    .mock-badge.value { background: rgba(200,242,67,.15); color: var(--value); border: 1px solid rgba(200,242,67,.25); }
-    .mock-badge.high  { background: rgba(59,130,246,.12); color: #6ba3f7; border: 1px solid rgba(59,130,246,.2); font-size:.58rem; }
-
-    .mock-grid {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      gap: 10px;
-      align-items: start;
-    }
-
-    .mock-player { display: flex; flex-direction: column; gap: 4px; }
-    .mock-player.right { align-items: flex-end; text-align: right; }
-
-    .mock-name {
-      font-family: var(--cond);
-      font-weight: 700;
-      font-size: .88rem;
-      letter-spacing: .02em;
-      color: var(--text);
-    }
-
-    .mock-chips {
-      display: flex;
-      gap: 4px;
-      flex-wrap: wrap;
-    }
-    .mock-player.right .mock-chips { justify-content: flex-end; }
-
-    .mock-chip {
-      font-family: var(--mono);
-      font-size: .58rem;
-      padding: 2px 6px;
-      border-radius: 3px;
-      background: var(--surface2);
-      color: var(--muted);
-      border: 1px solid var(--border);
-    }
-    .mock-chip.rank { color: var(--edge); border-color: rgba(79,168,255,.2); }
-
-    .mock-form {
-      display: flex;
-      gap: 3px;
-      margin: 2px 0;
-    }
-    .mock-player.right .mock-form { justify-content: flex-end; }
-
-    .mock-form .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-    }
-    .mock-form .dot.W { background: var(--green); }
-    .mock-form .dot.L { background: var(--red); opacity: .7; }
-
-    .mock-prob {
-      font-family: var(--cond);
-      font-weight: 900;
-      font-size: 2.2rem;
-      line-height: 1;
-      letter-spacing: -.02em;
-      color: var(--value);
-      margin: 4px 0;
-    }
-    .mock-prob.muted { color: var(--muted); }
-
-    .mock-detail { display: flex; flex-direction: column; gap: 2px; }
-    .mock-player.right .mock-detail { align-items: flex-end; }
-
-    .mock-odd {
-      font-family: var(--mono);
-      font-size: .7rem;
-      color: var(--text);
-    }
-
-    .mock-edge {
-      font-family: var(--mono);
-      font-size: .68rem;
-      color: var(--green);
-      font-weight: 700;
-    }
-
-    .mock-kelly {
-      font-family: var(--mono);
-      font-size: .65rem;
-      color: var(--muted);
-    }
-
-    .mock-bet-btn {
-      margin-top: 6px;
-      font-family: var(--cond);
-      font-weight: 700;
-      font-size: .75rem;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      background: var(--value);
-      color: var(--bg);
-      border: none;
-      padding: 7px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      width: 100%;
-      transition: opacity .15s;
-    }
-    .mock-bet-btn.ghost {
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--border);
-    }
-
-    .mock-vs {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding-top: 32px;
-    }
-
-    .mock-vs-label {
-      font-family: var(--cond);
-      font-size: .65rem;
-      font-weight: 700;
-      letter-spacing: .1em;
-      color: var(--muted);
-    }
-
-    .mock-h2h {
-      font-family: var(--mono);
-      font-size: .65rem;
-      color: var(--edge);
-      text-align: center;
-      line-height: 1.3;
-      background: rgba(79,168,255,.08);
-      border: 1px solid rgba(79,168,255,.15);
-      border-radius: 4px;
-      padding: 4px 7px;
-    }
-
-    .mock-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 12px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
-    }
-
-    .mock-elo {
-      font-family: var(--mono);
-      font-size: .62rem;
-      color: var(--muted);
-    }
-
-    .mock-dq {
-      font-family: var(--mono);
-      font-size: .6rem;
-      padding: 2px 7px;
-      border-radius: 3px;
-      background: rgba(59,130,246,.1);
-      color: var(--edge);
-      border: 1px solid rgba(59,130,246,.15);
-    }
-
-    /* Second mock card (stack) */
-    .mock-card-stack {
-      position: absolute;
-      top: -12px;
-      left: -12px;
-      right: 12px;
-      bottom: 12px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      z-index: -1;
-    }
-
-    /* ─── Stats strip ────────────────────────────────────── */
-    .stats-strip {
-      position: relative;
-      z-index: 1;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .stats-inner {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 clamp(20px, 5vw, 80px);
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      divide-x: 1px solid var(--border);
-    }
-
-    .stat-item {
-      padding: 36px 24px;
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-    }
-    .stat-item:last-child { border-right: none; }
-
-    .stat-value {
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: clamp(1.8rem, 3vw, 2.8rem);
-      color: var(--value);
-      line-height: 1;
-      letter-spacing: -.02em;
-    }
-
-    .stat-label {
-      font-family: var(--sans);
-      font-weight: 400;
-      font-size: .75rem;
-      color: var(--muted);
-      text-align: center;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      line-height: 1.4;
-    }
-
-    /* ─── Sections shared ────────────────────────────────── */
-    .section-wrapper {
-      position: relative;
-      z-index: 1;
-    }
-
-    .section-wrapper--tinted {
-      background: rgba(13,17,23,.6);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-
-    section {
-      position: relative;
-      z-index: 1;
-      padding: clamp(60px, 8vw, 100px) clamp(20px, 5vw, 80px);
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .section-label {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-family: var(--mono);
-      font-size: .8rem;
-      font-weight: 700;
-      color: var(--value);
-      letter-spacing: .12em;
-      margin-bottom: 48px;
-    }
-    .section-label::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-      max-width: 180px;
-    }
-
-    /* ─── Approach cards ─────────────────────────────────── */
-    .cards-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-    }
-
-    .approach-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--value);
-      border-radius: 6px;
-      padding: 32px 28px;
-      position: relative;
-      overflow: hidden;
-      transition: box-shadow .25s, transform .25s;
-    }
-
-    .approach-card:hover {
-      box-shadow: 0 4px 32px rgba(200,242,67,.07);
-      transform: translateY(-2px);
-    }
-
-    .approach-card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(200,242,67,.03) 0%, transparent 60%);
-      pointer-events: none;
-    }
-
-    .card-icon {
-      font-family: var(--mono);
-      font-size: 1.3rem;
-      color: var(--value);
-      margin-bottom: 20px;
-      display: block;
-      opacity: .8;
-    }
-
-    .card-title {
-      font-family: var(--cond);
-      font-weight: 700;
-      font-size: 1.1rem;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      color: var(--text);
-      margin-bottom: 14px;
-    }
-
-    .card-body {
-      font-family: var(--sans);
-      font-weight: 300;
-      font-size: .88rem;
-      color: var(--muted);
-      line-height: 1.75;
-    }
-    .card-body strong { color: var(--text); font-weight: 500; }
-
-    .card-stat {
-      font-family: var(--mono);
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--value);
-      margin-top: 20px;
-      display: block;
-    }
-
-    /* ─── Results / backtest ─────────────────────────────── */
-    .results-section {
-      background: var(--surface);
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      padding: clamp(24px, 4vw, 48px);
-      overflow-x: auto;
-    }
-
-    .results-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-family: var(--mono);
-      font-size: .86rem;
-    }
-
-    .results-table th {
-      text-align: left;
-      padding: 10px 20px;
-      font-weight: 700;
-      font-size: .72rem;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      color: var(--muted);
-      border-bottom: 1px solid var(--border);
-    }
-    .results-table th:not(:first-child) { text-align: center; }
-
-    .results-table td {
-      padding: 14px 20px;
-      border-bottom: 1px solid rgba(28,35,48,.6);
-      color: var(--muted);
-      vertical-align: middle;
-    }
-    .results-table td:first-child {
-      color: var(--text);
-      font-size: .78rem;
-      letter-spacing: .05em;
-      text-transform: uppercase;
-    }
-    .results-table td:not(:first-child) { text-align: center; }
-
-    .val-atp { color: var(--value); font-weight: 700; font-size: 1.05rem; }
-    .val-wta { color: var(--edge); font-weight: 700; font-size: 1.05rem; }
-    .val-na  { color: var(--border); font-size: .8rem; }
-
-    .results-table tr:last-child td { border-bottom: none; }
-
-    .results-note {
-      margin-top: 18px;
-      font-family: var(--mono);
-      font-size: .7rem;
-      color: var(--muted);
-      opacity: .65;
-    }
-
-    /* ─── Workflow ───────────────────────────────────────── */
-    .workflow-steps {
-      display: flex;
-      flex-direction: column;
-      max-width: 680px;
-      margin: 0 auto;
-    }
-
-    .workflow-step {
-      display: flex;
-      align-items: flex-start;
-      gap: 24px;
-      position: relative;
-      padding-bottom: 32px;
-    }
-    .workflow-step:last-child { padding-bottom: 0; }
-
-    .step-indicator {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      flex-shrink: 0;
-    }
-
-    .step-num {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--mono);
-      font-size: .72rem;
-      font-weight: 700;
-      color: var(--value);
-      flex-shrink: 0;
-      position: relative;
-      z-index: 1;
-    }
-
-    .step-line {
-      width: 1px;
-      flex: 1;
-      background: linear-gradient(to bottom, var(--border), transparent);
-      margin-top: 4px;
-      min-height: 24px;
-    }
-    .workflow-step:last-child .step-line { display: none; }
-
-    .step-content { padding-top: 6px; }
-
-    .step-title {
-      font-family: var(--cond);
-      font-weight: 700;
-      font-size: 1rem;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      color: var(--text);
-      margin-bottom: 5px;
-    }
-
-    .step-desc {
-      font-family: var(--sans);
-      font-weight: 300;
-      font-size: .875rem;
-      color: var(--muted);
-      line-height: 1.65;
-    }
-
-    .step-tag {
-      display: inline-block;
-      font-family: var(--mono);
-      font-size: .65rem;
-      font-weight: 500;
-      letter-spacing: .08em;
-      padding: 2px 7px;
-      border-radius: 3px;
-      margin-left: 8px;
-      vertical-align: middle;
-    }
-    .tag-edge  { background: rgba(79,168,255,.12); color: var(--edge); }
-    .tag-value { background: rgba(200,242,67,.1); color: var(--value); }
-    .tag-green { background: rgba(61,220,132,.1); color: var(--green); }
-
-    .signal-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-
-    .s-badge {
-      font-family: var(--mono);
-      font-size: .68rem;
-      font-weight: 700;
-      letter-spacing: .08em;
-      padding: 4px 10px;
-      border-radius: 3px;
-    }
-    .s-badge.value   { background: rgba(200,242,67,.15); color: var(--value); border: 1px solid rgba(200,242,67,.2); }
-    .s-badge.edge    { background: rgba(79,168,255,.12); color: var(--edge); border: 1px solid rgba(79,168,255,.2); }
-    .s-badge.neutral { background: rgba(90,106,126,.12); color: var(--muted); border: 1px solid var(--border); }
-
-    /* ─── Final CTA ──────────────────────────────────────── */
-    .cta-section {
-      text-align: center;
-      padding: clamp(80px,10vw,120px) clamp(20px,5vw,80px);
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .cta-title {
-      font-family: var(--cond);
-      font-weight: 900;
-      font-size: clamp(2.2rem, 5vw, 4.5rem);
-      text-transform: uppercase;
-      line-height: .95;
-      margin-bottom: 20px;
-    }
-
-    .cta-sub {
-      font-family: var(--sans);
-      font-weight: 300;
-      color: var(--muted);
-      font-size: .95rem;
-      max-width: 380px;
-      margin: 0 auto 36px;
-      line-height: 1.7;
-    }
-
-    /* ─── Footer ─────────────────────────────────────────── */
-    footer {
-      position: relative;
-      z-index: 1;
-      border-top: 1px solid var(--border);
-      padding: 36px clamp(20px, 5vw, 80px);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-
-    .footer-brand {
-      font-family: var(--cond);
-      font-weight: 700;
-      font-size: .9rem;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: var(--text);
-    }
-    .footer-brand span { color: var(--muted); font-weight: 400; }
-
-    .footer-legal {
-      font-family: var(--sans);
-      font-size: .73rem;
-      color: var(--muted);
-      text-align: right;
-      line-height: 1.5;
-    }
-
-    /* ─── Responsive ─────────────────────────────────────── */
     @media (max-width: 900px) {
-      .hero {
-        grid-template-columns: 1fr;
-        text-align: center;
-        min-height: auto;
-        padding-top: 60px;
-        padding-bottom: 60px;
-      }
-      .hero-sub { margin-left: auto; margin-right: auto; }
-      .hero-cta-row { justify-content: center; }
-      .hero-right { order: -1; }
-      .mock-card { width: 300px; }
-      .mock-prob { font-size: 1.8rem; }
+      .landing-hero { grid-template-columns: 1fr; padding: 48px 20px; }
+      .hero-card-wrap { display: none; }
+      .landing-headline { font-size: 56px; }
+      .hero-sub { max-width: none; }
+      .landing-section { padding: 48px 20px; }
+      .landing-nav-inner { padding: 0 20px; }
+      .nav-links { display: none; }
+      .faq-grid { grid-template-columns: 1fr; }
+      .cta-section { padding: 48px 20px; }
+      .landing-footer { padding: 24px 20px; }
     }
-
-    @media (max-width: 640px) {
-      .stats-inner { grid-template-columns: 1fr 1fr; }
-      .stat-item:nth-child(2) { border-right: none; }
-      .stat-item { border-bottom: 1px solid var(--border); }
-      .stat-item:nth-child(3), .stat-item:last-child { border-bottom: none; }
-      .cards-grid { grid-template-columns: 1fr; }
-      .results-table th, .results-table td { padding: 10px 12px; }
-      footer { flex-direction: column; align-items: flex-start; }
-      .footer-legal { text-align: left; }
-      .hero-right { display: none; }
-    }
-
-    @media (max-width: 400px) {
-      .ticker-label { display: none; }
+    @media (max-width: 600px) {
+      .landing-metrics { grid-template-columns: repeat(2, 1fr); }
+      .landing-metric:nth-child(2) { border-right: none; }
     }
   </style>
 </head>
-<body>
+<body class="tp-root">
 
-  <!-- ─── Live ticker ────────────────────────────────────── -->
-  <div class="ticker-bar">
-    <div class="ticker-label">
-      <span class="ticker-dot"></span>
-      LIVE
+<!-- Ticker -->
+<div class="tp-ticker">
+  <div class="tp-ticker-inner">
+    <span style="display:inline-flex;align-items:center;gap:6px">
+      <span style="width:6px;height:6px;background:var(--lime);border-radius:50%;box-shadow:0 0 6px var(--lime)"></span>
+      <span style="padding:2px 6px;background:var(--lime);color:#000;border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">LIVE</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime);color:#000;border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">VALUE BET</span>
+      <span style="color:var(--fg-2)">Alcaraz vs Zverev</span>
+      <span style="color:var(--lime)">+11.2%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime-bg);color:var(--lime);border:1px solid var(--lime-line);border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">EDGE</span>
+      <span style="color:var(--fg-2)">Sabalenka vs Pegula</span>
+      <span style="color:var(--lime)">+8.4%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime);color:#000;border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">VALUE BET</span>
+      <span style="color:var(--fg-2)">Djokovic vs Hurkacz</span>
+      <span style="color:var(--lime)">+14.7%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime-bg);color:var(--lime);border:1px solid var(--lime-line);border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">EDGE</span>
+      <span style="color:var(--fg-2)">Rybakina vs Keys</span>
+      <span style="color:var(--lime)">+6.9%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime);color:#000;border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">VALUE BET</span>
+      <span style="color:var(--fg-2)">Sinner vs Medvedev</span>
+      <span style="color:var(--lime)">+13.2%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+    <!-- dupliqué pour loop seamless -->
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime);color:#000;border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">VALUE BET</span>
+      <span style="color:var(--fg-2)">Alcaraz vs Zverev</span>
+      <span style="color:var(--lime)">+11.2%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime-bg);color:var(--lime);border:1px solid var(--lime-line);border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">EDGE</span>
+      <span style="color:var(--fg-2)">Sabalenka vs Pegula</span>
+      <span style="color:var(--lime)">+8.4%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime);color:#000;border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">VALUE BET</span>
+      <span style="color:var(--fg-2)">Djokovic vs Hurkacz</span>
+      <span style="color:var(--lime)">+14.7%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime-bg);color:var(--lime);border:1px solid var(--lime-line);border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">EDGE</span>
+      <span style="color:var(--fg-2)">Rybakina vs Keys</span>
+      <span style="color:var(--lime)">+6.9%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="padding:2px 6px;background:var(--lime);color:#000;border-radius:3px;font-weight:700;font-size:10px;letter-spacing:.08em">VALUE BET</span>
+      <span style="color:var(--fg-2)">Sinner vs Medvedev</span>
+      <span style="color:var(--lime)">+13.2%</span>
+      <span style="color:var(--fg-5);margin-left:8px">·</span>
+    </span>
+  </div>
+</div>
+
+<!-- Nav -->
+<div class="landing-nav">
+  <div class="landing-nav-inner">
+    <a class="landing-logo" href="/">
+      <span class="landing-logo-dot"></span>
+      <span class="landing-logo-text">TENNISPREDICT</span>
+    </a>
+    <div class="nav-links">
+      <a href="#approche" class="nav-link-item">Approche</a>
+      <a href="#backtest" class="nav-link-item">Backtest</a>
+      <a href="#how" class="nav-link-item">Comment ça marche</a>
+      <a href="#faq" class="nav-link-item">FAQ</a>
     </div>
-    <div style="overflow:hidden;flex:1">
-      <div class="ticker-track">
-        <!-- dupliqué pour le loop seamless -->
-        <span class="ticker-item"><span class="t-badge value">VALUE BET</span> <span class="t-match">Sinner vs Medvedev</span> <span class="t-edge">+13.2%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge edge">EDGE</span> <span class="t-match">Gauff vs Swiatek</span> <span class="t-edge">+7.8%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge value">VALUE BET</span> <span class="t-match">Alcaraz vs Zverev</span> <span class="t-edge">+11.1%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge edge">EDGE</span> <span class="t-match">Sabalenka vs Pegula</span> <span class="t-edge">+8.4%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge value">VALUE BET</span> <span class="t-match">Djokovic vs Hurkacz</span> <span class="t-edge">+14.7%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge edge">EDGE</span> <span class="t-match">Rybakina vs Keys</span> <span class="t-edge">+6.9%</span> <span class="t-sep">·</span></span>
-        <!-- copie 2 -->
-        <span class="ticker-item"><span class="t-badge value">VALUE BET</span> <span class="t-match">Sinner vs Medvedev</span> <span class="t-edge">+13.2%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge edge">EDGE</span> <span class="t-match">Gauff vs Swiatek</span> <span class="t-edge">+7.8%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge value">VALUE BET</span> <span class="t-match">Alcaraz vs Zverev</span> <span class="t-edge">+11.1%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge edge">EDGE</span> <span class="t-match">Sabalenka vs Pegula</span> <span class="t-edge">+8.4%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge value">VALUE BET</span> <span class="t-match">Djokovic vs Hurkacz</span> <span class="t-edge">+14.7%</span> <span class="t-sep">·</span></span>
-        <span class="ticker-item"><span class="t-badge edge">EDGE</span> <span class="t-match">Rybakina vs Keys</span> <span class="t-edge">+6.9%</span> <span class="t-sep">·</span></span>
-      </div>
+    <div style="display:flex;gap:10px">
+      <a href="/login" class="tp-btn ghost" style="text-decoration:none">Connexion</a>
+      <a href="/today" class="tp-btn primary" style="text-decoration:none">Ouvrir l'app →</a>
     </div>
   </div>
+</div>
 
-  <!-- ─── Navbar ───────────────────────────────────────────  -->
-  <nav>
-    <a class="nav-logo" href="/">
-      <span class="nav-dot"></span>
-      TennisPredict
-    </a>
-    <div class="nav-actions">
-      <a class="nav-link" href="/login">Connexion</a>
-      <a class="nav-cta" href="/today">Ouvrir l'app →</a>
-    </div>
-  </nav>
-
-  <!-- ─── Hero ──────────────────────────────────────────────  -->
-  <div class="hero-wrapper">
-    <div class="hero">
-
-      <!-- Left: copy -->
-      <div class="hero-left">
-        <p class="hero-eyebrow reveal">
-          // ML · ATP &amp; WTA · Pinnacle No-Vig
-          <span class="eyebrow-cursor"></span>
-        </p>
-        <h1 class="hero-headline reveal reveal-delay-1">
-          Pas de<br>
-          superstitions.<br>
-          <span class="accent">Que des<br>probabilités.</span>
+<!-- Hero -->
+<div class="hero-section">
+  <div class="hero-inner">
+    <div class="landing-hero">
+      <!-- Left copy -->
+      <div>
+        <div class="tp-section-mark reveal" style="margin-bottom:24px">// ML · ATP &amp; WTA · PINNACLE NO-VIG</div>
+        <h1 class="landing-headline reveal reveal-delay-1">
+          <span style="color:var(--fg)">Pas de<br>superstitions.</span><br>
+          <span style="color:var(--lime)">Que des<br>probabilités.</span>
         </h1>
         <p class="hero-sub reveal reveal-delay-2">
           XGBoost calibré sur les cotes Pinnacle. Edge calculé, Kelly appliqué.
-          Chaque signal repose sur des données, pas sur des opinions.
+          Chaque signal repose sur des données — pas sur des opinions.
         </p>
         <div class="hero-cta-row reveal reveal-delay-3">
-          <a class="hero-cta" href="/today">Voir les matchs du jour →</a>
+          <a href="/today" class="tp-btn primary" style="padding:14px 22px;font-size:12px;text-decoration:none">
+            ▸ Voir les signaux du jour
+          </a>
+          <a href="#backtest" class="tp-btn ghost" style="text-decoration:none">Voir le backtest</a>
           <span class="hero-note">78.1% précision · +7.4% ROI</span>
         </div>
       </div>
 
-      <!-- Right: mock card -->
-      <div class="hero-right reveal reveal-delay-2">
-        <div class="mock-card-wrap">
-          <div class="mock-card-stack"></div>
-          <div class="mock-card">
-            <div class="mock-header">
-              <span class="mock-meta">Madrid Open · Clay · R2</span>
-              <div class="mock-badges">
-                <span class="mock-badge value">VALUE BET</span>
-                <span class="mock-badge high">● HIGH</span>
+      <!-- Right: mock match card -->
+      <div class="hero-card-wrap reveal reveal-delay-2">
+        <div class="hero-card-container">
+          <div class="hero-mock-stack"></div>
+          <div class="hero-card-float">
+            <div class="hero-mock-card">
+              <!-- Card meta -->
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg);font-family:var(--font-mono);font-size:10px;letter-spacing:.10em;color:var(--fg-3);text-transform:uppercase">
+                <span>Madrid Open · Clay · R2</span>
+                <div style="display:flex;gap:6px">
+                  <span class="tp-badge lime">VALUE BET</span>
+                  <span class="tp-badge lime-outline dot">HIGH</span>
+                </div>
               </div>
-            </div>
-            <div class="mock-grid">
-              <!-- P1 -->
-              <div class="mock-player">
-                <div class="mock-name">J. Sinner</div>
-                <div class="mock-chips">
-                  <span class="mock-chip rank">#1</span>
-                  <span class="mock-chip">82% clay</span>
+              <!-- Players grid -->
+              <div style="padding:20px;display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center">
+                <!-- P1 -->
+                <div>
+                  <div style="font-size:13px;color:var(--fg);font-weight:600;margin-bottom:6px">J. Sinner</div>
+                  <div style="display:flex;gap:5px;margin-bottom:8px">
+                    <span class="tp-badge ghost">#1</span>
+                    <span class="tp-badge ghost" style="font-family:var(--font-mono);text-transform:none;letter-spacing:0">82% clay</span>
+                  </div>
+                  <!-- Form dots -->
+                  <div class="tp-form-dots" style="margin-bottom:8px">
+                    <i class="w"></i><i class="w"></i><i class="w"></i><i class="w"></i><i class="w"></i>
+                  </div>
+                  <div style="font-family:var(--font-mono);font-size:32px;font-weight:600;color:var(--lime);letter-spacing:-0.02em;line-height:1">67.4%</div>
+                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg-3);margin-top:4px">@1.45</div>
+                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--lime);margin-top:4px">+13.2% edge</div>
+                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4);margin-top:2px">Kelly 4.2€</div>
                 </div>
-                <div class="mock-form">
-                  <span class="dot W"></span><span class="dot W"></span>
-                  <span class="dot W"></span><span class="dot L"></span>
-                  <span class="dot W"></span>
+                <!-- VS -->
+                <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4);letter-spacing:.10em">VS</span>
+                  <div style="padding:4px 8px;border:1px solid var(--line-2);border-radius:4px;text-align:center">
+                    <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.10em">H2H</div>
+                    <div style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2)">7-5</div>
+                  </div>
                 </div>
-                <div class="mock-prob">67.4%</div>
-                <div class="mock-detail">
-                  <span class="mock-odd">@1.45</span>
-                  <span class="mock-edge">+13.2% edge</span>
-                  <span class="mock-kelly">Kelly 4.2€</span>
+                <!-- P2 -->
+                <div style="text-align:right">
+                  <div style="font-size:13px;color:var(--fg);font-weight:600;margin-bottom:6px">D. Medvedev</div>
+                  <div style="display:flex;gap:5px;margin-bottom:8px;justify-content:flex-end">
+                    <span class="tp-badge ghost" style="font-family:var(--font-mono);text-transform:none;letter-spacing:0">54% clay</span>
+                    <span class="tp-badge ghost">#4</span>
+                  </div>
+                  <div class="tp-form-dots" style="margin-bottom:8px;justify-content:flex-end">
+                    <i class="w"></i><i class="l"></i><i class="w"></i><i class="l"></i><i class="l"></i>
+                  </div>
+                  <div style="font-family:var(--font-mono);font-size:32px;font-weight:600;color:var(--fg-2);letter-spacing:-0.02em;line-height:1">32.6%</div>
+                  <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg-3);margin-top:4px">@2.98</div>
                 </div>
-                <button class="mock-bet-btn">Parier →</button>
               </div>
-              <!-- VS -->
-              <div class="mock-vs">
-                <span class="mock-vs-label">VS</span>
-                <span class="mock-h2h">H2H<br>7–5</span>
+              <!-- Footer -->
+              <div style="padding:10px 14px;border-top:1px solid var(--line);background:var(--bg);display:flex;justify-content:space-between;align-items:center">
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4)">ELO seul · 61.3%</span>
+                <span class="tp-badge lime-outline dot">DONNÉES FIABLES</span>
               </div>
-              <!-- P2 -->
-              <div class="mock-player right">
-                <div class="mock-name">D. Medvedev</div>
-                <div class="mock-chips">
-                  <span class="mock-chip">54% clay</span>
-                  <span class="mock-chip rank">#4</span>
-                </div>
-                <div class="mock-form">
-                  <span class="dot W"></span><span class="dot L"></span>
-                  <span class="dot W"></span><span class="dot L"></span>
-                  <span class="dot L"></span>
-                </div>
-                <div class="mock-prob muted">32.6%</div>
-                <div class="mock-detail">
-                  <span class="mock-odd">@2.90</span>
-                </div>
-                <button class="mock-bet-btn ghost">← Parier</button>
-              </div>
-            </div>
-            <div class="mock-footer">
-              <span class="mock-elo">ELO seul : 61.3% ⓘ</span>
-              <span class="mock-dq">● Données fiables</span>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Metrics strip -->
+<div class="landing-metrics">
+  <div class="landing-metric reveal">
+    <div class="landing-metric-val" data-target="78.1" data-decimals="1" data-suffix="%" data-prefix="">0%</div>
+    <div class="landing-metric-lbl">Précision ATP · validation 2023-24</div>
+  </div>
+  <div class="landing-metric reveal reveal-delay-1">
+    <div class="landing-metric-val" data-target="7.4" data-decimals="1" data-suffix="%" data-prefix="+">0%</div>
+    <div class="landing-metric-lbl">ROI Backtest · Pinnacle 2023-24</div>
+  </div>
+  <div class="landing-metric reveal reveal-delay-2">
+    <div class="landing-metric-val" data-target="88" data-decimals="0" data-suffix="k+" data-prefix="">0</div>
+    <div class="landing-metric-lbl">Matchs d'entraînement</div>
+  </div>
+  <div class="landing-metric reveal reveal-delay-3">
+    <div class="landing-metric-val" data-target="2" data-decimals="0" data-suffix=" ans" data-prefix="">0</div>
+    <div class="landing-metric-lbl">Validation out-of-sample</div>
+  </div>
+</div>
+
+<!-- Approche -->
+<div id="approche" class="landing-section-bg">
+  <div class="landing-section">
+    <div class="tp-section-mark" style="margin-bottom:36px">// Notre approche</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+
+      <div class="reveal" style="background:var(--bg-2);border:1px solid var(--line);border-left:3px solid var(--lime);border-radius:var(--r-md);padding:28px 24px">
+        <div style="font-family:var(--font-mono);font-size:18px;color:var(--lime);margin-bottom:16px;opacity:.8">[∑]</div>
+        <div style="font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px">Le modèle</div>
+        <p style="font-size:13px;color:var(--fg-3);line-height:1.7">
+          XGBoost entraîné sur <strong style="color:var(--fg)">88k matchs ATP/WTA</strong> (1991–2024).
+          Features : ELO dynamique (K variable par niveau), forme récente (5/10/20 matchs),
+          head-to-head, fatigue, surface, importance du tournoi, statistiques de service.
+        </p>
+        <div style="font-family:var(--font-mono);font-size:18px;color:var(--lime);margin-top:16px;font-weight:600">78.1% ATP · 77.8% WTA</div>
+      </div>
+
+      <div class="reveal reveal-delay-1" style="background:var(--bg-2);border:1px solid var(--line);border-left:3px solid var(--lime);border-radius:var(--r-md);padding:28px 24px">
+        <div style="font-family:var(--font-mono);font-size:18px;color:var(--lime);margin-bottom:16px;opacity:.8">[≈]</div>
+        <div style="font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px">La calibration</div>
+        <p style="font-size:13px;color:var(--fg-3);line-height:1.7">
+          Platt scaler recalibré sur les cotes <strong style="color:var(--fg)">Pinnacle no-vig</strong> (2023–2024).
+          Edge = probabilité modèle − probabilité implicite Pinnacle.
+          Si le modèle dit <strong style="color:var(--fg)">65%</strong> et Pinnacle implique <strong style="color:var(--fg)">55%</strong>,
+          l'edge est +10%.
+        </p>
+        <div style="font-family:var(--font-mono);font-size:18px;color:var(--lime);margin-top:16px;font-weight:600">Edge ≥ 5%</div>
+      </div>
+
+      <div class="reveal reveal-delay-2" style="background:var(--bg-2);border:1px solid var(--line);border-left:3px solid var(--lime);border-radius:var(--r-md);padding:28px 24px">
+        <div style="font-family:var(--font-mono);font-size:18px;color:var(--lime);margin-bottom:16px;opacity:.8">[f(x)]</div>
+        <div style="font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px">Kelly Criterion</div>
+        <p style="font-size:13px;color:var(--fg-3);line-height:1.7">
+          Mise proportionnelle à l'edge et au bankroll.
+          <strong style="color:var(--fg)">Quarter-Kelly</strong> avec cap à 5% par pari.
+          Gestion du risque mathématique — pas émotionnel.
+          Backtesté sur données réelles hors-entraînement.
+        </p>
+        <div style="font-family:var(--font-mono);font-size:18px;color:var(--lime);margin-top:16px;font-weight:600">¼ Kelly · cap 5%</div>
+      </div>
 
     </div>
   </div>
+</div>
 
-  <!-- ─── Stats strip ────────────────────────────────────── -->
-  <div class="stats-strip">
-    <div class="stats-inner">
-      <div class="stat-item reveal">
-        <span class="stat-value" data-target="78.1" data-decimals="1" data-suffix="%" data-prefix="">0%</span>
-        <span class="stat-label">Précision ATP<br>validation 2023–24</span>
-      </div>
-      <div class="stat-item reveal reveal-delay-1">
-        <span class="stat-value" data-target="7.4" data-decimals="1" data-suffix="%" data-prefix="+">0%</span>
-        <span class="stat-label">ROI backtest<br>Pinnacle 2023–24</span>
-      </div>
-      <div class="stat-item reveal reveal-delay-2">
-        <span class="stat-value" data-target="88" data-decimals="0" data-suffix="k+" data-prefix="">0</span>
-        <span class="stat-label">Matchs<br>d'entraînement</span>
-      </div>
-      <div class="stat-item reveal reveal-delay-3">
-        <span class="stat-value" data-target="2" data-decimals="0" data-suffix=" ans" data-prefix="">0</span>
-        <span class="stat-label">Validation<br>out-of-sample</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── Approche ──────────────────────────────────────── -->
-  <div class="section-wrapper section-wrapper--tinted">
-    <section>
-      <div class="section-label">// Notre approche</div>
-      <div class="cards-grid">
-
-        <div class="approach-card reveal">
-          <span class="card-icon">[∑]</span>
-          <div class="card-title">Le modèle</div>
-          <p class="card-body">
-            XGBoost entraîné sur <strong>88k matchs ATP/WTA</strong> (1991–2024).
-            Features : ELO dynamique (K variable par niveau), forme récente
-            (5/10/20 matchs), head-to-head, fatigue, surface, importance du tournoi,
-            statistiques de service.
-          </p>
-          <span class="card-stat">78.1% ATP · 77.8% WTA</span>
-        </div>
-
-        <div class="approach-card reveal reveal-delay-1">
-          <span class="card-icon">[≈]</span>
-          <div class="card-title">La calibration</div>
-          <p class="card-body">
-            Platt scaler recalibré sur les cotes <strong>Pinnacle no-vig</strong>
-            (2023–2024). Edge = probabilité modèle − probabilité implicite Pinnacle.
-            Si le modèle dit <strong>65%</strong> et Pinnacle implique <strong>55%</strong>,
-            l'edge est +10%. On ne signale que les vraies divergences.
-          </p>
-          <span class="card-stat">Edge ≥ 5%</span>
-        </div>
-
-        <div class="approach-card reveal reveal-delay-2">
-          <span class="card-icon">[f(x)]</span>
-          <div class="card-title">Kelly Criterion</div>
-          <p class="card-body">
-            Mise proportionnelle à l'edge et au bankroll.
-            <strong>Quarter-Kelly</strong> avec cap à 5% par pari.
-            Gestion du risque mathématique — pas émotionnel.
-            Backtesté sur données réelles hors-entraînement.
-          </p>
-          <span class="card-stat">¼ Kelly · cap 5%</span>
-        </div>
-
-      </div>
-    </section>
-  </div>
-
-  <!-- ─── Backtest 2023–2024 ────────────────────────────── -->
-  <div class="section-wrapper">
-    <section>
-      <div class="section-label">// Backtest 2023–2024</div>
-      <div class="results-section reveal">
-        <table class="results-table">
+<!-- Backtest -->
+<div id="backtest">
+  <div class="landing-section">
+    <div class="tp-section-mark reveal" style="margin-bottom:36px">// Backtest 2023–2024</div>
+    <div class="reveal" style="background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden">
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:13px">
           <thead>
-            <tr>
-              <th>Métrique</th>
-              <th>ATP</th>
-              <th>WTA</th>
+            <tr style="border-bottom:1px solid var(--line)">
+              <th style="text-align:left;padding:12px 20px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-4)">Métrique</th>
+              <th style="text-align:center;padding:12px 20px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-4)">ATP</th>
+              <th style="text-align:center;padding:12px 20px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-4)">WTA</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>Précision globale</td>
-              <td><span class="val-atp">78.1%</span></td>
-              <td><span class="val-wta">77.8%</span></td>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:14px 20px;color:var(--fg-2)">Précision globale</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--lime);font-weight:700;font-size:18px">78.1%</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--lime);font-weight:700;font-size:18px">77.8%</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:14px 20px;color:var(--fg-2)">ROI (Pinnacle)</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--lime);font-weight:700;font-size:18px">+7.4%</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--fg-4);font-size:12px">— données en cours</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:14px 20px;color:var(--fg-2)">Matchs backtestés</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--fg)">2 504</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--fg)">1 847</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:14px 20px;color:var(--fg-2)">Win rate VALUE BETs</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--fg)">64.3%</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--fg)">61.2%</td>
             </tr>
             <tr>
-              <td>ROI (Pinnacle)</td>
-              <td><span class="val-atp">+7.4%</span></td>
-              <td><span class="val-na">— données en cours</span></td>
-            </tr>
-            <tr>
-              <td>Matchs backtestés</td>
-              <td><span class="val-atp">2 504</span></td>
-              <td><span class="val-wta">1 847</span></td>
-            </tr>
-            <tr>
-              <td>Win rate VALUE BETs</td>
-              <td><span class="val-atp">64.3%</span></td>
-              <td><span class="val-wta">61.2%</span></td>
-            </tr>
-            <tr>
-              <td>Période de test</td>
-              <td><span class="val-atp">Jan–Déc 2023 &amp; 2024</span></td>
-              <td><span class="val-wta">Jan–Déc 2023 &amp; 2024</span></td>
+              <td style="padding:14px 20px;color:var(--fg-2)">Période de test</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--fg)">Jan–Déc 2023 &amp; 2024</td>
+              <td style="padding:14px 20px;text-align:center;color:var(--fg)">Jan–Déc 2023 &amp; 2024</td>
             </tr>
           </tbody>
         </table>
-        <p class="results-note">
-          // Backtesté sur données out-of-sample 2023–2024 (jamais vues à l'entraînement).
-          Le passé ne garantit pas le futur.
-        </p>
       </div>
-    </section>
-  </div>
-
-  <!-- ─── Workflow ──────────────────────────────────────── -->
-  <div class="section-wrapper section-wrapper--tinted">
-    <section>
-      <div class="section-label">// Comment ça marche</div>
-      <div class="workflow-steps">
-
-        <div class="workflow-step reveal">
-          <div class="step-indicator">
-            <div class="step-num">01</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="step-content">
-            <div class="step-title">Scraping des matchs du jour <span class="step-tag tag-green">ESPN API</span></div>
-            <p class="step-desc">Récupération automatique du calendrier ATP/WTA du jour — tournois, surfaces, rounds, têtes de série.</p>
-          </div>
-        </div>
-
-        <div class="workflow-step reveal reveal-delay-1">
-          <div class="step-indicator">
-            <div class="step-num">02</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="step-content">
-            <div class="step-title">Profils joueurs mis à jour <span class="step-tag tag-edge">Live</span></div>
-            <p class="step-desc">ELO dynamique, classement ATP/WTA, forme récente (5/10/20 matchs), fatigue, statistiques de service recalculées automatiquement.</p>
-          </div>
-        </div>
-
-        <div class="workflow-step reveal reveal-delay-2">
-          <div class="step-indicator">
-            <div class="step-num">03</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="step-content">
-            <div class="step-title">Prédiction XGBoost <span class="step-tag tag-value">ML</span></div>
-            <p class="step-desc">Le modèle génère une probabilité calibrée de victoire. Platt scaler appliqué pour corriger le biais systématique.</p>
-          </div>
-        </div>
-
-        <div class="workflow-step reveal reveal-delay-3">
-          <div class="step-indicator">
-            <div class="step-num">04</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="step-content">
-            <div class="step-title">Comparaison cotes Pinnacle no-vig <span class="step-tag tag-edge">Odds API</span></div>
-            <p class="step-desc">Les cotes brutes sont converties en probabilités implicites sans marge bookmaker. L'edge est la différence entre les deux.</p>
-          </div>
-        </div>
-
-        <div class="workflow-step reveal reveal-delay-4">
-          <div class="step-indicator">
-            <div class="step-num">05</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="step-content">
-            <div class="step-title">Signals de décision</div>
-            <p class="step-desc">Chaque match reçoit un signal selon l'amplitude de l'edge détecté et la qualité des données disponibles.</p>
-            <div class="signal-badges">
-              <span class="s-badge value">VALUE BET</span>
-              <span class="s-badge edge">EDGE</span>
-              <span class="s-badge neutral">NEUTRE</span>
-            </div>
-          </div>
-        </div>
-
+      <div style="padding:12px 20px;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;color:var(--fg-5)">
+        // Backtesté sur données out-of-sample 2023–2024 (jamais vues à l'entraînement). Le passé ne garantit pas le futur.
       </div>
-    </section>
-  </div>
-
-  <!-- ─── CTA final ─────────────────────────────────────── -->
-  <div class="section-wrapper">
-    <div class="cta-section">
-      <p class="hero-eyebrow reveal" style="justify-content:center;margin-bottom:16px">// Prêt à analyser</p>
-      <h2 class="cta-title reveal reveal-delay-1">
-        Les matchs du jour,<br><span style="color:var(--value)">maintenant.</span>
-      </h2>
-      <p class="cta-sub reveal reveal-delay-2">
-        Probabilités en temps réel, edges calculés, signals prêts à l'emploi.
-      </p>
-      <a class="hero-cta reveal reveal-delay-3" href="/today">Voir les matchs du jour →</a>
     </div>
   </div>
+</div>
 
-  <!-- ─── Footer ───────────────────────────────────────────  -->
-  <footer>
-    <div class="footer-brand">
-      TennisPredict <span>— Betting Intelligence</span>
+<!-- Comment ça marche -->
+<div id="how" class="landing-section-bg">
+  <div class="landing-section">
+    <div class="tp-section-mark" style="margin-bottom:36px">// Comment ça marche</div>
+
+    <div class="step-row reveal">
+      <div class="step-num">01</div>
+      <div>
+        <div class="step-title">Scraping des matchs du jour <span class="tp-badge lime-outline">ESPN API</span></div>
+        <div class="step-desc">Récupération automatique du calendrier ATP/WTA du jour — tournois, surfaces, rounds, têtes de série.</div>
+      </div>
     </div>
-    <div class="footer-legal">
-      Usage personnel uniquement.<br>
-      Pariez responsablement. Le trading sportif comporte des risques.
+
+    <div class="step-row reveal reveal-delay-1">
+      <div class="step-num">02</div>
+      <div>
+        <div class="step-title">Profils joueurs mis à jour <span class="tp-badge lime-outline">LIVE</span></div>
+        <div class="step-desc">ELO dynamique, classement ATP/WTA, forme récente (5/10/20 matchs), fatigue, statistiques de service recalculées automatiquement.</div>
+      </div>
     </div>
-  </footer>
 
-  <!-- ─── JS: scroll-reveal + counter animation ─────────── -->
-  <script>
-  (function () {
-    // ── Scroll reveal ──────────────────────────────────────
-    var revEls = document.querySelectorAll('.reveal');
-    if (!('IntersectionObserver' in window)) {
-      revEls.forEach(function (el) { el.classList.add('visible'); });
-    } else {
-      var revObs = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) {
-          if (e.isIntersecting) {
-            e.target.classList.add('visible');
-            revObs.unobserve(e.target);
-          }
-        });
-      }, { threshold: 0.12, rootMargin: '0px 0px -32px 0px' });
-      revEls.forEach(function (el) { revObs.observe(el); });
-    }
+    <div class="step-row reveal reveal-delay-2">
+      <div class="step-num">03</div>
+      <div>
+        <div class="step-title">Prédiction XGBoost <span class="tp-badge lime">ML</span></div>
+        <div class="step-desc">Le modèle génère une probabilité calibrée de victoire. Platt scaler appliqué pour corriger le biais systématique.</div>
+      </div>
+    </div>
 
-    // ── Counter animation ─────────────────────────────────
-    function animateCounter(el) {
-      var target   = parseFloat(el.dataset.target);
-      var decimals = parseInt(el.dataset.decimals, 10) || 0;
-      var suffix   = el.dataset.suffix || '';
-      var prefix   = el.dataset.prefix || '';
-      var duration = 1400;
-      var start    = null;
+    <div class="step-row reveal reveal-delay-3">
+      <div class="step-num">04</div>
+      <div>
+        <div class="step-title">Comparaison cotes Pinnacle no-vig <span class="tp-badge lime-outline">ODDS API</span></div>
+        <div class="step-desc">Les cotes brutes sont converties en probabilités implicites sans marge bookmaker. L'edge est la différence entre les deux.</div>
+      </div>
+    </div>
 
-      function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+    <div class="step-row reveal" style="border-bottom:none">
+      <div class="step-num">05</div>
+      <div>
+        <div class="step-title">Signaux de décision</div>
+        <div class="step-desc" style="margin-bottom:12px">Chaque match reçoit un signal selon l'amplitude de l'edge détecté et la qualité des données disponibles.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span class="tp-badge lime">VALUE BET</span>
+          <span class="tp-badge lime-outline">EDGE</span>
+          <span class="tp-badge ghost">NEUTRE</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-      function tick(ts) {
-        if (!start) start = ts;
-        var elapsed  = ts - start;
-        var progress = Math.min(elapsed / duration, 1);
-        var eased    = easeOutCubic(progress);
-        el.textContent = prefix + (eased * target).toFixed(decimals) + suffix;
-        if (progress < 1) requestAnimationFrame(tick);
-      }
-      requestAnimationFrame(tick);
-    }
+<!-- FAQ -->
+<div id="faq" class="landing-section-bg" style="background:var(--bg-1);border-top:1px solid var(--line)">
+  <div class="landing-section">
+    <div class="tp-section-mark" style="margin-bottom:36px">// FAQ</div>
+    <div class="faq-grid">
 
-    var counterEls = document.querySelectorAll('.stat-value[data-target]');
-    if ('IntersectionObserver' in window) {
-      var cntObs = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) {
-          if (e.isIntersecting) {
-            animateCounter(e.target);
-            cntObs.unobserve(e.target);
-          }
-        });
-      }, { threshold: 0.5 });
-      counterEls.forEach(function (el) { cntObs.observe(el); });
-    } else {
-      counterEls.forEach(function (el) {
-        el.textContent = el.dataset.prefix + parseFloat(el.dataset.target).toFixed(parseInt(el.dataset.decimals,10)) + el.dataset.suffix;
-      });
-    }
-  })();
-  </script>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">Pourquoi calibrer sur Pinnacle ?</div>
+        <div class="tp-faq-a">Pinnacle a la marge bookmaker la plus basse du marché (≈2%) et la limite la plus haute. Leurs cotes sont la référence "vraie probabilité" de tout sharp bettor.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">C'est quoi un edge de 13% ?</div>
+        <div class="tp-faq-a">Si le modèle dit 67.4% et la cote implicite Pinnacle dit 54.2%, le modèle pense que vous avez 13.2 points de pourcentage de plus qu'estimé. Edge ≥ 5% = signal pris.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">Pourquoi Kelly fractionné ?</div>
+        <div class="tp-faq-a">Le critère Kelly maximise la croissance long terme du bankroll. On utilise ¼ Kelly capé à 5% — quart de l'optimal théorique pour absorber l'incertitude du modèle.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">78.1% de précision, c'est trop beau ?</div>
+        <div class="tp-faq-a">C'est la précision globale incluant les favoris évidents. Ce qui compte vraiment c'est le ROI sur les value bets : +7.4% sur 2023-24 out-of-sample.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">Vais-je gagner à coup sûr ?</div>
+        <div class="tp-faq-a">Non. Aucun système ne gagne à coup sûr. Le passé ne garantit pas le futur. Le modèle a aussi des séries de défaites — la discipline de mise est essentielle.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">Quelles données utilise le modèle ?</div>
+        <div class="tp-faq-a">15 features principales : ELO global et par surface, forme 5/10/20 matchs, fatigue (jours depuis dernier match), H2H, importance du tournoi, statistiques de service.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- CTA Final -->
+<div class="cta-section reveal">
+  <div class="tp-section-mark" style="margin-bottom:16px;justify-content:center">// Prêt à analyser</div>
+  <h2 class="cta-headline">
+    Les matchs du jour,<br><span style="color:var(--lime)">maintenant.</span>
+  </h2>
+  <p style="font-size:14px;color:var(--fg-3);margin-bottom:28px;max-width:360px;margin-left:auto;margin-right:auto">
+    Probabilités en temps réel, edges calculés, signaux prêts à l'emploi.
+  </p>
+  <a href="/today" class="tp-btn primary" style="padding:16px 28px;font-size:13px;text-decoration:none">
+    ▸ Voir les matchs du jour
+  </a>
+</div>
+
+<!-- Footer -->
+<div class="landing-footer">
+  <div class="landing-footer-anj">
+    <div class="landing-anj-badge">18+</div>
+    <div style="font-size:12px;color:var(--fg-2);line-height:1.55">
+      <b style="color:var(--fg)">Jouer comporte des risques : endettement, isolement, dépendance.</b><br>
+      TennisPredict est un outil d'analyse statistique. Aucun signal ne garantit un gain.
+      Pour vous faire aider, appelez le <b>09 74 75 13 13</b> (appel non surtaxé) ou rendez-vous sur
+      <span style="color:var(--warn)">joueurs-info-service.fr</span>.
+      Conformément aux recommandations de l'<span style="color:var(--warn)">ANJ</span>,
+      les paris sportifs ne doivent pas être un moyen de gagner sa vie.
+    </div>
+  </div>
+  <div class="landing-footer-bottom">
+    <div>© 2026 TennisPredict — Betting Intelligence</div>
+    <div>v2.1 · ML EDGE · Usage personnel</div>
+  </div>
+</div>
+
+<script src="/static/js/ui.js"></script>
 
 </body>
 </html>

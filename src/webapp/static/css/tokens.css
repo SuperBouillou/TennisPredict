@@ -1,0 +1,340 @@
+/* TennisPredict / Oddshift — design tokens (refonte) */
+:root {
+  /* Surfaces — palette neutre froide légèrement bleutée comme l'app */
+  --bg: #0a0d10;
+  --bg-1: #0f1316;
+  --bg-2: #141a1f;
+  --bg-3: #1a2128;
+  --bg-elev: #1d252c;
+
+  /* Bordures */
+  --line: rgba(255, 255, 255, 0.06);
+  --line-2: rgba(255, 255, 255, 0.10);
+  --line-3: rgba(255, 255, 255, 0.16);
+
+  /* Texte */
+  --fg: #e8edf0;
+  --fg-2: #b6bfc6;
+  --fg-3: #7a848c;
+  --fg-4: #515961;
+  --fg-5: #363c42;
+
+  /* Accent — VERT LIME UNIQUE (palette unifiée) */
+  --lime: #c8ff3d;
+  --lime-2: #aee030;
+  --lime-3: #7a9d20;
+  --lime-bg: rgba(200, 255, 61, 0.10);
+  --lime-bg-2: rgba(200, 255, 61, 0.18);
+  --lime-line: rgba(200, 255, 61, 0.30);
+
+  /* États sémantiques (dérivés du lime quand possible) */
+  --gain: #c8ff3d;       /* gain = lime */
+  --loss: #ff5b5b;       /* perte = rouge cohérent */
+  --loss-bg: rgba(255, 91, 91, 0.10);
+  --warn: #ffc857;       /* attention = ambre, usage rare */
+
+  /* Typographie */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+  --font-display: "Inter", -apple-system, system-ui, sans-serif;
+
+  /* Radius */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+}
+
+/* Reset léger pour les artboards */
+.tp-root {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+}
+.tp-root *,
+.tp-root *::before,
+.tp-root *::after { box-sizing: border-box; }
+.tp-root .mono { font-family: var(--font-mono); letter-spacing: 0; }
+.tp-root .uc { text-transform: uppercase; letter-spacing: 0.08em; }
+.tp-root .ucw { text-transform: uppercase; letter-spacing: 0.14em; }
+
+/* Marqueurs `// section` cohérents */
+.tp-section-mark {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--lime);
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.tp-section-mark::after {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--lime);
+}
+
+/* Badges */
+.tp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  color: var(--fg-2);
+  background: var(--bg-2);
+}
+.tp-badge.lime {
+  background: var(--lime);
+  color: #0a0d10;
+  border-color: var(--lime);
+}
+.tp-badge.lime-outline {
+  background: var(--lime-bg);
+  color: var(--lime);
+  border-color: var(--lime-line);
+}
+.tp-badge.ghost {
+  background: transparent;
+  border-color: var(--line-2);
+  color: var(--fg-3);
+}
+.tp-badge.dot::before {
+  content: "";
+  width: 6px; height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Boutons */
+.tp-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 9px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--fg);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all .15s;
+}
+.tp-btn:hover { border-color: var(--line-3); background: var(--bg-3); }
+.tp-btn.primary {
+  background: var(--lime);
+  color: #0a0d10;
+  border-color: var(--lime);
+}
+.tp-btn.primary:hover { background: var(--lime-2); border-color: var(--lime-2); }
+.tp-btn.ghost { background: transparent; }
+.tp-btn.sm { padding: 6px 10px; font-size: 10px; }
+
+/* Inputs */
+.tp-input {
+  width: 100%;
+  background: var(--bg-1);
+  color: var(--fg);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: 11px 13px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color .15s, background .15s;
+}
+.tp-input:focus { border-color: var(--lime-line); background: var(--bg-2); }
+.tp-input::placeholder { color: var(--fg-4); }
+
+.tp-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* Sidebar (utilisée dans toutes les pages app) */
+.tp-sidebar {
+  width: 220px;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 22px 0;
+  flex-shrink: 0;
+}
+.tp-sidebar .brand {
+  padding: 0 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tp-sidebar .brand .row {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--fg);
+}
+.tp-sidebar .brand .row::before {
+  content: "";
+  width: 8px; height: 8px;
+  background: var(--lime);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--lime);
+}
+.tp-sidebar .brand .sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--fg-4);
+  padding-left: 16px;
+}
+.tp-nav-group { padding: 0 20px; margin-bottom: 18px; }
+.tp-nav-group-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--fg-4);
+  margin-bottom: 8px;
+}
+.tp-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--r-md);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-2);
+  cursor: pointer;
+  margin: 0 -10px;
+}
+.tp-nav-item:hover { background: var(--bg-2); color: var(--fg); }
+.tp-nav-item.active { background: var(--bg-2); color: var(--lime); }
+.tp-nav-item.active .ico { color: var(--lime); }
+.tp-nav-item .ico { color: var(--fg-3); width: 14px; display: inline-flex; }
+
+.tp-bankroll {
+  margin-top: auto;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+}
+.tp-bankroll .lbl {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--fg-4);
+  margin-bottom: 4px;
+}
+.tp-bankroll .val {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lime);
+}
+
+/* Topbar app */
+.tp-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--line);
+}
+.tp-topbar h1 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.tp-topbar .sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+  margin-top: 2px;
+}
+
+/* Segmented control */
+.tp-seg {
+  display: inline-flex;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 2px;
+}
+.tp-seg button {
+  background: transparent;
+  border: none;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.tp-seg button.on {
+  background: var(--bg-elev);
+  color: var(--lime);
+  box-shadow: 0 0 0 1px var(--line-2);
+}
+.tp-seg button:hover:not(.on) { color: var(--fg); }
+
+/* Sparkline / mini bars */
+.tp-form-dots { display: inline-flex; gap: 3px; }
+.tp-form-dots i {
+  width: 7px; height: 7px;
+  border-radius: 1px;
+  display: inline-block;
+}
+.tp-form-dots i.w { background: var(--lime); }
+.tp-form-dots i.l { background: var(--loss); opacity: 0.55; }
+
+/* Stat tile */
+.tp-stat {
+  display: flex; flex-direction: column;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-1);
+}
+.tp-stat .v { font-family: var(--font-mono); font-size: 22px; font-weight: 600; color: var(--fg); }
+.tp-stat .v.lime { color: var(--lime); }
+.tp-stat .v.loss { color: var(--loss); }
+.tp-stat .l {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--fg-4);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* Card */
+.tp-card {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+/* Scrollbars cachées dans les artboards */
+.tp-root ::-webkit-scrollbar { width: 0; height: 0; }

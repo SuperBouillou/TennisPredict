@@ -3,6 +3,40 @@
    ═══════════════════════════════════════════════════════════════ */
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700&family=Barlow:wght@300;400;500&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
+/* ── Compatibility bridge: map old vars to new refonte tokens ──
+   tokens.css is loaded before app.css; these aliases let old
+   selectors continue working while new ones use token names.     */
+:root {
+  /* Remap old --blue/--edge to lime (no more blue accent) */
+  --edge:    var(--lime);
+  --edge-bg: var(--lime-bg);
+  /* Keep old --value pointing to same lime */
+  --value:     var(--lime);
+  --value-bg:  var(--lime-bg);
+  /* Old surface vars → new bg tokens */
+  --surface:   var(--bg-1);
+  --surface2:  var(--bg-2);
+  /* Old border → new line tokens */
+  --border:    var(--line);
+  --border2:   var(--line-2);
+  /* Old text/muted → new fg tokens */
+  --text:    var(--fg);
+  --muted:   var(--fg-3);
+  --muted2:  var(--fg-4);
+  /* Old color tokens */
+  --green:   var(--gain);
+  --red:     var(--loss);
+  --orange:  var(--warn);
+  /* Old font vars */
+  --mono: var(--font-mono);
+  --cond: "Inter", system-ui;
+  --sans: var(--font-sans);
+  /* --blue was used for H2H and low-edge colors — map to lime-outline feel */
+  --blue: var(--lime);
+  /* Old sidebar width */
+  --sidebar-w: 220px;
+}
+
 :root {
   --bg:        #07090E;
   --surface:   #0D1117;
