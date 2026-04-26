@@ -32,7 +32,7 @@ html, body.tp-root { height: 100%; min-height: 100vh; }
 .prob-bar-fill { height: 100%; }
 
 /* Landing */
-.landing-nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 48px; border-bottom: 1px solid var(--line); }
+.landing-nav { position: sticky; top: 0; z-index: 100; }
 .landing-hero { padding: 80px 48px 100px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
 .landing-headline { font-size: clamp(48px, 7vw, 96px); font-weight: 800; line-height: 0.95; letter-spacing: -0.04em; text-transform: uppercase; margin: 0; }
 .landing-metrics { padding: 32px 48px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, 1fr); }
