@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Request, Form, Query
+from fastapi import APIRouter, BackgroundTasks, Request, Form, Query
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
@@ -23,9 +23,10 @@ templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates"
 _pnl_cache: dict[str, tuple[dict, float]] = {}  # key → (data, timestamp)
 _PNL_TTL = 30  # seconds
 
-# Cooldown for auto-resolve: at most one ESPN fetch per N seconds across all sessions
-_AUTO_RESOLVE_COOLDOWN = 300  # 5 minutes
+# Auto-resolve state: cooldown + result of last completed background run
+_AUTO_RESOLVE_COOLDOWN = 300  # 5 minutes — at most one ESPN fetch every 5 min
 _auto_resolve_last_run: float = 0.0
+_auto_resolve_last_count: int = 0   # shown on next page load after a background run
 
 
 def _invalidate_pnl_cache() -> None:
@@ -35,23 +36,24 @@ def _invalidate_pnl_cache() -> None:
 _SRC = str(Path(__file__).resolve().parents[3] / 'src')
 
 
-def _try_auto_resolve(db) -> int:
+def _run_auto_resolve_bg(db) -> None:
     """
-    Fetch ESPN results for the last 3 days and auto-resolve pending bets.
-    Runs at most once every _AUTO_RESOLVE_COOLDOWN seconds to avoid blocking
-    every history page load with 6 synchronous ESPN HTTP requests.
-    Returns total number of bets resolved across ATP + WTA.
+    Background task: fetch ESPN results for the last 3 days and auto-resolve pending bets.
+    Called via FastAPI BackgroundTasks — runs AFTER the HTTP response is sent, so it
+    never blocks the page load.  Cooldown prevents hammering ESPN on every page visit.
+    Result is stored in _auto_resolve_last_count and shown on the next page load.
     """
-    global _auto_resolve_last_run
+    global _auto_resolve_last_run, _auto_resolve_last_count
+
     if time.time() - _auto_resolve_last_run < _AUTO_RESOLVE_COOLDOWN:
-        return 0
+        return
 
     if str(_SRC) not in sys.path:
         sys.path.insert(0, _SRC)
     try:
         from espn_client import fetch_results  # noqa: PLC0415
     except Exception:
-        return 0
+        return
 
     _auto_resolve_last_run = time.time()
     today = date.today()
@@ -66,7 +68,12 @@ def _try_auto_resolve(db) -> int:
                 pass
         if all_results:
             total += auto_resolve_pending(db, tour, all_results)
-    return total
+
+    if total:
+        _auto_resolve_last_count = total
+        _invalidate_pnl_cache()
+    else:
+        _auto_resolve_last_count = 0
 
 
 def _badge_from_edge(edge) -> str:
@@ -158,6 +165,7 @@ def _compute_stats(bets: list[dict]) -> dict:
 @router.get("/history", response_class=HTMLResponse)
 async def history_page(
     request: Request,
+    background_tasks: BackgroundTasks,
     tour: str | None = Query(default=None),  # None = all tours
     surface: str | None = None,
     status: str | None = None,
@@ -165,8 +173,10 @@ async def history_page(
 ):
     db = get_state()['db']
 
-    # Auto-resolve pending bets against ESPN results (last 3 days)
-    auto_resolved = _try_auto_resolve(db)
+    # Schedule ESPN auto-resolve as a background task (runs after response is sent).
+    # Show the count from the last completed background run (_auto_resolve_last_count).
+    background_tasks.add_task(_run_auto_resolve_bg, db)
+    auto_resolved = _auto_resolve_last_count
 
     # Fetch all bets — no pagination, history is small enough to show in full
     all_bets = list_bets(db, tour=tour, surface=surface, status=status, limit=5000)
