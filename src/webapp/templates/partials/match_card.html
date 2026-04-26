@@ -178,11 +178,15 @@
       </div>
       {% endif %}
 
-      {# H2H chip #}
-      {% if m.get('h2h_total') %}
+      {# H2H chip — always shown, 0-0 when no prior meetings #}
+      {% if m.get('prob_p1') %}
       <div class="center-chip">
         <span class="lbl">H2H</span>
-        <span class="val">{{ m.h2h_p1_wins }}–{{ m.h2h_p2_wins }}</span>
+        {% if m.get('h2h_total') %}
+          <span class="val">{{ m.h2h_p1_wins }}–{{ m.h2h_p2_wins }}</span>
+        {% else %}
+          <span class="val" style="color:var(--fg-4)">0–0</span>
+        {% endif %}
       </div>
       {% endif %}
 
