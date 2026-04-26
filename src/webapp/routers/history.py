@@ -23,6 +23,10 @@ templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates"
 _pnl_cache: dict[str, tuple[dict, float]] = {}  # key → (data, timestamp)
 _PNL_TTL = 30  # seconds
 
+# Cooldown for auto-resolve: at most one ESPN fetch per N seconds across all sessions
+_AUTO_RESOLVE_COOLDOWN = 300  # 5 minutes
+_auto_resolve_last_run: float = 0.0
+
 
 def _invalidate_pnl_cache() -> None:
     _pnl_cache.clear()
@@ -34,8 +38,14 @@ _SRC = str(Path(__file__).resolve().parents[3] / 'src')
 def _try_auto_resolve(db) -> int:
     """
     Fetch ESPN results for the last 3 days and auto-resolve pending bets.
+    Runs at most once every _AUTO_RESOLVE_COOLDOWN seconds to avoid blocking
+    every history page load with 6 synchronous ESPN HTTP requests.
     Returns total number of bets resolved across ATP + WTA.
     """
+    global _auto_resolve_last_run
+    if time.time() - _auto_resolve_last_run < _AUTO_RESOLVE_COOLDOWN:
+        return 0
+
     if str(_SRC) not in sys.path:
         sys.path.insert(0, _SRC)
     try:
@@ -43,6 +53,7 @@ def _try_auto_resolve(db) -> int:
     except Exception:
         return 0
 
+    _auto_resolve_last_run = time.time()
     today = date.today()
     total = 0
     for tour in ('atp', 'wta'):
