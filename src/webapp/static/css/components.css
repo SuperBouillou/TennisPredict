@@ -31,16 +31,6 @@ html, body.tp-root { height: 100%; min-height: 100vh; }
 .prob-bar { position: relative; height: 5px; border-radius: 3px; background: var(--bg-3); overflow: hidden; display: flex; }
 .prob-bar-fill { height: 100%; }
 
-/* Landing */
-.landing-nav { position: sticky; top: 0; z-index: 100; }
-.landing-hero { padding: 80px 48px 100px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
-.landing-headline { font-size: clamp(48px, 7vw, 96px); font-weight: 800; line-height: 0.95; letter-spacing: -0.04em; text-transform: uppercase; margin: 0; }
-.landing-metrics { padding: 32px 48px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, 1fr); }
-.landing-metric { text-align: center; padding: 12px; }
-.landing-metric:not(:last-child) { border-right: 1px solid var(--line); }
-.landing-metric-val { font-family: var(--font-mono); font-size: 42px; font-weight: 600; color: var(--lime); letter-spacing: -0.02em; line-height: 1; }
-.landing-metric-lbl { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); letter-spacing: .14em; text-transform: uppercase; margin-top: 8px; }
-
 /* Ticker */
 .tp-ticker { background: #000; border-bottom: 1px solid var(--line); padding: 8px 0; overflow: hidden; white-space: nowrap; font-family: var(--font-mono); font-size: 11px; letter-spacing: .05em; }
 .tp-ticker-inner { display: inline-flex; gap: 24px; animation: ticker-scroll 30s linear infinite; }
