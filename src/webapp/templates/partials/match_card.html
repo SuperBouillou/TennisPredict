@@ -8,22 +8,19 @@
 </div>
 {% elif not matches %}
 <div class="card" style="text-align:center;color:var(--muted);padding:40px">
-  {% if mode == 'hier' %}
-    Aucun résultat ESPN trouvé pour {{ tour | upper }} hier.
-  {% elif mode == 'demain' %}
-    Aucun match programmé pour {{ tour | upper }} demain.
-  {% else %}
-    Aucun match trouvé pour {{ tour | upper }} aujourd'hui.
-    <br><br><a href="/predictions" style="color:var(--blue)">→ Saisie manuelle</a>
+  {% if mode == 'hier' %}Aucun résultat ESPN trouvé pour {{ tour | upper }} hier.
+  {% elif mode == 'demain' %}Aucun match programmé pour {{ tour | upper }} demain.
+  {% else %}Aucun match trouvé pour {{ tour | upper }} aujourd'hui.<br><br>
+    <a href="/predictions" style="color:var(--lime)">→ Saisie manuelle</a>
   {% endif %}
 </div>
 {% endif %}
+
 {% for m in matches %}
+
 {% if m.get('winner_name') %}
-<!-- Result card (hier mode) -->
+{# ── RESULT CARD (hier mode) ─────────────────────────────────────── #}
 {% set pred_correct = m.get('prob_p1', 0) > 0.5 %}
-{% set ep1 = m.get('edge_p1') or 0 %}
-{% set ep2 = m.get('edge_p2') or 0 %}
 {% set dq = m.get('data_quality', 'low') %}
 <div class="match-card neutral result-card" data-badge="neutral">
   <div class="card-header">
@@ -34,24 +31,17 @@
       <span class="badge" style="background:rgba(100,116,139,.15);color:var(--muted);font-size:10px">TERMINÉ</span>
       {% if m.get('prob_p1') %}
         {% if pred_correct %}
-          <span class="badge tip tip-down tip-left" style="background:rgba(34,197,94,.12);color:var(--green);font-size:10px"
-                data-tip="Le modèle avait prédit la bonne issue">✓ ML</span>
+          <span class="badge" style="background:rgba(61,220,132,.12);color:var(--green);font-size:10px">✓ ML</span>
         {% else %}
-          <span class="badge tip tip-down tip-left" style="background:rgba(239,68,68,.12);color:var(--red);font-size:10px"
-                data-tip="Le modèle avait prédit l'issue inverse">✗ ML</span>
+          <span class="badge" style="background:rgba(239,68,68,.12);color:var(--red);font-size:10px">✗ ML</span>
         {% endif %}
-        {% if dq == 'high' %}
-          <span class="badge badge-quality-high tip tip-down tip-left" data-tip="Données solides : profil récent complet">● HIGH</span>
-        {% elif dq == 'medium' %}
-          <span class="badge badge-quality-med tip tip-down tip-left" data-tip="Données partielles : peu de matchs récents">● MED</span>
-        {% else %}
-          <span class="badge badge-quality-low tip tip-down tip-left" data-tip="Données insuffisantes : ELO uniquement">● LOW</span>
-        {% endif %}
+        {% if dq == 'high' %}<span class="badge badge-quality-high">● HIGH</span>
+        {% elif dq == 'medium' %}<span class="badge badge-quality-med">● MED</span>
+        {% else %}<span class="badge badge-quality-low">● LOW</span>{% endif %}
       {% endif %}
     </div>
   </div>
   <div class="card-grid">
-    <!-- Winner (p1) -->
     <div class="player-side">
       <div class="player-name" style="color:var(--green)">{{ m.get('p1_name','?') }}</div>
       <div style="font-size:11px;color:var(--green);margin-top:2px">✓ Vainqueur</div>
@@ -61,20 +51,17 @@
         </div>
       {% endif %}
     </div>
-    <!-- Score center -->
     <div class="card-vs">
-      <span class="vs-label" style="font-size:10px;letter-spacing:.5px">SCORE</span>
+      <span class="vs-label" style="font-size:10px">SCORE</span>
       {% if m.get('score') %}
         <span style="font-size:12px;color:var(--text);font-weight:600;margin-top:4px;text-align:center;line-height:1.4">{{ m.get('score') }}</span>
       {% endif %}
       {% if m.get('prob_p1') %}
-        <span class="tip" style="font-size:10px;margin-top:6px;color:{% if pred_correct %}var(--green){% else %}var(--red){% endif %}"
-              data-tip="{% if pred_correct %}Le modèle favorisait le bon joueur{% else %}Le modèle favorisait le perdant{% endif %}">
+        <span style="font-size:10px;margin-top:6px;color:{% if pred_correct %}var(--green){% else %}var(--red){% endif %}">
           {% if pred_correct %}✓ Prédit{% else %}✗ Raté{% endif %}
         </span>
       {% endif %}
     </div>
-    <!-- Loser (p2) -->
     <div class="player-side right">
       <div class="player-name" style="color:var(--muted)">{{ m.get('p2_name','?') }}</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px">Défaite</div>
@@ -86,13 +73,19 @@
     </div>
   </div>
 </div>
+
 {% else %}
+{# ── LIVE MATCH CARD ─────────────────────────────────────────────── #}
 {% set ep1 = m.get('edge_p1') or 0 %}
 {% set ep2 = m.get('edge_p2') or 0 %}
 {% set badge = m.get('badge','neutral') %}
 {% set dq = m.get('data_quality','low') %}
+{% set is_p1_pick = (m.get('prob_p1') or 0) >= (m.get('prob_p2') or 0) %}
+{% set pick_edge = ep1 if is_p1_pick else ep2 %}
+{% set pick_kelly = m.get('kelly_eur_p1') if is_p1_pick else m.get('kelly_eur_p2') %}
 {% set _bet_key = m.get('p1_name','') ~ '|' ~ m.get('p2_name','') %}
 {% set placed_bet = (pending_lookup.get(_bet_key)) if pending_lookup is defined else none %}
+
 <div class="match-card {{ badge }}"
      data-badge="{{ badge }}"
      data-tour="{{ tour }}"
@@ -104,115 +97,175 @@
      data-best-of="{{ m.get('best_of', 3) }}"
      data-odd-p1="{{ m.odd_p1 if m.get('odd_p1') is not none else '' }}"
      data-odd-p2="{{ m.odd_p2 if m.get('odd_p2') is not none else '' }}">
-  <!-- Header -->
+
+  {# Header #}
   <div class="card-header" onclick="openModal(this.closest('.match-card'))">
     <div class="card-meta">
       {{ m.get('tournament','') }}{% if m.get('round') %} · {{ m.get('round') }}{% endif %}{% if m.get('surface') %} · {{ m.get('surface') }}{% endif %}{% if m.get('time') %} · {{ m.get('time') }}{% endif %}
     </div>
     <div class="card-badges">
-      {% if badge == 'value' %}
-        <span class="badge badge-value tip tip-down tip-left" data-tip="Edge ≥12% sur les cotes Pinnacle — mise recommandée">VALUE BET</span>
-      {% elif badge == 'edge' %}
-        <span class="badge badge-edge tip tip-down tip-left" data-tip="Edge modéré (6–12%) — signal positif, miser prudemment">EDGE</span>
-      {% else %}
-        <span class="badge badge-neutral tip tip-down tip-left" data-tip="Pas d'avantage statistique détecté — match à éviter">NEUTRE</span>
-      {% endif %}
-      {% if dq == 'high' %}
-        <span class="badge badge-quality-high tip tip-down tip-left" data-tip="Données solides : profil récent complet, prédiction fiable">● HIGH</span>
-      {% elif dq == 'medium' %}
-        <span class="badge badge-quality-med tip tip-down tip-left" data-tip="Données partielles : peu de matchs récents, seuils relevés">● MED</span>
-      {% else %}
-        <span class="badge badge-quality-low tip tip-down tip-left" data-tip="Données insuffisantes : ELO uniquement, précision réduite">● LOW</span>
-      {% endif %}
+      {% if badge == 'value' %}<span class="badge badge-value">VALUE BET</span>
+      {% elif badge == 'edge' %}<span class="badge badge-edge">EDGE</span>
+      {% else %}<span class="badge badge-neutral">NEUTRE</span>{% endif %}
+      {% if dq == 'high' %}<span class="badge badge-quality-high">● HIGH</span>
+      {% elif dq == 'medium' %}<span class="badge badge-quality-med">● MED</span>
+      {% else %}<span class="badge badge-quality-low">● LOW</span>{% endif %}
     </div>
   </div>
-  <!-- 3-column grid -->
-  <div class="card-grid">
-    <!-- P1 -->
+
+  {# Body — 3-col: P1 | Center | P2 #}
+  <div class="card-body">
+
+    {# P1 #}
     <div class="player-side">
-      <div class="player-name" style="cursor:pointer" onclick="event.stopPropagation();window.location='/joueurs/'+encodeURIComponent(this.closest('.match-card').dataset.p1)+'?tour='+this.closest('.match-card').dataset.tour">{{ m.get('p1_name','?') }}</div>
+      <div class="player-name"
+           onclick="event.stopPropagation();window.location='/joueurs/'+encodeURIComponent(this.closest('.match-card').dataset.p1)+'?tour='+this.closest('.match-card').dataset.tour">
+        {{ m.get('p1_name','?') }}
+      </div>
       <div class="player-chips">
         {% if m.get('p1_rank') %}<span class="player-chip player-chip-rank">#{{ m.p1_rank }}</span>{% endif %}
-        {% if m.get('p1_surf_pct') is not none %}<span class="player-chip tip" data-tip="Win rate sur {{ m.get('surface','cette surface') }}">{{ m.p1_surf_pct }}% {{ m.get('surface','surf') | lower }}</span>{% endif %}
-        {% if m.get('p1_days_since') is not none and m.p1_days_since > 10 %}<span class="player-chip player-chip-rest tip" data-tip="Jours depuis le dernier match">{{ m.p1_days_since }}j</span>{% endif %}
+        {% if m.get('p1_surf_pct') is not none %}<span class="player-chip">{{ m.p1_surf_pct }}% {{ m.get('surface','surf') | lower }}</span>{% endif %}
+        {% if m.get('p1_days_since') is not none and m.p1_days_since > 10 %}<span class="player-chip player-chip-rest">{{ m.p1_days_since }}j</span>{% endif %}
       </div>
       {% if m.get('p1_form') %}
-      <div class="form-dots tip" data-tip="5 derniers matchs · vert = victoire · rouge = défaite · gris = inconnu">
-        {% for dot in m.p1_form %}
-        <span class="form-dot {{ dot }}"></span>
-        {% endfor %}
+      <div class="form-dots">
+        {% for dot in m.p1_form %}<span class="form-dot {{ dot }}"></span>{% endfor %}
       </div>
       {% endif %}
       {% if m.get('prob_p1') %}
-        <div class="prob-number {% if ep1 >= 0.02 %}value-color{% elif m.get('prob_p1', 0) > 0.55 %}edge-color{% endif %}">
-          {{ "%.1f"|format(m.prob_p1 * 100) }}%
-        </div>
-      {% endif %}
-      <div class="prob-detail">
-        {% if m.get('odd_p1') %}
-          <div class="prob-odd">@{{ "%.2f"|format(m.odd_p1) }}</div>
-        {% endif %}
-        {% if ep1 > 0 and badge != 'neutral' %}
-          <div class="prob-edge">+{{ "%.1f"|format(ep1 * 100) }}% edge</div>
-          {% if m.get('kelly_eur_p1') %}
-            <div class="prob-kelly">Kelly <span class="kelly-eur" data-frac="{{ m.get('kelly_frac_p1', 0) }}">{{ m.kelly_eur_p1 }}</span>€</div>
-          {% endif %}
-        {% endif %}
+      <div class="prob-number {{ 'value-color' if (is_p1_pick and badge != 'neutral') else '' }}">
+        {{ "%.1f"|format(m.prob_p1 * 100) }}%
       </div>
-      {% if placed_bet and placed_bet.bet_on == m.get('p1_name') %}
-      <div class="parie-badge tip tip-down" data-tip="Pari en attente de résolution">✓ Parié {{ "%.2f"|format(placed_bet.stake) }}€ @{{ "%.2f"|format(placed_bet.odd) }}</div>
-      {% elif not placed_bet and m.get('odd_p1') %}
-      <button class="btn-bet" onclick="event.stopPropagation();openModal(this.closest('.match-card'))">Parier →</button>
+      {% endif %}
+      {% if m.get('odd_p1') %}
+      <div class="prob-odd">@{{ "%.2f"|format(m.odd_p1) }}</div>
       {% endif %}
     </div>
-    <!-- VS center -->
-    <div class="card-vs" onclick="openModal(this.closest('.match-card'))">
-      <span class="vs-label">VS</span>
+
+    {# Center column #}
+    <div class="card-center" onclick="openModal(this.closest('.match-card'))">
+
+      {# Split probability bar #}
+      {% if m.get('prob_p1') and m.get('prob_p2') %}
+      <div class="prob-split">
+        <div class="prob-split-half {{ 'lime' if is_p1_pick else 'dim' }}"
+             style="width:{{ "%.1f"|format(m.prob_p1 * 100) }}%"></div>
+        <div class="prob-split-half {{ 'lime' if not is_p1_pick else 'dim' }}"
+             style="flex:1"></div>
+      </div>
+      {% endif %}
+
+      {# H2H chip #}
       {% if m.get('h2h_total') %}
-      <span class="vs-h2h tip" data-tip="Face-à-face historique ({{ m.h2h_total }} matchs)">
-        <span style="font-size:8px;color:var(--muted);letter-spacing:.04em">H2H</span><br>
-        {{ m.h2h_p1_wins }}–{{ m.h2h_p2_wins }}
-      </span>
+      <div class="center-chip">
+        <span class="lbl">H2H</span>
+        <span class="val">{{ m.h2h_p1_wins }}–{{ m.h2h_p2_wins }}</span>
+      </div>
       {% endif %}
+
+      {# Odds chips #}
+      {% if m.get('odd_p1') and m.get('odd_p2') %}
+      <div class="center-chip">
+        <span class="lbl">OPEN</span>
+        <span class="val">{{ "%.2f"|format(m.odd_p1) }}</span>
+        <span style="color:var(--fg-5)">↑</span>
+        <span class="val">{{ "%.2f"|format(m.odd_p2) }}</span>
+      </div>
+      {% endif %}
+
+      {# Edge + Kelly pill #}
+      {% if badge != 'neutral' and pick_edge > 0.05 %}
+      <div class="edge-pill">
+        EDGE +{{ "%.1f"|format(pick_edge * 100) }}%{% if pick_kelly %} · KELLY {{ pick_kelly }}€{% endif %}
+      </div>
+      {% endif %}
+
     </div>
-    <!-- P2 -->
+
+    {# P2 #}
     <div class="player-side right">
-      <div class="player-name" style="cursor:pointer" onclick="event.stopPropagation();window.location='/joueurs/'+encodeURIComponent(this.closest('.match-card').dataset.p2)+'?tour='+this.closest('.match-card').dataset.tour">{{ m.get('p2_name','?') }}</div>
+      <div class="player-name"
+           onclick="event.stopPropagation();window.location='/joueurs/'+encodeURIComponent(this.closest('.match-card').dataset.p2)+'?tour='+this.closest('.match-card').dataset.tour">
+        {{ m.get('p2_name','?') }}
+      </div>
       <div class="player-chips">
-        {% if m.get('p2_days_since') is not none and m.p2_days_since > 10 %}<span class="player-chip player-chip-rest tip" data-tip="Jours depuis le dernier match">{{ m.p2_days_since }}j</span>{% endif %}
-        {% if m.get('p2_surf_pct') is not none %}<span class="player-chip tip" data-tip="Win rate sur {{ m.get('surface','cette surface') }}">{{ m.p2_surf_pct }}% {{ m.get('surface','surf') | lower }}</span>{% endif %}
+        {% if m.get('p2_days_since') is not none and m.p2_days_since > 10 %}<span class="player-chip player-chip-rest">{{ m.p2_days_since }}j</span>{% endif %}
+        {% if m.get('p2_surf_pct') is not none %}<span class="player-chip">{{ m.p2_surf_pct }}% {{ m.get('surface','surf') | lower }}</span>{% endif %}
         {% if m.get('p2_rank') %}<span class="player-chip player-chip-rank">#{{ m.p2_rank }}</span>{% endif %}
       </div>
       {% if m.get('p2_form') %}
-      <div class="form-dots tip" data-tip="5 derniers matchs · vert = victoire · rouge = défaite · gris = inconnu">
-        {% for dot in m.p2_form %}
-        <span class="form-dot {{ dot }}"></span>
-        {% endfor %}
+      <div class="form-dots" style="justify-content:flex-end">
+        {% for dot in m.p2_form %}<span class="form-dot {{ dot }}"></span>{% endfor %}
       </div>
       {% endif %}
       {% if m.get('prob_p2') %}
-        <div class="prob-number {% if ep2 >= 0.02 %}value-color{% elif m.get('prob_p2', 0) > 0.55 %}edge-color{% endif %}">
-          {{ "%.1f"|format(m.prob_p2 * 100) }}%
-        </div>
-      {% endif %}
-      <div class="prob-detail" style="align-items:flex-end">
-        {% if m.get('odd_p2') %}
-          <div class="prob-odd">@{{ "%.2f"|format(m.odd_p2) }}</div>
-        {% endif %}
-        {% if ep2 > 0 and badge != 'neutral' %}
-          <div class="prob-edge">+{{ "%.1f"|format(ep2 * 100) }}% edge</div>
-          {% if m.get('kelly_eur_p2') %}
-            <div class="prob-kelly">Kelly <span class="kelly-eur" data-frac="{{ m.get('kelly_frac_p2', 0) }}">{{ m.kelly_eur_p2 }}</span>€</div>
-          {% endif %}
-        {% endif %}
+      <div class="prob-number {{ 'value-color' if (not is_p1_pick and badge != 'neutral') else '' }}">
+        {{ "%.1f"|format(m.prob_p2 * 100) }}%
       </div>
-      {% if placed_bet and placed_bet.bet_on == m.get('p2_name') %}
-      <div class="parie-badge tip tip-down" data-tip="Pari en attente de résolution">✓ Parié {{ "%.2f"|format(placed_bet.stake) }}€ @{{ "%.2f"|format(placed_bet.odd) }}</div>
-      {% elif not placed_bet and m.get('odd_p2') %}
-      <button class="btn-bet" onclick="event.stopPropagation();openModal(this.closest('.match-card'))">← Parier</button>
+      {% endif %}
+      {% if m.get('odd_p2') %}
+      <div class="prob-odd">@{{ "%.2f"|format(m.odd_p2) }}</div>
       {% endif %}
     </div>
-  </div>
-</div>
+
+  </div>{# /card-body #}
+
+  {# Footer strip #}
+  <div class="card-footer-strip">
+
+    {# P1 sparkline + stats #}
+    <div class="footer-side">
+      {% if m.get('p1_form') and m.p1_form | length >= 2 %}
+      {% set sf = m.p1_form %}
+      {% set ns = namespace(d='') %}
+      {% for dot in sf %}
+        {% set _x = loop.index0 * 15 %}
+        {% set _y = 3 if dot == 'W' else (15 if dot == 'L' else 9) %}
+        {% if loop.first %}{% set ns.d = 'M' ~ _x ~ ',' ~ _y %}
+        {% else %}{% set ns.d = ns.d ~ ' L' ~ _x ~ ',' ~ _y %}{% endif %}
+      {% endfor %}
+      <svg width="60" height="18" viewBox="0 0 60 18" style="flex-shrink:0;display:block">
+        <path d="{{ ns.d }}" fill="none"
+              stroke="{{ 'var(--lime)' if (is_p1_pick and badge != 'neutral') else 'var(--fg-4)' }}"
+              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      {% endif %}
+      <span>10M FORM{% if m.get('p1_surf_pct') is not none %} · {{ m.p1_surf_pct }}% {{ m.get('surface','surf') | lower }}{% endif %}</span>
+    </div>
+
+    {# Action button #}
+    <div class="footer-btn">
+      {% if placed_bet %}
+      <div class="parie-badge">✓ Parié {{ "%.2f"|format(placed_bet.stake) }}€ @{{ "%.2f"|format(placed_bet.odd) }}</div>
+      {% elif badge != 'neutral' %}
+      <button class="btn-pick" onclick="event.stopPropagation();openModal(this.closest('.match-card'))">⚡ Parier sur le pick</button>
+      {% else %}
+      <button class="btn-detail" onclick="event.stopPropagation();openModal(this.closest('.match-card'))">→ Détails</button>
+      {% endif %}
+    </div>
+
+    {# P2 stats + sparkline #}
+    <div class="footer-side right">
+      <span>{% if m.get('p2_surf_pct') is not none %}{{ m.p2_surf_pct }}% {{ m.get('surface','surf') | lower }} · {% endif %}10M FORM</span>
+      {% if m.get('p2_form') and m.p2_form | length >= 2 %}
+      {% set sf = m.p2_form %}
+      {% set ns = namespace(d='') %}
+      {% for dot in sf %}
+        {% set _x = loop.index0 * 15 %}
+        {% set _y = 3 if dot == 'W' else (15 if dot == 'L' else 9) %}
+        {% if loop.first %}{% set ns.d = 'M' ~ _x ~ ',' ~ _y %}
+        {% else %}{% set ns.d = ns.d ~ ' L' ~ _x ~ ',' ~ _y %}{% endif %}
+      {% endfor %}
+      <svg width="60" height="18" viewBox="0 0 60 18" style="flex-shrink:0;display:block">
+        <path d="{{ ns.d }}" fill="none"
+              stroke="{{ 'var(--lime)' if (not is_p1_pick and badge != 'neutral') else 'var(--fg-4)' }}"
+              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      {% endif %}
+    </div>
+
+  </div>{# /card-footer-strip #}
+
+</div>{# /match-card #}
 {% endif %}
 {% endfor %}

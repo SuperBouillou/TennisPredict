@@ -342,7 +342,129 @@ body {
   flex-shrink: 0;
 }
 
-/* Card 3-column grid */
+/* Card body — new design (1fr 200px 1fr) */
+.card-body {
+  display: grid;
+  grid-template-columns: 1fr 200px 1fr;
+  gap: 24px;
+  padding: 20px 24px;
+  align-items: center;
+}
+
+/* Center column */
+.card-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+/* Split probability bar */
+.prob-split {
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-3);
+  overflow: hidden;
+  display: flex;
+}
+.prob-split-half.lime { background: var(--lime); }
+.prob-split-half.dim  { background: var(--fg-4); opacity: 0.35; }
+
+/* H2H / OPEN chips */
+.center-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+.center-chip .lbl { color: var(--fg-4); }
+.center-chip .val { color: var(--fg); font-weight: 600; }
+
+/* Edge + Kelly pill */
+.edge-pill {
+  padding: 6px 12px;
+  border: 1px solid var(--lime-line);
+  background: var(--lime-bg);
+  color: var(--lime);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+/* Footer strip */
+.card-footer-strip {
+  display: grid;
+  grid-template-columns: 1fr 200px 1fr;
+  gap: 24px;
+  padding: 10px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+  align-items: center;
+}
+.footer-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-4);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow: hidden;
+  min-width: 0;
+}
+.footer-side span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.footer-side.right { justify-content: flex-end; flex-direction: row-reverse; }
+.footer-btn { display: flex; justify-content: center; }
+
+/* Pick / detail buttons */
+.btn-pick {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: var(--r-sm);
+  border: none;
+  background: var(--lime);
+  color: #0a0d10;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: opacity 0.12s;
+}
+.btn-pick:hover { opacity: 0.85; }
+
+.btn-detail {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--fg-2);
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: border-color 0.12s, color 0.12s;
+}
+.btn-detail:hover { border-color: var(--line-3); color: var(--fg); }
+
+/* Card 3-column grid (still used by result card) */
 .card-grid {
   display: grid;
   grid-template-columns: 1fr 72px 1fr;
