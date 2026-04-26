@@ -303,6 +303,93 @@
   </div>
 </div>
 
+<!-- Comment ça marche -->
+<div id="how" class="landing-section-bg">
+  <div class="landing-section">
+    <div class="tp-section-mark" style="margin-bottom:36px">// Comment ça marche</div>
+
+    <div class="step-row reveal">
+      <div class="step-num">01</div>
+      <div>
+        <div class="step-title">Scraping des matchs du jour <span class="tp-badge lime-outline">ESPN API</span></div>
+        <div class="step-desc">Récupération automatique du calendrier ATP/WTA du jour — tournois, surfaces, rounds, têtes de série.</div>
+      </div>
+    </div>
+
+    <div class="step-row reveal reveal-delay-1">
+      <div class="step-num">02</div>
+      <div>
+        <div class="step-title">Profils joueurs mis à jour <span class="tp-badge lime-outline">LIVE</span></div>
+        <div class="step-desc">ELO dynamique, classement ATP/WTA, forme récente (5/10/20 matchs), fatigue, statistiques de service recalculées automatiquement.</div>
+      </div>
+    </div>
+
+    <div class="step-row reveal reveal-delay-2">
+      <div class="step-num">03</div>
+      <div>
+        <div class="step-title">Prédiction XGBoost <span class="tp-badge lime">ML</span></div>
+        <div class="step-desc">Le modèle génère une probabilité calibrée de victoire. Platt scaler appliqué pour corriger le biais systématique.</div>
+      </div>
+    </div>
+
+    <div class="step-row reveal reveal-delay-3">
+      <div class="step-num">04</div>
+      <div>
+        <div class="step-title">Comparaison cotes Pinnacle no-vig <span class="tp-badge lime-outline">ODDS API</span></div>
+        <div class="step-desc">Les cotes brutes sont converties en probabilités implicites sans marge bookmaker. L'edge est la différence entre les deux.</div>
+      </div>
+    </div>
+
+    <div class="step-row reveal" style="border-bottom:none">
+      <div class="step-num">05</div>
+      <div>
+        <div class="step-title">Signaux de décision</div>
+        <div class="step-desc" style="margin-bottom:12px">Chaque match reçoit un signal selon l'amplitude de l'edge détecté et la qualité des données disponibles.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span class="tp-badge lime">VALUE BET</span>
+          <span class="tp-badge lime-outline">EDGE</span>
+          <span class="tp-badge ghost">NEUTRE</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div id="faq" class="landing-section-bg" style="background:var(--bg-1);border-top:1px solid var(--line)">
+  <div class="landing-section">
+    <div class="tp-section-mark" style="margin-bottom:36px">// FAQ</div>
+    <div class="faq-grid">
+
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">Pourquoi calibrer sur Pinnacle ?</div>
+        <div class="tp-faq-a">Pinnacle a la marge bookmaker la plus basse du marché (≈2%) et la limite la plus haute. Leurs cotes sont la référence "vraie probabilité" de tout sharp bettor.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">C'est quoi un edge de 13% ?</div>
+        <div class="tp-faq-a">Si le modèle dit 67.4% et la cote implicite Pinnacle dit 54.2%, le modèle pense que vous avez 13.2 points de pourcentage de plus qu'estimé. Edge ≥ 5% = signal pris.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">Pourquoi Kelly fractionné ?</div>
+        <div class="tp-faq-a">Le critère Kelly maximise la croissance long terme du bankroll. On utilise ¼ Kelly capé à 5% — quart de l'optimal théorique pour absorber l'incertitude du modèle.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">78.1% de précision, c'est trop beau ?</div>
+        <div class="tp-faq-a">C'est la précision globale incluant les favoris évidents. Ce qui compte vraiment c'est le ROI sur les value bets : +7.4% sur 2023-24 out-of-sample.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">Vais-je gagner à coup sûr ?</div>
+        <div class="tp-faq-a">Non. Aucun système ne gagne à coup sûr. Le passé ne garantit pas le futur. Le modèle a aussi des séries de défaites — la discipline de mise est essentielle.</div>
+      </div>
+      <div class="tp-faq-item">
+        <div class="tp-faq-q">Quelles données utilise le modèle ?</div>
+        <div class="tp-faq-a">15 features principales : ELO global et par surface, forme 5/10/20 matchs, fatigue (jours depuis dernier match), H2H, importance du tournoi, statistiques de service.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- Approche -->
 <div id="approche" class="landing-section-bg">
   <div class="landing-section">
@@ -394,93 +481,6 @@
       <div style="padding:12px 20px;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10px;color:var(--fg-5)">
         // Backtesté sur données out-of-sample 2023–2024 (jamais vues à l'entraînement). Le passé ne garantit pas le futur.
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- Comment ça marche -->
-<div id="how" class="landing-section-bg">
-  <div class="landing-section">
-    <div class="tp-section-mark" style="margin-bottom:36px">// Comment ça marche</div>
-
-    <div class="step-row reveal">
-      <div class="step-num">01</div>
-      <div>
-        <div class="step-title">Scraping des matchs du jour <span class="tp-badge lime-outline">ESPN API</span></div>
-        <div class="step-desc">Récupération automatique du calendrier ATP/WTA du jour — tournois, surfaces, rounds, têtes de série.</div>
-      </div>
-    </div>
-
-    <div class="step-row reveal reveal-delay-1">
-      <div class="step-num">02</div>
-      <div>
-        <div class="step-title">Profils joueurs mis à jour <span class="tp-badge lime-outline">LIVE</span></div>
-        <div class="step-desc">ELO dynamique, classement ATP/WTA, forme récente (5/10/20 matchs), fatigue, statistiques de service recalculées automatiquement.</div>
-      </div>
-    </div>
-
-    <div class="step-row reveal reveal-delay-2">
-      <div class="step-num">03</div>
-      <div>
-        <div class="step-title">Prédiction XGBoost <span class="tp-badge lime">ML</span></div>
-        <div class="step-desc">Le modèle génère une probabilité calibrée de victoire. Platt scaler appliqué pour corriger le biais systématique.</div>
-      </div>
-    </div>
-
-    <div class="step-row reveal reveal-delay-3">
-      <div class="step-num">04</div>
-      <div>
-        <div class="step-title">Comparaison cotes Pinnacle no-vig <span class="tp-badge lime-outline">ODDS API</span></div>
-        <div class="step-desc">Les cotes brutes sont converties en probabilités implicites sans marge bookmaker. L'edge est la différence entre les deux.</div>
-      </div>
-    </div>
-
-    <div class="step-row reveal" style="border-bottom:none">
-      <div class="step-num">05</div>
-      <div>
-        <div class="step-title">Signaux de décision</div>
-        <div class="step-desc" style="margin-bottom:12px">Chaque match reçoit un signal selon l'amplitude de l'edge détecté et la qualité des données disponibles.</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <span class="tp-badge lime">VALUE BET</span>
-          <span class="tp-badge lime-outline">EDGE</span>
-          <span class="tp-badge ghost">NEUTRE</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- FAQ -->
-<div id="faq" class="landing-section-bg" style="background:var(--bg-1);border-top:1px solid var(--line)">
-  <div class="landing-section">
-    <div class="tp-section-mark" style="margin-bottom:36px">// FAQ</div>
-    <div class="faq-grid">
-
-      <div class="tp-faq-item">
-        <div class="tp-faq-q">Pourquoi calibrer sur Pinnacle ?</div>
-        <div class="tp-faq-a">Pinnacle a la marge bookmaker la plus basse du marché (≈2%) et la limite la plus haute. Leurs cotes sont la référence "vraie probabilité" de tout sharp bettor.</div>
-      </div>
-      <div class="tp-faq-item">
-        <div class="tp-faq-q">C'est quoi un edge de 13% ?</div>
-        <div class="tp-faq-a">Si le modèle dit 67.4% et la cote implicite Pinnacle dit 54.2%, le modèle pense que vous avez 13.2 points de pourcentage de plus qu'estimé. Edge ≥ 5% = signal pris.</div>
-      </div>
-      <div class="tp-faq-item">
-        <div class="tp-faq-q">Pourquoi Kelly fractionné ?</div>
-        <div class="tp-faq-a">Le critère Kelly maximise la croissance long terme du bankroll. On utilise ¼ Kelly capé à 5% — quart de l'optimal théorique pour absorber l'incertitude du modèle.</div>
-      </div>
-      <div class="tp-faq-item">
-        <div class="tp-faq-q">78.1% de précision, c'est trop beau ?</div>
-        <div class="tp-faq-a">C'est la précision globale incluant les favoris évidents. Ce qui compte vraiment c'est le ROI sur les value bets : +7.4% sur 2023-24 out-of-sample.</div>
-      </div>
-      <div class="tp-faq-item">
-        <div class="tp-faq-q">Vais-je gagner à coup sûr ?</div>
-        <div class="tp-faq-a">Non. Aucun système ne gagne à coup sûr. Le passé ne garantit pas le futur. Le modèle a aussi des séries de défaites — la discipline de mise est essentielle.</div>
-      </div>
-      <div class="tp-faq-item">
-        <div class="tp-faq-q">Quelles données utilise le modèle ?</div>
-        <div class="tp-faq-a">15 features principales : ELO global et par surface, forme 5/10/20 matchs, fatigue (jours depuis dernier match), H2H, importance du tournoi, statistiques de service.</div>
-      </div>
-
     </div>
   </div>
 </div>

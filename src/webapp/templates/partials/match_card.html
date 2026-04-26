@@ -81,8 +81,8 @@
 {% set badge = m.get('badge','neutral') %}
 {% set dq = m.get('data_quality','low') %}
 {% set is_p1_pick = (m.get('prob_p1') or 0) >= (m.get('prob_p2') or 0) %}
-{% set pick_edge = ep1 if is_p1_pick else ep2 %}
-{% set pick_kelly = m.get('kelly_eur_p1') if is_p1_pick else m.get('kelly_eur_p2') %}
+{% set pick_edge = ep1 if ep1 >= ep2 else ep2 %}
+{% set pick_kelly = m.get('kelly_eur_p1') if ep1 >= ep2 else m.get('kelly_eur_p2') %}
 {% set _bet_key = m.get('p1_name','') ~ '|' ~ m.get('p2_name','') %}
 {% set placed_bet = (pending_lookup.get(_bet_key)) if pending_lookup is defined else none %}
 
@@ -160,16 +160,6 @@
       <div class="center-chip">
         <span class="lbl">H2H</span>
         <span class="val">{{ m.h2h_p1_wins }}–{{ m.h2h_p2_wins }}</span>
-      </div>
-      {% endif %}
-
-      {# Odds chips #}
-      {% if m.get('odd_p1') and m.get('odd_p2') %}
-      <div class="center-chip">
-        <span class="lbl">OPEN</span>
-        <span class="val">{{ "%.2f"|format(m.odd_p1) }}</span>
-        <span style="color:var(--fg-5)">↑</span>
-        <span class="val">{{ "%.2f"|format(m.odd_p2) }}</span>
       </div>
       {% endif %}
 

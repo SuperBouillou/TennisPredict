@@ -26,13 +26,28 @@
   .landing-nav { padding: 14px 20px; }
   .landing-nav .nav-links { display: none; }
 
-  /* Match cards */
+  /* Match cards — new card-body grid */
+  .card-body {
+    grid-template-columns: 1fr 120px 1fr;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .card-footer-strip {
+    grid-template-columns: 1fr;
+    padding: 10px 16px;
+  }
+  /* Hide sparklines + footer stats on mobile — keep only center button */
+  .footer-side { display: none !important; }
+  /* Narrower center column, smaller prob numbers */
+  .prob-number { font-size: 20px; }
+  .player-name { font-size: 13px; }
+  /* Old compat classes */
   .match-card-body { grid-template-columns: 1fr; gap: 12px; }
   .match-card-footer { grid-template-columns: 1fr; }
 
   /* Topbar */
-  .tp-topbar-inner { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
-  .tp-topbar-inner h1 { font-size: 14px; }
+  .tp-topbar { padding: 10px 16px; }
+  .tp-topbar h1 { font-size: 14px; }
 
   /* Filter / bankroll bars */
   .tp-filter-bar { padding: 10px 16px; }
@@ -64,4 +79,11 @@
   .match-card-footer { padding: 8px 16px; }
   .tp-stats-grid { grid-template-columns: repeat(2, 1fr); }
   .landing-metrics { grid-template-columns: repeat(2, 1fr); }
+  /* Very small screens: stack card body fully */
+  .card-body {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .card-center { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .player-side.right { text-align: right; align-items: flex-end; }
 }
