@@ -330,12 +330,13 @@ async def quick_bet(
         'odd': odd, 'stake': round(stake, 2), 'kelly_frac': kelly_frac,
     })
     new_bankroll = get_bankroll(db)
-    # OOB swap updates bankroll bar without page reload
+    # OOB swap updates sidebar bankroll without page reload
+    # Must match the canonical _bankroll_sidebar_html() format from today.py
     oob = (
-        f'<span id="bankroll-global" hx-swap-oob="true" '
-        f'title="Cliquer pour modifier" class="bankroll-amount" '
-        f'hx-get="/bankroll/edit" hx-target="#bankroll-global" hx-swap="outerHTML">'
-        f'💰 <strong>{new_bankroll:.2f}€</strong></span>'
+        f'<span id="bankroll-global" hx-swap-oob="true" class="bw-amount" '
+        f'title="Cliquer pour modifier" '
+        f'hx-get="/bankroll/edit?sidebar=1" hx-target="#bankroll-global" hx-swap="outerHTML">'
+        f'{new_bankroll:.2f}€</span>'
     )
     return HTMLResponse(
         f'<span style="color:var(--green);font-size:12px">✓ Pari enregistré · Bankroll {new_bankroll:.2f}€</span>'
