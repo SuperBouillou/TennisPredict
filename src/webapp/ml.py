@@ -400,7 +400,7 @@ def predict(
         edge_p1 = round(cal_prob - novid_p1, 4)
         ev_p1   = round(cal_prob * (odd_p1 - 1) - (1 - cal_prob), 4)
         discount = _odds_discount(odd_p1)
-        if edge_p1 > 0 and discount > 0 and novid_p1 >= MIN_BK_DIR_PROB:
+        if edge_p1 > 0 and discount > 0:
             raw_kelly = (cal_prob * odd_p1 - 1) / (odd_p1 - 1)
             if raw_kelly > 0:
                 kelly_frac_p1 = round(min(raw_kelly * kelly_fraction * discount, 0.05), 4)
@@ -411,7 +411,7 @@ def predict(
         edge_p2 = round(prob_p2 - novid_p2, 4)
         ev_p2   = round(prob_p2 * (odd_p2 - 1) - (1 - prob_p2), 4)
         discount2 = _odds_discount(odd_p2)
-        if edge_p2 > 0 and discount2 > 0 and novid_p2 >= MIN_BK_DIR_PROB:
+        if edge_p2 > 0 and discount2 > 0:
             raw_kelly2 = (prob_p2 * odd_p2 - 1) / (odd_p2 - 1)
             if raw_kelly2 > 0:
                 kelly_frac_p2 = round(min(raw_kelly2 * kelly_fraction * discount2, 0.05), 4)
