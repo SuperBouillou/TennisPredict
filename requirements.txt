@@ -10,6 +10,7 @@ jupyterlab==4.1.0
 requests==2.31.0
 tqdm==4.66.0
 openpyxl==3.1.5
+xlrd==2.0.2
 optuna==3.6.2
 python-dotenv>=1.0.0
 # Webapp (FastAPI + HTMX)

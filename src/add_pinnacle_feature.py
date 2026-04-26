@@ -25,12 +25,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from config import get_paths
-from backtest_real import build_compound_lastnames, join_odds_to_predictions
+from backtest_real import _read_excel_auto, build_compound_lastnames, join_odds_to_predictions
 
 
 def _load_odds_robust(years: list[int], odds_dir: Path, odds_filename) -> pd.DataFrame:
     """
-    Load odds files year by year, handling both .xlsx and .xls formats.
+    Load odds files year by year, auto-detecting OLE (.xls) vs OOXML (.xlsx) format.
     Skips missing or unreadable files instead of crashing.
     """
     dfs = []
@@ -39,19 +39,13 @@ def _load_odds_robust(years: list[int], odds_dir: Path, odds_filename) -> pd.Dat
         path  = odds_dir / fname
         if not path.exists():
             continue
-        loaded = False
-        for engine in ('openpyxl', 'xlrd'):
-            try:
-                df = pd.read_excel(path, engine=engine)
-                df['year'] = year
-                dfs.append(df)
-                print(f"  {year}: {len(df):,} rows [{engine}]")
-                loaded = True
-                break
-            except Exception:
-                continue
-        if not loaded:
-            print(f"  {year}: SKIP (unreadable)")
+        try:
+            df = _read_excel_auto(path)
+            df['year'] = year
+            dfs.append(df)
+            print(f"  {year}: {len(df):,} rows")
+        except Exception as e:
+            print(f"  {year}: SKIP ({e})")
     if not dfs:
         raise ValueError(f"No odds files loaded from {odds_dir}")
     combined = pd.concat(dfs, ignore_index=True)

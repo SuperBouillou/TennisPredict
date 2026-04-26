@@ -22,6 +22,22 @@ from config import get_tour_config, get_paths, make_dirs
 # CHARGEMENT ET NETTOYAGE DES COTES
 # ─────────────────────────────────────────────────────────────────────────────
 
+_OLE_MAGIC = b'\xd0\xcf\x11\xe0'  # Excel 97-2003 compound document
+
+
+def _read_excel_auto(path: Path) -> pd.DataFrame:
+    """Read xlsx/xls using the correct engine.
+
+    Files from tennis-data.co.uk prior to 2013 are saved in the old
+    OLE/BIFF (.xls) format but with a .xlsx extension.  openpyxl cannot
+    read them; xlrd handles both OLE and, via fallback, real OOXML files.
+    """
+    with open(path, 'rb') as fh:
+        magic = fh.read(4)
+    engine = 'xlrd' if magic == _OLE_MAGIC else 'openpyxl'
+    return pd.read_excel(path, engine=engine)
+
+
 def load_real_odds(years: list, odds_dir: Path, odds_filename) -> pd.DataFrame:
     """Charge et consolide les fichiers de cotes tennis-data.co.uk"""
     dfs = []
@@ -33,7 +49,7 @@ def load_real_odds(years: list, odds_dir: Path, odds_filename) -> pd.DataFrame:
             print(f"  {year} manquant ({filename})")
             continue
 
-        df = pd.read_excel(path, engine='openpyxl')
+        df = _read_excel_auto(path)
         df['year'] = year
         dfs.append(df)
 

@@ -51,7 +51,9 @@ def inspect_odds_file(year: int, cfg: dict, odds_dir: Path) -> None:
 
     ext = path.suffix.lstrip('.')
     if ext in ['xlsx', 'xls']:
-        df = pd.read_excel(path, nrows=3)
+        from backtest_real import _read_excel_auto
+        df = _read_excel_auto(path)
+        df = df.head(3)
     else:
         df = pd.read_csv(path, nrows=3, encoding='latin-1')
 
