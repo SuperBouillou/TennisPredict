@@ -12,10 +12,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/tokens.css?v=20260426b">
-  <link rel="stylesheet" href="/static/app.css?v=20260426b">
-  <link rel="stylesheet" href="/static/css/components.css?v=20260426b">
-  <link rel="stylesheet" href="/static/css/mobile.css?v=20260426b">
+  <link rel="stylesheet" href="/static/css/tokens.css?v=20260426c">
+  <link rel="stylesheet" href="/static/app.css?v=20260426c">
+  <link rel="stylesheet" href="/static/css/components.css?v=20260426c">
+  <link rel="stylesheet" href="/static/css/mobile.css?v=20260426c">
   <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   {% block head %}{% endblock %}
@@ -69,17 +69,15 @@
 
     {# Topbar #}
     <div class="tp-topbar">
-      <div class="tp-topbar-inner">
-        <div>
-          <h1>{% block page_title %}TennisML{% endblock %}</h1>
-          <div class="sub">{% block page_meta %}{% endblock %}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          {% block topbar_right %}{% endblock %}
-          <form method="post" action="/logout" style="margin:0">
-            <button type="submit" class="tp-btn ghost sm">Déconnexion</button>
-          </form>
-        </div>
+      <div>
+        <h1>{% block page_title %}TennisML{% endblock %}</h1>
+        <div class="sub">{% block page_meta %}{% endblock %}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        {% block topbar_right %}{% endblock %}
+        <form method="post" action="/logout" style="margin:0">
+          <button type="submit" class="tp-btn ghost sm">Déconnexion</button>
+        </form>
       </div>
     </div>
 

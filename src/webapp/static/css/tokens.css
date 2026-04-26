@@ -254,21 +254,32 @@
 
 /* Topbar app */
 .tp-topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 28px;
   border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
 }
 .tp-topbar h1 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   margin: 0;
   letter-spacing: -0.01em;
+  color: var(--fg);
 }
 .tp-topbar .sub {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-3);
   margin-top: 2px;
+  letter-spacing: 0.03em;
 }
 
 /* Segmented control */
