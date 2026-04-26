@@ -118,6 +118,19 @@ def _compute_stats(bets: list[dict]) -> dict:
         g['roi'] = round(g['pnl'] / staked * 100, 1) if staked > 0 else 0
         g['pnl'] = round(g['pnl'], 2)
 
+    # Drawdown and best winning streak (consecutive P&L)
+    by_chrono = sorted(resolved, key=lambda b: b.get('resolved_at') or b.get('created_at') or '')
+    max_dd = 0.0; dd_count = 0; best_run = 0.0; run_count = 0
+    cur_loss = 0.0; cur_loss_n = 0; cur_win = 0.0; cur_win_n = 0
+    for b in by_chrono:
+        p = b.get('pnl', 0) or 0
+        if b['status'] == 'lost':
+            cur_loss += p; cur_loss_n += 1; cur_win = 0; cur_win_n = 0
+            if abs(cur_loss) > abs(max_dd): max_dd = cur_loss; dd_count = cur_loss_n
+        else:
+            cur_win += p; cur_win_n += 1; cur_loss = 0; cur_loss_n = 0
+            if cur_win > best_run: best_run = cur_win; run_count = cur_win_n
+
     return {
         "win_rate": round(num_won / len(resolved) * 100, 1),
         "roi": round(pnl / total_staked * 100, 1) if total_staked > 0 else 0,
@@ -128,6 +141,10 @@ def _compute_stats(bets: list[dict]) -> dict:
         "num_bets": len(resolved),
         "num_won": num_won,
         "badge_stats": badge_stats,
+        "drawdown": round(max_dd, 2),
+        "drawdown_count": dd_count,
+        "best_streak_pnl": round(best_run, 2),
+        "best_streak_count": run_count,
     }
 
 

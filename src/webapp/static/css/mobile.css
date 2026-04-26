@@ -4,6 +4,15 @@
 .mobile-body  { display: none; }
 .desktop-body { display: contents; }
 
+/* ── History page desktop/mobile toggling ── */
+.hist-stats-desktop    { display: block; }
+.hist-stats-mobile     { display: none; }
+.hist-dd-desktop       { display: flex; }
+.hist-badge-chart-desktop { display: flex; }
+.hist-resolved-table   { display: block; }
+.hist-resolved-rows    { display: none; }
+.hist-bankroll-mobile  { display: none; }
+
 /* Mobile card pieces */
 .mobile-names {
   font-size: 16px;
@@ -99,8 +108,17 @@
   /* Table horizontal scroll */
   .tp-table-wrap { overflow-x: auto; }
 
-  /* History page */
+  /* History page — desktop sections hidden on mobile */
   .hist-actions-desktop { display: none; }
+  .hist-stats-desktop { display: none; }
+  .hist-dd-desktop { display: none; }
+  .hist-badge-chart-desktop { display: none; }
+  .hist-resolved-table { display: none; }
+
+  /* History page — mobile sections shown on mobile */
+  .hist-stats-mobile { display: grid !important; }
+  .hist-resolved-rows { display: block !important; }
+  .hist-bankroll-mobile { display: inline-block !important; }
 }
 
 @media (max-width: 480px) {

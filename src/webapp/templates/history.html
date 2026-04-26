@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Historique — TennisPredict{% endblock %}
-{% block page_title %}Historique{% endblock %}
-{% block page_meta %}{{ resolved | length }} résolus · {{ pending | length }} en attente{% endblock %}
+{% block page_title %}Historique des paris{% endblock %}
+{% block page_meta %}{{ "ATP + WTA" if not tour else tour | upper }} · {{ resolved | length }} paris résolus · {{ pending | length }} en attente{% endblock %}
 
 {% block topbar_right %}
 {% set _f = '' %}
@@ -9,26 +9,25 @@
 {% if period_filter %}{% set _f = _f ~ 'period=' ~ period_filter ~ '&' %}{% endif %}
 {% if status_filter %}{% set _f = _f ~ 'status=' ~ status_filter ~ '&' %}{% endif %}
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  <span style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--lime)">{{ "%.0f"|format(bankroll) }}€</span>
+  {# Bankroll shown only on mobile (topbar) #}
+  <span class="hist-bankroll-mobile" style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--lime)">{{ "%.0f"|format(bankroll) }}€</span>
   <div class="tp-toggle-group">
     <a href="/history?{{ _f }}" class="tp-toggle-btn {% if not tour %}active{% endif %}">Tous</a>
     <a href="/history?{{ _f }}tour=atp" class="tp-toggle-btn {% if tour=='atp' %}active{% endif %}">ATP</a>
     <a href="/history?{{ _f }}tour=wta" class="tp-toggle-btn {% if tour=='wta' %}active{% endif %}">WTA</a>
   </div>
-  <div class="hist-actions-desktop">
-    <a href="/history/export{% if tour %}?tour={{ tour }}{% endif %}" style="text-decoration:none">
-      <button class="tp-btn sm ghost">↓ CSV</button>
-    </a>
-    {% set _total_bets = (pending | length) + (resolved | length) %}
-    <form hx-post="/bets/clear" hx-target="#history-content" hx-swap="innerHTML"
-          hx-confirm="Supprimer {% if tour %}tout l'historique {{ tour | upper }}{% else %}tout l'historique ATP + WTA{% endif %} ({{ _total_bets }} paris) ?"
-          style="display:inline">
-      <input type="hidden" name="tour" value="{{ tour or '' }}">
-      <button type="submit" class="tp-btn sm" style="background:var(--loss-bg);color:var(--loss);border-color:rgba(255,91,91,.3)">
-        Vider ({{ _total_bets }})
-      </button>
-    </form>
-  </div>
+  {% set _total_bets = (pending | length) + (resolved | length) %}
+  <a href="/history/export{% if tour %}?tour={{ tour }}{% endif %}" style="text-decoration:none">
+    <button class="tp-btn sm ghost">→ CSV</button>
+  </a>
+  <form hx-post="/bets/clear" hx-target="#history-content" hx-swap="innerHTML"
+        hx-confirm="Supprimer {% if tour %}tout l'historique {{ tour | upper }}{% else %}tout l'historique ATP + WTA{% endif %} ({{ _total_bets }} paris) ?"
+        style="display:inline">
+    <input type="hidden" name="tour" value="{{ tour or '' }}">
+    <button type="submit" class="tp-btn sm" style="background:var(--loss-bg);color:var(--loss);border-color:rgba(255,91,91,.3)">
+      VIDER ({{ _total_bets }})
+    </button>
+  </form>
 </div>
 {% endblock %}
 
@@ -41,59 +40,163 @@
   <span class="tp-badge lime">AUTO</span>
   <span style="font-size:12px;color:var(--fg-2)">
     <strong style="color:var(--lime)">{{ auto_resolved }} pari{{ 's' if auto_resolved > 1 else '' }}</strong>
-    résolu{{ 's' if auto_resolved > 1 else '' }} automatiquement via ESPN.
+    résolu{{ 's' if auto_resolved > 1 else '' }} automatiquement via ESPN (dernières 72h).
   </span>
 </div>
 {% endif %}
 
-{# Stats 2×2 grid #}
+{# ── DESKTOP stats row (7 tiles) ── #}
 {% if stats.num_bets > 0 %}
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-  <div class="tp-kpi" style="border-color:{% if pnl_total >= 0 %}var(--lime-line){% else %}rgba(255,91,91,.3){% endif %};background:{% if pnl_total >= 0 %}var(--lime-bg){% else %}var(--loss-bg){% endif %}">
-    <div class="v {% if pnl_total >= 0 %}lime{% else %}loss{% endif %}" style="font-size:26px">
-      {% if pnl_total >= 0 %}+{% endif %}{{ "%.2f"|format(pnl_total) }}€
+<div class="hist-stats-desktop">
+  <div class="tp-stats-grid" style="grid-template-columns:repeat(7,1fr);gap:8px">
+    <div class="tp-stats-cell" style="cursor:pointer" id="bankroll-global"
+         hx-get="/bankroll/edit?card=1" hx-target="#bankroll-global" hx-swap="outerHTML">
+      <div class="v">{{ "%.2f"|format(bankroll) }}€</div>
+      <div class="l">Bankroll ✏</div>
     </div>
-    <div class="l">P&L Total</div>
-  </div>
-  <div class="tp-kpi">
-    <div class="v {% if stats.roi >= 0 %}lime{% else %}loss{% endif %}" style="font-size:26px">
-      {% if stats.roi >= 0 %}+{% endif %}{{ stats.roi }}%
+    <div class="tp-stats-cell" style="background:{% if pnl_total >= 0 %}var(--lime-bg){% else %}var(--loss-bg){% endif %};border-color:{% if pnl_total >= 0 %}var(--lime-line){% else %}rgba(255,91,91,.3){% endif %}">
+      <div class="v {% if pnl_total >= 0 %}lime{% else %}loss{% endif %}">
+        {% if pnl_total >= 0 %}+{% endif %}{{ "%.2f"|format(pnl_total) }}€
+      </div>
+      <div class="l">P&L Total</div>
     </div>
-    <div class="l">ROI</div>
-  </div>
-  <div class="tp-kpi">
-    <div class="v {% if stats.win_rate >= 55 %}lime{% elif stats.win_rate < 45 %}loss{% endif %}">
-      {{ stats.win_rate }}%
+    <div class="tp-stats-cell">
+      <div class="v">{{ stats.num_bets }}</div>
+      <div class="l">Paris résolus</div>
     </div>
-    <div class="l">Win Rate</div>
+    <div class="tp-stats-cell">
+      <div class="v {% if stats.win_rate >= 55 %}lime{% elif stats.win_rate < 45 %}loss{% endif %}">
+        {{ stats.win_rate }}%
+      </div>
+      <div class="l">Win Rate</div>
+    </div>
+    <div class="tp-stats-cell">
+      <div class="v {% if stats.roi >= 0 %}lime{% else %}loss{% endif %}">
+        {% if stats.roi >= 0 %}+{% endif %}{{ stats.roi }}%
+      </div>
+      <div class="l">ROI</div>
+    </div>
+    <div class="tp-stats-cell">
+      <div class="v">{{ stats.avg_odds }}</div>
+      <div class="l">Cote moy.</div>
+    </div>
+    <div class="tp-stats-cell">
+      <div class="v {% if stats.streak_type == 'won' %}lime{% else %}loss{% endif %}">
+        {{ stats.streak }}
+        <span style="font-size:10px">{% if stats.streak_type == 'won' %}🟢{% else %}🔴{% endif %}</span>
+      </div>
+      <div class="l">Série</div>
+    </div>
   </div>
-  <div class="tp-kpi">
-    <div class="v">{{ stats.num_bets }}</div>
-    <div class="l">Paris résolus</div>
+</div>
+
+{# ── MOBILE stats 2×2 ── #}
+<div class="hist-stats-mobile">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div class="tp-kpi" style="border-color:{% if pnl_total >= 0 %}var(--lime-line){% else %}rgba(255,91,91,.3){% endif %};background:{% if pnl_total >= 0 %}var(--lime-bg){% else %}var(--loss-bg){% endif %}">
+      <div class="v {% if pnl_total >= 0 %}lime{% else %}loss{% endif %}" style="font-size:24px">
+        {% if pnl_total >= 0 %}+{% endif %}{{ "%.2f"|format(pnl_total) }}€
+      </div>
+      <div class="l">P&L Total</div>
+    </div>
+    <div class="tp-kpi">
+      <div class="v {% if stats.roi >= 0 %}lime{% else %}loss{% endif %}" style="font-size:24px">
+        {% if stats.roi >= 0 %}+{% endif %}{{ stats.roi }}%
+      </div>
+      <div class="l">ROI</div>
+    </div>
+    <div class="tp-kpi">
+      <div class="v {% if stats.win_rate >= 55 %}lime{% elif stats.win_rate < 45 %}loss{% endif %}">{{ stats.win_rate }}%</div>
+      <div class="l">Win Rate</div>
+    </div>
+    <div class="tp-kpi">
+      <div class="v">{{ stats.num_bets }}</div>
+      <div class="l">Paris résolus</div>
+    </div>
   </div>
 </div>
 {% endif %}
 
-{# Period + Surface filter chips #}
+{# ── Filter row ── #}
 {% set _t = ('tour=' ~ tour ~ '&') if tour else '' %}
 {% set _s = ('surface=' ~ surface_filter ~ '&') if surface_filter else '' %}
 {% set _p = ('period=' ~ period_filter ~ '&') if period_filter else '' %}
 {% set _st = ('status=' ~ status_filter ~ '&') if status_filter else '' %}
-<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
-  <a href="/history?{{ _t }}{{ _s }}{{ _st }}" style="text-decoration:none"><button class="tp-filter-chip {% if not period_filter %}active{% endif %}">Tout</button></a>
-  <a href="/history?{{ _t }}{{ _s }}{{ _st }}period=mois" style="text-decoration:none"><button class="tp-filter-chip {% if period_filter=='mois' %}active{% endif %}">Ce mois</button></a>
-  <a href="/history?{{ _t }}{{ _s }}{{ _st }}period=7j" style="text-decoration:none"><button class="tp-filter-chip {% if period_filter=='7j' %}active{% endif %}">7 jours</button></a>
-  <span style="width:1px;height:18px;background:var(--line-2);display:inline-block;align-self:center;margin:0 2px"></span>
-  <a href="/history?{{ _t }}{{ _p }}{{ _st }}" style="text-decoration:none"><button class="tp-filter-chip {% if not surface_filter %}active{% endif %}">Toutes</button></a>
-  <a href="/history?{{ _t }}{{ _p }}{{ _st }}surface=Hard" style="text-decoration:none"><button class="tp-filter-chip {% if surface_filter=='Hard' %}active{% endif %}">Hard</button></a>
-  <a href="/history?{{ _t }}{{ _p }}{{ _st }}surface=Clay" style="text-decoration:none"><button class="tp-filter-chip {% if surface_filter=='Clay' %}active{% endif %}">Clay</button></a>
-  <a href="/history?{{ _t }}{{ _p }}{{ _st }}surface=Grass" style="text-decoration:none"><button class="tp-filter-chip {% if surface_filter=='Grass' %}active{% endif %}">Grass</button></a>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;margin-top:10px">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1">
+    <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.12em;text-transform:uppercase;margin-right:2px">Période</span>
+    <a href="/history?{{ _t }}{{ _s }}{{ _st }}" style="text-decoration:none"><button class="tp-filter-chip {% if not period_filter %}active{% endif %}">Tout</button></a>
+    <a href="/history?{{ _t }}{{ _s }}{{ _st }}period=mois" style="text-decoration:none"><button class="tp-filter-chip {% if period_filter=='mois' %}active{% endif %}">Ce mois</button></a>
+    <a href="/history?{{ _t }}{{ _s }}{{ _st }}period=7j" style="text-decoration:none"><button class="tp-filter-chip {% if period_filter=='7j' %}active{% endif %}">7 jours</button></a>
+    <span style="width:1px;height:16px;background:var(--line-2);display:inline-block;align-self:center;margin:0 4px"></span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.12em;text-transform:uppercase;margin-right:2px">Surface</span>
+    <a href="/history?{{ _t }}{{ _p }}{{ _st }}" style="text-decoration:none"><button class="tp-filter-chip {% if not surface_filter %}active{% endif %}">Toutes</button></a>
+    {% for surf in ['Hard','Clay','Grass'] %}
+    <a href="/history?{{ _t }}{{ _p }}{{ _st }}surface={{ surf }}" style="text-decoration:none"><button class="tp-filter-chip {% if surface_filter==surf %}active{% endif %}">{{ surf }}</button></a>
+    {% endfor %}
+    {% if stats.badge_stats %}
+    <span style="width:1px;height:16px;background:var(--line-2);display:inline-block;align-self:center;margin:0 4px"></span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.12em;text-transform:uppercase;margin-right:2px">Signal</span>
+    {% set _badge_link_base = '/history?' ~ _t ~ _p ~ _s %}
+    <a href="{{ _badge_link_base }}" style="text-decoration:none"><button class="tp-filter-chip {% if not status_filter %}active{% endif %}">Tous</button></a>
+    <a href="{{ _badge_link_base }}status=value" style="text-decoration:none"><button class="tp-filter-chip {% if status_filter=='value' %}active{% endif %}" style="border-color:var(--lime-line);color:var(--lime)">VALUE</button></a>
+    <a href="{{ _badge_link_base }}status=edge" style="text-decoration:none"><button class="tp-filter-chip {% if status_filter=='edge' %}active{% endif %}">EDGE</button></a>
+    {% endif %}
+  </div>
+
+  {# Drawdown / Best streak — desktop only #}
+  {% if stats.num_bets > 0 and (stats.drawdown or stats.best_streak_pnl) %}
+  <div class="hist-dd-desktop" style="display:flex;gap:8px;flex-shrink:0">
+    {% if stats.drawdown %}
+    <div class="tp-stats-cell" style="min-width:130px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--loss-bg)">
+      <div class="v loss" style="font-size:16px">{{ "%.2f"|format(stats.drawdown) }}€</div>
+      <div class="l">Drawdown max</div>
+      <div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);margin-top:3px">{{ stats.drawdown_count }} paris consécutifs</div>
+    </div>
+    {% endif %}
+    {% if stats.best_streak_pnl %}
+    <div class="tp-stats-cell" style="min-width:130px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--lime-bg)">
+      <div class="v lime" style="font-size:16px">+{{ "%.2f"|format(stats.best_streak_pnl) }}€</div>
+      <div class="l">Best streak</div>
+      <div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);margin-top:3px">{{ stats.best_streak_count }} paris consécutifs</div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
-{# P&L equity curve #}
+{# ── P&L Chart ── #}
 <div class="tp-chart-wrap" id="pnl-chart-card" style="margin-top:14px">
-  <div class="tp-section-mark" style="margin-bottom:14px">// P&L cumulée</div>
-  <canvas id="pnl-chart" height="90"></canvas>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+    <div>
+      <div class="tp-section-mark">// Courbe P&L cumulée</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg-4);margin-top:4px;letter-spacing:.06em">
+        {{ "ATP + WTA" if not tour else tour | upper }}{% if period_filter %} · {{ period_filter | upper }}{% elif stats.num_bets > 0 %} · {{ stats.num_bets }} JOURS{% endif %}
+      </div>
+    </div>
+    {# Badge stats mini ── desktop only #}
+    {% if stats.badge_stats %}
+    {% set bs = stats.badge_stats %}
+    <div class="hist-badge-chart-desktop" style="display:flex;gap:8px">
+      {% if bs.value.total > 0 %}
+      <div style="padding:10px 14px;background:var(--lime-bg);border:1px solid var(--lime-line);border-radius:var(--r-md);min-width:100px;text-align:center">
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--lime);letter-spacing:.10em;margin-bottom:4px">VALUE BET</div>
+        <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--lime);line-height:1">{{ bs.value.win_rate }}%</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);margin-top:3px">{{ bs.value.won }}/{{ bs.value.total }} · ROI {% if bs.value.roi >= 0 %}+{% endif %}{{ bs.value.roi }}%</div>
+      </div>
+      {% endif %}
+      {% if bs.edge.total > 0 %}
+      <div style="padding:10px 14px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:var(--r-md);min-width:100px;text-align:center">
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-2);letter-spacing:.10em;margin-bottom:4px">EDGE</div>
+        <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--fg);line-height:1">{{ bs.edge.win_rate }}%</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);margin-top:3px">{{ bs.edge.won }}/{{ bs.edge.total }} · ROI {% if bs.edge.roi >= 0 %}+{% endif %}{{ bs.edge.roi }}%</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  <canvas id="pnl-chart" style="height:140px;max-height:140px"></canvas>
 </div>
 <script>
 (function() {
@@ -101,88 +204,72 @@
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var pts = data.points;
-      if (!pts || pts.length < 1) {
-        document.getElementById('pnl-chart-card').style.display = 'none';
-        return;
-      }
-      var labels = ['Départ'].concat(pts.map(function(p) { return p.date; }));
-      var values = [0].concat(pts.map(function(p) { return p.pnl; }));
-      var last = values[values.length - 1];
+      if (!pts || pts.length < 1) { document.getElementById('pnl-chart-card').style.display='none'; return; }
+      var labels = ['Départ'].concat(pts.map(function(p){return p.date;}));
+      var values = [0].concat(pts.map(function(p){return p.pnl;}));
+      var last = values[values.length-1];
       var color = last >= 0 ? '#c8ff3d' : '#ff5b5b';
       new Chart(document.getElementById('pnl-chart'), {
         type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            data: values,
-            borderColor: color,
-            backgroundColor: last >= 0 ? 'rgba(200,255,61,.10)' : 'rgba(255,91,91,.10)',
-            fill: true,
-            tension: 0.35,
-            pointRadius: pts.length > 30 ? 0 : 3,
-            pointBackgroundColor: color,
-            borderWidth: 2,
-          }],
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: {
-              grid: { color: 'rgba(255,255,255,.04)' },
-              ticks: { color: '#515961', font: { size: 10 }, callback: function(v) { return (v >= 0 ? '+' : '') + v + '€'; } },
-            },
-            x: {
-              ticks: { maxTicksLimit: 8, color: '#515961', font: { size: 10 } },
-              grid: { display: false },
-            },
-          },
-        },
+        data: { labels: labels, datasets: [{ data: values, borderColor: color,
+          backgroundColor: last>=0?'rgba(200,255,61,.10)':'rgba(255,91,91,.10)',
+          fill:true, tension:0.35, pointRadius: pts.length>30?0:3, pointBackgroundColor:color, borderWidth:2 }] },
+        options: { responsive:true, maintainAspectRatio:false,
+          plugins:{legend:{display:false}},
+          scales:{
+            y:{ grid:{color:'rgba(255,255,255,.04)'}, ticks:{color:'#515961',font:{size:10},callback:function(v){return(v>=0?'+':'')+v+'€';}} },
+            x:{ ticks:{maxTicksLimit:8,color:'#515961',font:{size:10}}, grid:{display:false} }
+          }
+        }
       });
     });
 })();
 </script>
 
-{# History content #}
+{# ── History content ── #}
 <div id="history-content">
 
-{# Pending bets #}
+{# ── Pending bets ── #}
 {% if pending %}
-<div style="display:flex;align-items:center;gap:8px;margin-top:14px;margin-bottom:10px">
-  <div class="tp-section-mark">// En attente</div>
+<div style="display:flex;align-items:center;gap:8px;margin-top:16px;margin-bottom:10px">
+  <div class="tp-section-mark">// Paris en attente</div>
   <span style="background:var(--lime);color:#0a0d10;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">{{ pending | length }}</span>
 </div>
 <div id="pending-bets">
   {% for b in pending %}
   <div class="tp-pending-card" id="bet-{{ b.id }}">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
-      <div style="min-width:0">
-        <div style="font-weight:700;font-size:17px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.bet_on }}</div>
-        <div style="font-size:11px;color:var(--fg-4);font-family:var(--font-mono);margin-top:4px">
-          Cote {{ "%.2f"|format(b.odd) }} · Mise {{ "%.2f"|format(b.stake) }}€
-        </div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">
+        <span class="tp-badge {% if b.tour=='atp' %}lime-outline{% else %}ghost{% endif %}">{{ (b.tour or 'ATP') | upper }}</span>
+        <span style="font-weight:700;font-size:15px;color:var(--fg)">{{ b.bet_on }}</span>
+        <span class="tp-badge" style="background:var(--bg-3);border-color:var(--line-2);color:var(--fg-3);font-size:9px">● EN ATTENTE</span>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--lime)">
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--fg-4)">COTE {{ "%.2f"|format(b.odd) }} · MISE {{ "%.2f"|format(b.stake) }}€</div>
+        <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--lime);margin-top:2px">
           +{{ ((b.stake * (b.odd - 1))) | round(2) }}€
         </div>
-        <div style="font-size:10px;color:var(--fg-4);font-family:var(--font-mono);margin-top:2px">si gagné</div>
+        <div style="font-size:9px;font-family:var(--font-mono);color:var(--fg-4);letter-spacing:.08em">GAIN POTENTIEL</div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div style="font-size:12px;color:var(--fg-3);font-family:var(--font-mono);margin-bottom:12px">
+      {{ b.p1_name }} vs {{ b.p2_name }}
+      {% if b.tournament %} · {{ b.tournament }}{% endif %}
+      {% if b.surface %} · {{ b.surface }}{% endif %}
+      {% if b.round %} · {{ b.round }}{% endif %}
+    </div>
+    <div class="tp-bet-actions">
       <form hx-post="/bets/{{ b.id }}/resolve" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML" style="display:contents">
         <input type="hidden" name="outcome" value="won">
-        <button type="submit" class="tp-btn-won" style="width:100%;padding:10px;font-size:11px;letter-spacing:.08em;font-weight:700">GAGNÉ</button>
+        <button type="submit" class="tp-btn-won" style="padding:8px 20px;font-size:11px;font-weight:700;letter-spacing:.08em">✓ GAGNÉ</button>
       </form>
       <form hx-post="/bets/{{ b.id }}/resolve" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML" style="display:contents">
         <input type="hidden" name="outcome" value="lost">
-        <button type="submit" class="tp-btn-lost" style="width:100%;padding:10px;font-size:11px;letter-spacing:.08em;font-weight:700">PERDU</button>
+        <button type="submit" class="tp-btn-lost" style="padding:8px 20px;font-size:11px;font-weight:700;letter-spacing:.08em">✗ PERDU</button>
       </form>
-    </div>
-    <div style="margin-top:8px;text-align:right">
       <form hx-post="/bets/{{ b.id }}/delete" hx-target="#bet-{{ b.id }}" hx-swap="outerHTML"
-            hx-confirm="Annuler ce pari et rembourser la mise ?" style="display:inline">
-        <button type="submit" class="tp-btn sm ghost" style="color:var(--fg-4);font-size:9px;padding:3px 8px">Annuler</button>
+            hx-confirm="Annuler ce pari et rembourser la mise ?" style="display:contents;margin-left:auto">
+        <button type="submit" class="tp-btn sm ghost" style="color:var(--fg-4)">ANNULER</button>
       </form>
     </div>
   </div>
@@ -194,46 +281,100 @@
 </div>
 {% endif %}
 
-{# Resolved bets — compact rows #}
+{# ── Resolved bets ── #}
 {% if resolved %}
-<div style="display:flex;align-items:center;gap:8px;margin-top:14px;margin-bottom:10px">
+<div style="display:flex;align-items:center;gap:8px;margin-top:16px;margin-bottom:10px">
   <div class="tp-section-mark">// Résolus</div>
-  <span style="background:var(--bg-3);color:var(--fg-3);font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;border:1px solid var(--line-2)">{{ resolved | length }}</span>
+  <span style="background:var(--bg-3);color:var(--fg-3);font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;border:1px solid var(--line-2)">{{ resolved | length }}{% if resolved | length >= 50 %}+{% endif %}</span>
 </div>
-<div style="background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden">
-  {% for b in resolved %}
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
-              border-bottom:{% if not loop.last %}1px solid var(--line){% else %}none{% endif %};gap:10px"
-       id="resolved-bet-{{ b.id }}"
-       data-bet-on="{{ b.bet_on }}" data-tournament="{{ b.tournament }}"
-       data-odd="{{ b.odd }}" data-stake="{{ b.stake }}"
-       data-pnl="{{ b.pnl }}" data-status="{{ b.status }}">
-    <div style="min-width:0;flex:1">
-      <div style="font-weight:600;font-size:14px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-        {{ b.bet_on }}
-      </div>
-      <div style="font-size:11px;color:var(--fg-4);font-family:var(--font-mono);margin-top:2px">
-        @{{ "%.2f"|format(b.odd) }} · {{ b.created_at[5:10] | replace('-', '/') if b.created_at else '—' }}
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-      <span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:{% if b.pnl >= 0 %}var(--lime){% else %}var(--loss){% endif %}">
-        {% if b.pnl >= 0 %}+{% endif %}{{ "%.2f"|format(b.pnl) }}€
-      </span>
-      {% if b.status == 'won' %}
-        <span class="tp-badge lime-outline" style="font-size:9px">GAGNÉ</span>
-      {% else %}
-        <span class="tp-badge" style="background:var(--loss-bg);color:var(--loss);border-color:rgba(255,91,91,.3);font-size:9px">PERDU</span>
-      {% endif %}
-      <form hx-post="/bets/{{ b.id }}/delete-resolved"
-            hx-confirm="Supprimer ce pari et annuler son impact sur la bankroll ?"
-            style="display:inline">
-        <button type="submit" class="tp-btn sm ghost" style="padding:2px 5px;color:var(--fg-5);border-color:transparent"
-                title="Supprimer">✕</button>
-      </form>
+
+{# Desktop: full table #}
+<div class="hist-resolved-table">
+  <div class="tp-card-basic" style="padding:0;overflow:hidden">
+    <div class="tp-table-wrap">
+      <table class="tp-table">
+        <thead>
+          <tr>
+            <th data-col="bet_on" onclick="sortTable(this)">Match <span class="sort-ind"></span></th>
+            <th data-col="tournament" onclick="sortTable(this)">Tournoi <span class="sort-ind"></span></th>
+            <th data-col="odd" onclick="sortTable(this)">Cote <span class="sort-ind"></span></th>
+            <th data-col="stake" onclick="sortTable(this)">Mise <span class="sort-ind"></span></th>
+            <th data-col="pnl" onclick="sortTable(this)">P&L <span class="sort-ind"></span></th>
+            <th data-col="status" onclick="sortTable(this)">Statut <span class="sort-ind"></span></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in resolved %}
+          <tr id="resolved-bet-{{ b.id }}"
+              data-bet-on="{{ b.bet_on }}" data-tournament="{{ b.tournament }}"
+              data-odd="{{ b.odd }}" data-stake="{{ b.stake }}"
+              data-pnl="{{ b.pnl }}" data-status="{{ b.status }}">
+            <td>
+              <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
+                <span class="tp-badge {% if b.tour=='atp' %}lime-outline{% else %}ghost{% endif %}" style="font-size:9px;padding:2px 4px">{{ (b.tour or 'ATP') | upper }}</span>
+                <span style="font-weight:600;font-size:13px;color:var(--fg)">{{ b.bet_on }}</span>
+              </div>
+              <div style="font-size:11px;color:var(--fg-3);font-family:var(--font-mono)">
+                vs {{ (b.p2_name if b.bet_on == b.p1_name else b.p1_name) or '' }} · {{ b.created_at[:10] if b.created_at else '—' }}
+              </div>
+            </td>
+            <td style="color:var(--fg-3);font-size:12px">{{ b.tournament }}<br><span style="color:var(--fg-4)">{{ b.surface }}</span></td>
+            <td style="font-family:var(--font-mono)">{{ "%.2f"|format(b.odd) }}</td>
+            <td style="font-family:var(--font-mono)">{{ "%.2f"|format(b.stake) }}€</td>
+            <td style="font-family:var(--font-mono);font-weight:700;color:{% if b.pnl >= 0 %}var(--lime){% else %}var(--loss){% endif %}">
+              {% if b.pnl >= 0 %}+{% endif %}{{ "%.2f"|format(b.pnl) }}€
+            </td>
+            <td>
+              {% if b.status == 'won' %}
+                <span class="tp-badge lime-outline">GAGNÉ</span>
+              {% else %}
+                <span class="tp-badge" style="background:var(--loss-bg);color:var(--loss);border-color:rgba(255,91,91,.3)">PERDU</span>
+              {% endif %}
+            </td>
+            <td>
+              <form hx-post="/bets/{{ b.id }}/delete-resolved"
+                    hx-confirm="Supprimer ce pari et annuler son impact sur la bankroll ?"
+                    style="display:inline">
+                <button type="submit" class="tp-btn sm ghost" style="padding:2px 6px;color:var(--fg-4)" title="Supprimer">✕</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
-  {% endfor %}
+</div>
+
+{# Mobile: compact rows #}
+<div class="hist-resolved-rows">
+  <div style="background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden">
+    {% for b in resolved %}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
+                border-bottom:{% if not loop.last %}1px solid var(--line){% else %}none{% endif %};gap:10px"
+         id="resolved-mob-{{ b.id }}">
+      <div style="min-width:0;flex:1">
+        <div style="font-weight:600;font-size:14px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          {{ b.bet_on }}
+        </div>
+        <div style="font-size:11px;color:var(--fg-4);font-family:var(--font-mono);margin-top:2px">
+          @{{ "%.2f"|format(b.odd) }} · {{ b.created_at[5:10] | replace('-', '/') if b.created_at else '—' }}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:{% if b.pnl >= 0 %}var(--lime){% else %}var(--loss){% endif %}">
+          {% if b.pnl >= 0 %}+{% endif %}{{ "%.2f"|format(b.pnl) }}€
+        </span>
+        {% if b.status == 'won' %}
+          <span class="tp-badge lime-outline" style="font-size:9px">GAGNÉ</span>
+        {% else %}
+          <span class="tp-badge" style="background:var(--loss-bg);color:var(--loss);border-color:rgba(255,91,91,.3);font-size:9px">PERDU</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
 </div>
 {% endif %}
 
@@ -245,7 +386,6 @@
 {% endif %}
 
 </div><!-- end #history-content -->
-
 </div><!-- end .tp-content -->
 {% endblock %}
 
@@ -259,16 +399,15 @@
     _asc = (_col===col) ? !_asc : true;
     _col = col;
     document.querySelectorAll('.sort-ind').forEach(s=>s.textContent='');
-    if (th.querySelector('.sort-ind')) th.querySelector('.sort-ind').textContent = _asc ? ' ▲' : ' ▼';
-    const container = th.closest('[data-sort-container]') || document.querySelector('#history-content');
-    const rows = Array.from(document.querySelectorAll('[id^="resolved-bet-"]'))
-      .sort((a,b) => {
+    if(th.querySelector('.sort-ind')) th.querySelector('.sort-ind').textContent = _asc?' ▲':' ▼';
+    const tbody = th.closest('table').querySelector('tbody');
+    Array.from(tbody.querySelectorAll('tr'))
+      .sort((a,b)=>{
         let av=a.dataset[col]||'', bv=b.dataset[col]||'';
-        if(NUMS.has(col)){ av=parseFloat(av)||0; bv=parseFloat(bv)||0; return _asc?av-bv:bv-av; }
+        if(NUMS.has(col)){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return _asc?av-bv:bv-av;}
         return _asc?av.localeCompare(bv,'fr',{sensitivity:'base'}):bv.localeCompare(av,'fr',{sensitivity:'base'});
-      });
-    const wrap = document.querySelector('[id^="resolved-bet-"]')?.parentElement;
-    if (wrap) rows.forEach(r=>wrap.appendChild(r));
+      })
+      .forEach(r=>tbody.appendChild(r));
   };
 })();
 </script>
