@@ -2,8 +2,7 @@
 {% block title %}{{ p.player_name }} — Oddshift{% endblock %}
 {% block page_title %}{{ p.player_name }}{% endblock %}
 {% block page_meta %}
-  {% if p.get('ioc') %}{{ p.ioc }}{% endif %}
-  {% if p.get('rank') %} · #{{ p.rank | int }}{% endif %}
+  {% if ioc %}{{ ioc }}{% endif %}{% if p.get('rank') %} · #{{ p.rank | int }}{% endif %}
 {% endblock %}
 
 {% block topbar_right %}
@@ -12,97 +11,494 @@
 </a>
 {% endblock %}
 
+{% block head %}
+<style>
+/* ── Profile layout ── */
+.prof-grid-2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;
+}
+.prof-tiles-5 {
+  display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-bottom: 12px;
+}
+.prof-tile {
+  background: var(--bg-1); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 14px 16px;
+}
+.prof-tile .val {
+  font-family: var(--font-mono); font-size: 22px; font-weight: 700;
+  line-height: 1; color: var(--fg); margin-bottom: 6px;
+}
+.prof-tile .val.lime { color: var(--lime); }
+.prof-tile .val.loss { color: var(--loss); }
+.prof-tile .lbl {
+  font-family: var(--font-mono); font-size: 9px; color: var(--fg-4);
+  letter-spacing: .10em; text-transform: uppercase;
+}
+.prof-card {
+  background: var(--bg-1); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 18px 20px;
+}
+.prof-section-mark {
+  font-family: var(--font-mono); font-size: 10px; color: var(--fg-3);
+  letter-spacing: .10em; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+.prof-section-mark::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
+/* ELO surface bars */
+.prof-elo-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.prof-elo-bar:last-child { margin-bottom: 0; }
+.prof-elo-bar .surf-lbl {
+  font-family: var(--font-mono); font-size: 10px; color: var(--fg-3);
+  letter-spacing: .08em; width: 38px;
+}
+.prof-elo-bar .bar-track {
+  flex: 1; height: 5px; background: var(--bg-3); border-radius: 3px; overflow: hidden;
+}
+.prof-elo-bar .bar-fill {
+  height: 100%; border-radius: 3px; background: var(--lime); transition: width .4s ease;
+}
+.prof-elo-bar .bar-val {
+  font-family: var(--font-mono); font-size: 11px; color: var(--fg-2); width: 38px; text-align: right;
+}
+/* Form dots */
+.prof-form-dots { display: flex; gap: 5px; }
+.prof-form-dots i {
+  width: 13px; height: 13px; border-radius: 3px; display: inline-block;
+}
+.prof-form-dots i.w { background: var(--lime); }
+.prof-form-dots i.l { background: var(--loss); }
+/* Insight rows */
+.prof-insight {
+  display: flex; gap: 10px; align-items: flex-start; padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.prof-insight:last-child { border-bottom: none; }
+.prof-insight .ico {
+  font-size: 13px; margin-top: 1px; flex-shrink: 0;
+}
+.prof-insight .body-title {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--fg);
+  margin-bottom: 2px;
+}
+.prof-insight .body-sub {
+  font-family: var(--font-mono); font-size: 10px; color: var(--fg-4);
+}
+/* Splits stub rows */
+.prof-split-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 9px;
+}
+.prof-split-row:last-child { margin-bottom: 0; }
+.prof-split-lbl {
+  font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); width: 94px;
+  letter-spacing: .06em;
+}
+.prof-split-bar { flex: 1; height: 4px; background: var(--bg-3); border-radius: 2px; overflow: hidden; }
+.prof-split-fill { height: 100%; border-radius: 2px; background: var(--lime); transition: width .4s ease; }
+.prof-split-pct { font-family: var(--font-mono); font-size: 11px; color: var(--fg); width: 32px; text-align: right; }
+.prof-split-rec { font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); width: 62px; text-align: right; }
+
+@media (max-width: 900px) {
+  .prof-tiles-5 { grid-template-columns: repeat(3,1fr); }
+  .prof-grid-2  { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .prof-tiles-5 { grid-template-columns: repeat(2,1fr); }
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="tp-content">
+{% set elo_c = p.get('elo_Clay',  1500) | float %}
+{% set elo_h = p.get('elo_Hard',  1500) | float %}
+{% set elo_g = p.get('elo_Grass', 1500) | float %}
+{% set max_surf_elo = [elo_c, elo_h, elo_g] | max %}
+{% set streak = (p.get('streak') or 0) | int %}
+{% set wr10   = ((p.get('winrate_10') or 0.5) * 100) | int %}
 
-{# Identity card — 3 KPIs #}
-<div class="tp-player-header">
-  <div class="tp-player-kpi">
-    <div class="v">#{{ p.get('rank', '—') }}</div>
-    <div class="l">Classement</div>
-  </div>
-  <div class="tp-player-kpi">
-    <div class="v">{{ p.get('elo', 0) | int }}</div>
-    <div class="l">ELO Global</div>
-  </div>
-  <div class="tp-player-kpi">
-    {% set hand = p.get('hand', '') or '' %}
-    <div class="v">{% if hand == 'R' %}Droitier{% elif hand == 'L' %}Gaucher{% elif hand == 'A' %}Ambidextre{% else %}—{% endif %}</div>
-    <div class="l">Main</div>
-  </div>
-</div>
+<div style="padding:16px 24px 80px">
 
-{# ELO par surface — barres lime #}
-<div class="tp-section-lbl">ELO par surface</div>
-<div class="tp-card-basic">
-  {% set surfaces = [('Hard', p.get('elo_Hard', 0) or 0), ('Clay', p.get('elo_Clay', 0) or 0), ('Grass', p.get('elo_Grass', 0) or 0)] %}
-  {% set max_elo = [p.get('elo_Hard', 1) or 1, p.get('elo_Clay', 1) or 1, p.get('elo_Grass', 1) or 1] | max %}
-  <div class="tp-elo-bar-wrap">
-    {% for surf, val in surfaces %}
-    <div class="tp-elo-bar">
-      <span class="lbl">{{ surf }}</span>
-      <div class="tp-elo-bar-track">
-        <div class="tp-elo-bar-fill" style="width:{{ [(val / max_elo * 100) | int, 0] | max }}%;opacity:{% if surf=='Hard' %}1{% elif surf=='Clay' %}0.8{% else %}0.65{% endif %}"></div>
+{# ── HEADER ──────────────────────────────────────────────────────────────────── #}
+<div class="prof-card" style="margin-bottom:12px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+  <div style="display:flex;gap:14px;align-items:flex-start">
+    {# Country badge #}
+    {% if flag %}
+    <div style="font-size:36px;line-height:1;flex-shrink:0;margin-top:2px">{{ flag }}</div>
+    {% elif ioc %}
+    <div style="background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 10px;font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--fg-2);flex-shrink:0">{{ ioc[:2] }}</div>
+    {% endif %}
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+        <span style="font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--fg)">{{ p.player_name }}</span>
+        <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--lime);background:rgba(200,255,61,.1);border:1px solid rgba(200,255,61,.25);border-radius:20px;padding:3px 10px">
+          {{ tour | upper }}{% if p.get('rank') %} · #{{ p.rank | int }}{% endif %}
+        </span>
       </div>
-      <span class="val">{{ val | int }}</span>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--fg-4);display:flex;gap:10px;flex-wrap:wrap">
+        {% if country_name %}<span>{{ country_name }}</span>{% endif %}
+        {% if hand_label and hand_label != '—' %}<span>{{ hand_label }}</span>{% endif %}
+        {% if age %}<span>{{ age }} ans</span>{% endif %}
+        {% if height and height > 0 %}<span>{{ height | int }}cm</span>{% endif %}
+      </div>
     </div>
-    {% endfor %}
+  </div>
+
+  {# Action buttons #}
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    {# COMPARER — placeholder for future head-to-head feature #}
+    {# <button class="tp-btn sm ghost" disabled title="Bientôt disponible">⇄ Comparer</button> #}
+    <a href="/joueurs?tour={{ tour }}" style="text-decoration:none">
+      <button class="tp-btn sm ghost">← Retour</button>
+    </a>
   </div>
 </div>
 
-{# Forme récente — 3 cartes #}
-<div class="tp-section-lbl">Forme récente (win rate)</div>
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-  {% for label, key in [('5 matchs', 'winrate_5'), ('10 matchs', 'winrate_10'), ('20 matchs', 'winrate_20')] %}
-  <div class="tp-kpi">
-    <div class="v {% if (p.get(key) or 0) >= 0.6 %}lime{% elif (p.get(key) or 0) >= 0.4 %}{% else %}loss{% endif %}">
-      {{ ((p.get(key) or 0) * 100) | int }}%
-    </div>
-    <div class="l">{{ label }}</div>
+{# ── 5 KPI TILES ─────────────────────────────────────────────────────────────── #}
+<div class="prof-tiles-5">
+  <div class="prof-tile">
+    <div class="val {% if (p.get('elo') or 0) > 1800 %}lime{% endif %}">{{ (p.get('elo') or 0) | int }}</div>
+    <div class="lbl">ELO Global</div>
   </div>
-  {% endfor %}
-</div>
-
-{# Form dots (5 derniers matchs) #}
-{% set form_str = p.get('form_last5', '') or '' %}
-{% if form_str %}
-<div class="tp-section-lbl">Forme récente (5 derniers matchs)</div>
-<div class="tp-card-basic" style="display:flex;align-items:center;gap:14px">
-  <div class="tp-form-dots">
-    {% for dot in form_str.split(',') %}
-      {% set d = dot.strip() %}
-      <i class="{{ 'w' if d == 'W' else 'l' }}" style="width:12px;height:12px;border-radius:2px"></i>
-    {% endfor %}
+  <div class="prof-tile">
+    <div class="val">{% if p.get('rank') %}#{{ p.rank | int }}{% else %}—{% endif %}</div>
+    <div class="lbl">Classement {{ tour | upper }}</div>
   </div>
-  <span style="font-size:11px;color:var(--fg-4);font-family:var(--font-mono)">◀ plus récent</span>
-</div>
-{% endif %}
-
-{# Fatigue & points #}
-<div class="tp-section-lbl">Données additionnelles</div>
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-  <div class="tp-kpi">
-    <div class="v">{{ p.get('rank_points', 0) | int }}</div>
-    <div class="l">Points ATP/WTA</div>
+  <div class="prof-tile">
+    <div class="val {% if wr10 >= 60 %}lime{% elif wr10 < 40 %}loss{% endif %}">{{ wr10 }}%</div>
+    <div class="lbl">Win rate · 10M</div>
   </div>
-  <div class="tp-kpi">
-    <div class="v">{{ p.get('matches_7d', 0) | int }}</div>
-    <div class="l">Matchs (7j)</div>
+  <div class="prof-tile">
+    <div class="val">{{ (p.get('rank_points') or 0) | int }}</div>
+    <div class="lbl">Points {{ tour | upper }}</div>
   </div>
-  <div class="tp-kpi">
-    {% set streak = p.get('streak', 0) | int %}
+  <div class="prof-tile">
     {% if streak > 0 %}
-      <div class="v lime">{{ streak }}</div>
-      <div class="l">Victoires de suite</div>
+      <div class="val lime">{{ streak }} 🔥</div>
+      <div class="lbl">Victoires de suite</div>
     {% elif streak < 0 %}
-      <div class="v loss">{{ (streak * -1) }}</div>
-      <div class="l">Défaites de suite</div>
+      <div class="val loss">{{ (streak * -1) }}</div>
+      <div class="lbl">Défaites de suite</div>
     {% else %}
-      <div class="v" style="color:var(--fg-4)">—</div>
-      <div class="l">Série en cours</div>
+      <div class="val" style="color:var(--fg-4)">—</div>
+      <div class="lbl">Série en cours</div>
     {% endif %}
   </div>
 </div>
 
-</div><!-- end .tp-content -->
+{# ── RADAR + SURFACE/FORME ───────────────────────────────────────────────────── #}
+<div class="prof-grid-2">
+
+  {# Radar #}
+  <div class="prof-card">
+    <div class="prof-section-mark">// Profil ML</div>
+    <div style="position:relative;height:220px">
+      <canvas id="radar-chart"></canvas>
+    </div>
+    <div style="text-align:center;font-family:var(--font-mono);font-size:9px;color:var(--fg-5);letter-spacing:.10em;margin-top:10px">
+      SURFACE DOMINANTE : <span style="color:var(--lime)">{{ best_surf | upper }}</span>
+    </div>
+  </div>
+
+  {# ELO surface + Forme #}
+  <div style="display:flex;flex-direction:column;gap:12px">
+
+    <div class="prof-card" style="flex:1">
+      <div class="prof-section-mark">// Elo par surface</div>
+
+      {% for surf_name, surf_elo in [('Clay', elo_c), ('Hard', elo_h), ('Grass', elo_g)] %}
+      {% set bar_pct = ([[(surf_elo / max_surf_elo * 100) | int, 0] | max, 100] | min) if max_surf_elo > 0 else 0 %}
+      <div class="prof-elo-bar">
+        <div class="surf-lbl">
+          {{ surf_name | upper }}
+          {% if surf_name == best_surf %}
+            <span style="font-size:8px;color:var(--lime);background:rgba(200,255,61,.12);border:1px solid rgba(200,255,61,.25);border-radius:10px;padding:1px 5px;margin-left:3px;letter-spacing:.06em">BEST</span>
+          {% endif %}
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:{{ bar_pct }}%;opacity:{% if surf_name == best_surf %}1{% elif loop.index == 2 %}0.75{% else %}0.55{% endif %}"></div>
+        </div>
+        <div class="bar-val">{{ surf_elo | int }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="prof-card" style="flex:1">
+      <div class="prof-section-mark">// Forme récente</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+        {% for lbl, key in [('5 MATCHS', 'winrate_5'), ('10 MATCHS', 'winrate_10'), ('20 MATCHS', 'winrate_20')] %}
+        {% set pct = ((p.get(key) or 0.5) * 100) | int %}
+        <div style="text-align:center">
+          <div style="font-family:var(--font-mono);font-size:20px;font-weight:700;line-height:1;margin-bottom:4px;color:{% if pct >= 60 %}var(--lime){% elif pct < 40 %}var(--loss){% else %}var(--fg){% endif %}">{{ pct }}%</div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.08em">{{ lbl }}</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% set form_str = p.get('form_last5', '') or '' %}
+      {% if form_str %}
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="prof-form-dots">
+          {% for dot in form_str.split(',') %}
+            {% set d = dot.strip() %}
+            <i class="{{ 'w' if d == 'W' else 'l' }}"></i>
+          {% endfor %}
+        </div>
+        <span style="font-size:10px;color:var(--fg-5);font-family:var(--font-mono)">◀ plus récent</span>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+{# ── ELO TRAJECTORY ──────────────────────────────────────────────────────────── #}
+<div class="prof-card" style="margin-bottom:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div class="prof-section-mark" style="margin-bottom:0;flex:1">// Trajectoire ELO · 12 mois</div>
+    <div style="display:flex;gap:16px;font-family:var(--font-mono);font-size:10px;color:var(--fg-4);letter-spacing:.08em">
+      <span>MIN <span id="elo-min" style="color:var(--fg-3)">—</span></span>
+      <span>MAX <span id="elo-max" style="color:var(--fg-3)">—</span></span>
+      <span id="elo-delta" style="font-weight:700">—</span>
+    </div>
+  </div>
+  <div id="elo-chart-wrap" style="position:relative;height:160px">
+    <canvas id="elo-trajectory-chart"></canvas>
+    <div id="elo-chart-loader" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;color:var(--fg-4);letter-spacing:.08em">
+      CHARGEMENT…
+    </div>
+  </div>
+</div>
+
+{# ── INSIGHTS + SPLITS ───────────────────────────────────────────────────────── #}
+<div class="prof-grid-2">
+
+  {# Insights #}
+  <div class="prof-card">
+    <div class="prof-section-mark">// Le modèle dit quoi</div>
+    {% if insights %}
+      {% for ins in insights %}
+      <div class="prof-insight">
+        <div class="ico">
+          {% if ins.ok == true %}
+            <span style="color:var(--lime)">✓</span>
+          {% elif ins.ok == false %}
+            <span style="color:var(--loss)">✗</span>
+          {% else %}
+            <span style="color:var(--warn)">◌</span>
+          {% endif %}
+        </div>
+        <div>
+          <div class="body-title">{{ ins.title }}</div>
+          <div class="body-sub">{{ ins.sub }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--fg-5);text-align:center;padding:20px 0">
+      Données insuffisantes pour générer des insights
+    </div>
+    {% endif %}
+
+    {# Additional stats row #}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+      <div style="text-align:center">
+        <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--fg);margin-bottom:3px">{{ (p.get('matches_14d') or 0) | int }}</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.08em">MATCHS / 14J</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--fg);margin-bottom:3px">{{ (p.get('days_since') or 0) | int }}j</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.08em">DERNIER MATCH</div>
+      </div>
+      <div style="text-align:center">
+        {% set tb_wr = ((p.get('tiebreak_winrate_10') or 0.5) * 100) | int %}
+        <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:{% if tb_wr >= 55 %}var(--lime){% elif tb_wr < 45 %}var(--loss){% else %}var(--fg){% endif %};margin-bottom:3px">{{ tb_wr }}%</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-4);letter-spacing:.08em">TIE-BREAKS</div>
+      </div>
+    </div>
+  </div>
+
+  {# Splits ── real data if available, placeholder otherwise #}
+  <div class="prof-card">
+    <div class="prof-section-mark">
+      // Splits 2025-2026
+      {% if not splits %}
+        <span style="font-size:9px;color:var(--warn);background:rgba(255,200,87,.08);border:1px solid rgba(255,200,87,.2);border-radius:10px;padding:2px 8px;letter-spacing:.06em">BIENTÔT</span>
+      {% endif %}
+    </div>
+
+    {% if splits %}
+      {# Real splits data #}
+      {% for row in splits %}
+      <div class="prof-split-row">
+        <div class="prof-split-lbl">{{ row.label }}</div>
+        <div class="prof-split-bar">
+          <div class="prof-split-fill" style="width:{{ row.wr }}%"></div>
+        </div>
+        <div class="prof-split-pct">{{ row.wr }}%</div>
+        {% if row.rec %}<div class="prof-split-rec">{{ row.rec }}</div>{% endif %}
+      </div>
+      {% endfor %}
+
+    {% else %}
+      {# Placeholder rows showing future structure #}
+      {% for lbl in ['BEST OF 3', 'BEST OF 5', 'TOP 10 ADV.', 'VS GAUCHERS', 'TIE-BREAKS', 'INDOOR'] %}
+      <div class="prof-split-row" style="opacity:.35">
+        <div class="prof-split-lbl">{{ lbl }}</div>
+        <div class="prof-split-bar">
+          <div class="prof-split-fill" style="width:50%;background:var(--fg-5)"></div>
+        </div>
+        <div class="prof-split-pct" style="color:var(--fg-5)">—</div>
+        <div class="prof-split-rec" style="color:var(--fg-5)">—</div>
+      </div>
+      {% endfor %}
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--fg-5);text-align:center;margin-top:10px;letter-spacing:.08em">
+        Données disponibles après update_database.py v2
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  // ── Radar chart ──────────────────────────────────────────────────────────────
+  var radarData = {{ radar | tojson }};
+  var radarCtx  = document.getElementById('radar-chart');
+  if (radarCtx && window.Chart) {
+    new Chart(radarCtx.getContext('2d'), {
+      type: 'radar',
+      data: {
+        labels: radarData.labels,
+        datasets: [{
+          data:              radarData.values,
+          backgroundColor:   'rgba(200,255,61,.12)',
+          borderColor:       '#c8ff3d',
+          borderWidth:       1.5,
+          pointBackgroundColor: '#c8ff3d',
+          pointRadius:       3,
+          pointHoverRadius:  5,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          r: {
+            min: 0, max: 100, beginAtZero: true,
+            grid:        { color: 'rgba(255,255,255,.07)' },
+            angleLines:  { color: 'rgba(255,255,255,.07)' },
+            ticks:       { display: false, stepSize: 25 },
+            pointLabels: {
+              color: '#55616e',
+              font: { family: "'JetBrains Mono', monospace", size: 9, weight: '500' },
+            }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#161b22',
+            borderColor: '#2a3140',
+            borderWidth: 1,
+            titleFont: { family: "'JetBrains Mono', monospace", size: 10 },
+            bodyFont:  { family: "'JetBrains Mono', monospace", size: 11 },
+            callbacks: { label: function(ctx) { return ctx.raw.toFixed(1) + ' / 100'; } }
+          }
+        }
+      }
+    });
+  }
+
+  // ── ELO trajectory chart ──────────────────────────────────────────────────
+  var tour = '{{ tour }}';
+  var playerName = encodeURIComponent('{{ p.player_name | replace("'", "\\'") }}');
+
+  fetch('/joueurs/' + playerName + '/elo-history?tour=' + tour)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var loader = document.getElementById('elo-chart-loader');
+      if (loader) loader.style.display = 'none';
+
+      if (!data.months || data.months.length < 2) {
+        var wrap = document.getElementById('elo-chart-wrap');
+        if (wrap) wrap.innerHTML = '<div style="height:160px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;color:var(--fg-4);letter-spacing:.08em">DONNÉES INSUFFISANTES</div>';
+        return;
+      }
+
+      var elos  = data.elo;
+      var minV  = Math.min.apply(null, elos);
+      var maxV  = Math.max.apply(null, elos);
+      var delta = elos[elos.length - 1] - elos[0];
+
+      var minEl   = document.getElementById('elo-min');
+      var maxEl   = document.getElementById('elo-max');
+      var deltaEl = document.getElementById('elo-delta');
+      if (minEl)   minEl.textContent   = minV.toFixed(0);
+      if (maxEl)   maxEl.textContent   = maxV.toFixed(0);
+      if (deltaEl) {
+        deltaEl.textContent  = (delta >= 0 ? '+' : '') + delta.toFixed(0);
+        deltaEl.style.color  = delta >= 0 ? 'var(--lime)' : 'var(--loss)';
+      }
+
+      var canvas = document.getElementById('elo-trajectory-chart');
+      if (!canvas || !window.Chart) return;
+
+      new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: data.months,
+          datasets: [{
+            data: elos,
+            borderColor:      '#c8ff3d',
+            borderWidth:      2,
+            pointRadius:      3,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#c8ff3d',
+            fill: true,
+            backgroundColor: function(ctx) {
+              var g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
+              g.addColorStop(0, 'rgba(200,255,61,.22)');
+              g.addColorStop(1, 'rgba(200,255,61,0)');
+              return g;
+            },
+            tension: 0.4,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#161b22',
+              borderColor: '#2a3140', borderWidth: 1,
+              titleFont: { family: "'JetBrains Mono', monospace", size: 10 },
+              bodyFont:  { family: "'JetBrains Mono', monospace", size: 11 },
+              callbacks: { label: function(ctx) { return 'ELO ' + ctx.raw.toFixed(0); } }
+            }
+          },
+          scales: {
+            x: {
+              grid:  { color: 'rgba(255,255,255,.04)' },
+              ticks: { color: '#4a5568', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0 }
+            },
+            y: {
+              grid:  { color: 'rgba(255,255,255,.04)' },
+              ticks: { color: '#4a5568', font: { family: "'JetBrains Mono', monospace", size: 9 } },
+              suggestedMin: minV - 60,
+              suggestedMax: maxV + 30,
+            }
+          }
+        }
+      });
+    })
+    .catch(function() {
+      var loader = document.getElementById('elo-chart-loader');
+      if (loader) loader.textContent = 'Erreur de chargement';
+    });
+})();
+</script>
 {% endblock %}
