@@ -52,6 +52,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Local Development Constraints
+
+- **No local Python env or data**: `venv/`, `data/processed/`, `data/models/` exist only on the server. Inspect parquet columns/data via SSH: `Invoke-SSHCommand ... -Command "cd /app/tennisml && python -c 'import pandas as pd; ...'"`
+- **Bash tool**: works for git and Unix commands. Use `PowerShell` tool for Windows-path operations.
+- **PowerShell heredoc**: `@'...'@` requires closing `'@` at column 0 — breaks in the tool. Use Bash `$(cat <<'EOF'...EOF)` for multi-line git commit messages instead.
+
+## Webapp Frontend Conventions
+
+- **Chart.js + HTMX already loaded globally** in `base.html` — never add CDN links in individual templates.
+- **Python → JS data**: use `{{ python_dict | tojson }}` in templates to safely pass server-computed dicts/lists to Chart.js or inline scripts.
+- **CSS cache-busting**: `?v=20260426i` suffix on CSS links in `base.html` — bump the string after significant style changes.
+- **Inline styles**: established pattern — new components use inline `style=` rather than separate CSS classes (see `predictions.html`, `joueurs_profile.html`).
+
+## Player Profile Data
+
+- **`get_profile(profiles, players, name)`** merges `player_profiles_updated.parquet` (stats) with `players.parquet` (identity: `dob`, `height`, `hand`, `ioc`). Result dict has both.
+- **Key profile columns**: `elo`, `elo_Hard/Clay/Grass`, `rank`, `rank_points`, `winrate_5/10/20`, `winrate_surf_Hard/Clay/Grass`, `form_last5` (comma-sep W/L), `streak`, `days_since`, `matches_7d/14d/21d`, `sets_ratio_10`, `tiebreak_winrate_10`.
+- **ELO history**: `matches_with_elo.parquet` has per-match `p1_name`, `p2_name`, `p1_elo`, `p2_elo`, `tourney_date` — use with column projection for lightweight queries.
+- **`APP_STATE['models'][tour]`** keys: `model`, `imputer`, `platt`, `platt_surfaces`, `profiles` (DataFrame), `profiles_dict` (O(1) name→dict lookup), `players`, `ranking_lookup`, `feature_list`.
+
 ## Odds Data Quirks
 
 - **2010-2012 xlsx = OLE format** : tennis-data.co.uk 2010-2012 sont du vrai `.xls` (Excel 97-2003, magic bytes `d0cf 11e0`) avec extension `.xlsx`. `openpyxl` les rejette. `_read_excel_auto()` dans `backtest_real.py` détecte le format et dispatche vers `xlrd` ou `openpyxl`.
