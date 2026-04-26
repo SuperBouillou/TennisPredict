@@ -43,12 +43,12 @@
     padding: 8px 0 14px; z-index: 100;
   }
   .tp-tab-item {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
     color: var(--fg-3); text-decoration: none;
     font-family: var(--font-mono); font-size: 9px; letter-spacing: .06em;
   }
   .tp-tab-item.active { color: var(--lime); }
-  .tp-tab-item span:first-child { font-size: 20px; }
+  .tp-tab-item svg { width: 18px; height: 18px; }
   .tp-main { padding-bottom: 70px; }
 
   /* Landing responsive */
@@ -98,6 +98,9 @@
 
   /* Table horizontal scroll */
   .tp-table-wrap { overflow-x: auto; }
+
+  /* History page */
+  .hist-actions-desktop { display: none; }
 }
 
 @media (max-width: 480px) {
