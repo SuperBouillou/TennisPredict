@@ -180,7 +180,8 @@ def prepare_dataset(df: pd.DataFrame,
 
 def temporal_split(X: pd.DataFrame,
                    y: pd.Series,
-                   df_meta: pd.DataFrame) -> dict:
+                   df_meta: pd.DataFrame,
+                   split_cfg: dict = None) -> dict:
     """
     Split temporel strict — pas de random split pour les séries temporelles.
 
@@ -189,10 +190,11 @@ def temporal_split(X: pd.DataFrame,
     Test   : ≥ 2025  (TEMPORAL_SPLIT['test_start'] — ne pas toucher avant évaluation)
     """
     year = df_meta['year']
+    _cfg = split_cfg or TEMPORAL_SPLIT
 
-    train_mask = year <= TEMPORAL_SPLIT['train_end'].year
-    valid_mask = (year >= TEMPORAL_SPLIT['valid_start'].year) & (year <= TEMPORAL_SPLIT['valid_end'].year)
-    test_mask  = year >= TEMPORAL_SPLIT['test_start'].year
+    train_mask = year <= _cfg['train_end'].year
+    valid_mask = (year >= _cfg['valid_start'].year) & (year <= _cfg['valid_end'].year)
+    test_mask  = year >= _cfg['test_start'].year
 
     splits = {
         'X_train' : X[train_mask],
@@ -207,10 +209,10 @@ def temporal_split(X: pd.DataFrame,
     }
 
     print(f"\n  Split temporel :")
-    train_end_y  = TEMPORAL_SPLIT['train_end'].year
-    valid_s_y    = TEMPORAL_SPLIT['valid_start'].year
-    valid_e_y    = TEMPORAL_SPLIT['valid_end'].year
-    test_start_y = TEMPORAL_SPLIT['test_start'].year
+    train_end_y  = _cfg["train_end"].year
+    valid_s_y    = _cfg['valid_start'].year
+    valid_e_y    = _cfg['valid_end'].year
+    test_start_y = _cfg['test_start'].year
     print(f"    Train  (<=  {train_end_y}) : {train_mask.sum():>7,} matchs")
     print(f"    Valid  ({valid_s_y}-{valid_e_y}) : {valid_mask.sum():>7,} matchs")
     print(f"    Test   (>= {test_start_y}) : {test_mask.sum():>7,} matchs")
@@ -251,9 +253,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Préparation dataset ML par tour")
     parser.add_argument('--tour', default='atp', choices=['atp', 'wta'],
                         help="Tour à traiter : atp ou wta (défaut: atp)")
+    parser.add_argument('--valid-year', type=int, default=None,
+                        help='Année validation (défaut: 2024 ATP / 2023 WTA)')
     args = parser.parse_args()
 
     tour  = args.tour.lower()
+    # Build tour-specific temporal split
+    _default_valid = 2023 if tour == 'wta' else 2024
+    _vy = args.valid_year if args.valid_year else _default_valid
+    split_cfg = {
+        'train_end'  : pd.Timestamp(f'{_vy-1}-12-31'),
+        'valid_start': pd.Timestamp(f'{_vy}-01-01'),
+        'valid_end'  : pd.Timestamp(f'{_vy}-12-31'),
+        'test_start' : pd.Timestamp(f'{_vy+1}-01-01'),
+    }
     cfg   = get_tour_config(tour)
     paths = get_paths(tour)
     make_dirs(tour)
@@ -274,7 +287,7 @@ if __name__ == "__main__":
     print("-- Dataset avec stats service (post-1991) ----------")
     X, y, df_meta, features = prepare_dataset(df, feature_sets, use_stats=True)
 
-    splits = temporal_split(X, y, df_meta)
+    splits = temporal_split(X, y, df_meta, split_cfg=split_cfg)
     audit_splits(splits, features)
 
     # Sauvegarde

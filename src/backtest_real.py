@@ -558,7 +558,7 @@ if __name__ == "__main__":
     ODDS_DIR   = paths['odds_dir']
 
     BANKROLL   = 1000.0
-    TEST_YEARS = [2025]
+    TEST_YEARS = [2025]  # fallback — overridden below after splits load
 
     print("=" * 55)
     print(f"BACKTEST REEL — COTES TENNIS-DATA.CO.UK — {tour.upper()}")
@@ -591,6 +591,13 @@ if __name__ == "__main__":
         X_test = splits['X_valid']
         y_test = splits['y_valid']
         meta   = splits['meta_valid']
+
+    # Derive TEST_YEARS from actual set dates
+    if 'tourney_date' in meta.columns:
+        _dates = pd.to_datetime(meta['tourney_date'], errors='coerce').dropna()
+        if len(_dates):
+            TEST_YEARS = sorted(set(_dates.dt.year.tolist()))
+            print(f'  TEST_YEARS (auto) : {TEST_YEARS}')
 
     X_imp    = imputer.transform(X_test) if imputer is not None else X_test
     raw_prob = model.predict_proba(X_imp)[:, 1]
