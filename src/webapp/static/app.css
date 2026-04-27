@@ -174,7 +174,7 @@ body {
   display: flex;
 }
 .prob-split-half.lime { background: var(--lime); }
-.prob-split-half.dim  { background: var(--fg-4); opacity: 0.35; }
+.prob-split-half.dim  { background: rgba(255,255,255,0.22); }
 
 /* H2H / OPEN chips */
 .center-chip {
