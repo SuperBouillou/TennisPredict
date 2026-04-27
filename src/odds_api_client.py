@@ -287,23 +287,29 @@ def _save_cache(tour: str, today: date, result: OddsResult) -> None:
 def _match_outcome_to_player(outcome_name: str, player_key: str) -> bool:
     """
     Flexible player name matching between Pinnacle outcome names and event player keys.
-    Handles: full name, last name only, abbreviated "F. Lastname".
+    Handles: full name, last name only, "F. Lastname", "Lastname F." (API format).
     Both inputs are already normalized (lowercase, no accents).
     """
     on = normalize_player_name(outcome_name)
+    if not on:
+        return False
     # Exact match
     if on == player_key:
         return True
-    # Last name match (e.g. outcome "lehecka" vs key "jiri lehecka")
+    # Last name only (e.g. outcome "lehecka" vs key "jiri lehecka")
     player_last = player_key.split()[-1]
     if on == player_last:
         return True
-    # Abbreviated first name "j. lehecka" vs "jiri lehecka"
+    # "F. Lastname" format — outcome ends with player last name
     if on.endswith(player_last) and len(on) > len(player_last):
         return True
     # Key ends with outcome last name
     outcome_last = on.split()[-1] if on else ""
-    if outcome_last and player_key.endswith(outcome_last):
+    if outcome_last and len(outcome_last) > 1 and player_key.endswith(outcome_last):
+        return True
+    # "Lastname F." format — first word of outcome matches a word in player key
+    outcome_first = on.split()[0] if on else ""
+    if outcome_first and len(outcome_first) > 1 and outcome_first in player_key.split():
         return True
     return False
 
@@ -321,9 +327,9 @@ def _pair_outcomes(outcomes: list, home_key: str, away_key: str) -> tuple | None
             away_price = price
     if home_price is not None and away_price is not None:
         return (home_price, away_price)
-    # Last resort: positional but log a warning
-    log.debug("Outcome name mismatch for %s / %s — using positional", home_key, away_key)
-    return (float(outcomes[0]["price"]), float(outcomes[1]["price"]))
+    # Name matching failed — return None rather than silently assigning wrong odds
+    log.warning("Outcome name mismatch for %s / %s — skipping", home_key, away_key)
+    return None
 
 
 def _extract_pinnacle_odds(bookmakers: list, home_key: str, away_key: str) -> tuple | None:
