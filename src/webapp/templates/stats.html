@@ -40,25 +40,17 @@
 
   <div class="tp-section-lbl">Configuration</div>
   <div class="tp-card-basic">
-    <div style="font-size:11px;color:var(--fg-3);margin-bottom:12px">Ces seuils filtrent les signaux affichés sur la page des matchs.</div>
+    <div style="font-size:11px;color:var(--fg-3);margin-bottom:12px">Les seuils d'edge sont calibrés automatiquement par surface et niveau de tournoi.</div>
     <form hx-post="/settings" hx-target="#settings-result" hx-swap="innerHTML">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">
-        <div class="tp-form-group">
-          <label class="tp-label">Edge minimum</label>
-          <input class="tp-input" name="min_edge" type="number" step="0.01" min="0" max="0.2" value="{{ settings.min_edge }}">
-        </div>
-        <div class="tp-form-group">
-          <label class="tp-label">Probabilité minimum</label>
-          <input class="tp-input" name="min_prob" type="number" step="0.01" min="0.5" max="0.8" value="{{ settings.min_prob }}">
-        </div>
+      <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
         <div class="tp-form-group">
           <label class="tp-label">Fraction Kelly</label>
-          <input class="tp-input" name="kelly_fraction" type="number" step="0.05" min="0.1" max="0.5" value="{{ settings.kelly_fraction }}">
+          <input class="tp-input" name="kelly_fraction" type="number" step="0.05" min="0.1" max="0.5" value="{{ settings.kelly_fraction }}" style="width:100px">
         </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <button type="submit" class="tp-btn primary sm">Sauvegarder</button>
-        <span id="settings-result" style="font-family:var(--font-mono);font-size:11px;color:var(--lime)"></span>
+        <div style="display:flex;align-items:center;gap:12px;padding-bottom:2px">
+          <button type="submit" class="tp-btn primary sm">Sauvegarder</button>
+          <span id="settings-result" style="font-family:var(--font-mono);font-size:11px;color:var(--lime)"></span>
+        </div>
       </div>
     </form>
   </div>

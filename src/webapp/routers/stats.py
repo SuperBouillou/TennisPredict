@@ -130,8 +130,6 @@ def _kpis(tour: str) -> dict:
 async def stats_page(request: Request, tour: str = "atp"):
     db = get_state()['db']
     settings = {
-        'min_edge':       get_setting(db, 'min_edge', '0.03'),
-        'min_prob':       get_setting(db, 'min_prob', '0.55'),
         'kelly_fraction': get_setting(db, 'kelly_fraction', '0.25'),
     }
     kpis     = _kpis(tour)
@@ -366,13 +364,7 @@ async def signal_recent(tour: str | None = Query(default=None),
 
 
 @router.post("/settings", response_class=HTMLResponse)
-async def save_settings(
-    min_edge: str = Form(...),
-    min_prob: str = Form(...),
-    kelly_fraction: str = Form(...),
-):
+async def save_settings(kelly_fraction: str = Form(...)):
     db = get_state()['db']
-    set_setting(db, 'min_edge', min_edge)
-    set_setting(db, 'min_prob', min_prob)
     set_setting(db, 'kelly_fraction', kelly_fraction)
-    return HTMLResponse('<div style="color:var(--green);padding:8px">&#x2705; Seuils sauvegardés.</div>')
+    return HTMLResponse('<div style="color:var(--green);padding:8px">&#x2705; Sauvegardé.</div>')
