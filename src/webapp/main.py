@@ -207,9 +207,18 @@ from slowapi.errors import RateLimitExceeded  # noqa: E402
 from src.webapp.limiter import limiter  # noqa: E402
 from src.webapp.middleware import AuthMiddleware  # noqa: E402
 from src.webapp.routers.auth import router as auth_router  # noqa: E402
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+
+class _NoCacheHTML(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if "text/html" in response.headers.get("content-type", ""):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(_NoCacheHTML)
 app.add_middleware(AuthMiddleware)
 app.include_router(auth_router)
 
