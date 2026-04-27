@@ -68,6 +68,10 @@
   .landing-nav { padding: 14px 20px; }
   .landing-nav .nav-links { display: none; }
 
+  /* Modal — stack player columns vertically on mobile */
+  #modal-content .grid-2 { grid-template-columns: 1fr; }
+  #modal-content .card { padding: 14px 16px; }
+
   /* Match cards — swap desktop↔mobile views */
   .mobile-body {
     display: block;
