@@ -28,7 +28,7 @@
 }
 .mobile-prob {
   font-family: var(--font-mono);
-  font-size: 40px;
+  font-size: 32px;
   font-weight: 700;
   color: var(--fg-2);
   line-height: 1;
@@ -71,7 +71,7 @@
   /* Match cards — swap desktop↔mobile views */
   .mobile-body {
     display: block;
-    padding: 12px 16px 14px;
+    padding: 8px 14px 10px;
     cursor: pointer;
   }
   .desktop-body { display: none; }
