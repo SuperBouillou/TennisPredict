@@ -147,7 +147,7 @@
 
   {# Drawdown / Best streak — desktop only #}
   {% if stats.num_bets > 0 and (stats.drawdown or stats.best_streak_pnl) %}
-  <div class="hist-dd-desktop" style="display:flex;gap:8px;flex-shrink:0">
+  <div class="hist-dd-desktop" style="gap:8px;flex-shrink:0">
     {% if stats.drawdown %}
     <div class="tp-stats-cell" style="min-width:130px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--loss-bg)">
       <div class="v loss" style="font-size:16px">{{ "%.2f"|format(stats.drawdown) }}€</div>
@@ -178,7 +178,7 @@
     {# Badge stats mini ── desktop only #}
     {% if stats.badge_stats %}
     {% set bs = stats.badge_stats %}
-    <div class="hist-badge-chart-desktop" style="display:flex;gap:8px">
+    <div class="hist-badge-chart-desktop" style="gap:8px">
       {% if bs.value.total > 0 %}
       <div style="padding:10px 14px;background:var(--lime-bg);border:1px solid var(--lime-line);border-radius:var(--r-md);min-width:100px;text-align:center">
         <div style="font-family:var(--font-mono);font-size:9px;color:var(--lime);letter-spacing:.10em;margin-bottom:4px">VALUE BET</div>
