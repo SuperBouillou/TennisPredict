@@ -313,6 +313,10 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
                 logger.warning("signal_log insert failed: %s", _exc)
 
         enriched.append(m)
+
+    # Exclure les matchs sans aucune cote disponible (tournois non couverts par l'Odds API)
+    enriched = [m for m in enriched if m.get('odd_p1') is not None or m.get('odd_p2') is not None]
+
     return sorted(enriched, key=lambda x: -max(x.get('edge_p1') or -99, x.get('edge_p2') or -99))
 
 
