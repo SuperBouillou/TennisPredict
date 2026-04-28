@@ -239,9 +239,9 @@ def log_signal(conn: sqlite3.Connection, signal: dict) -> int | None:
     existing = conn.execute(
         """SELECT id FROM signal_log
            WHERE tour=? AND p1_name=? AND p2_name=? AND bet_on=?
-             AND date(created_at)=date(?)""",
+             AND tournament=?""",
         (signal['tour'], signal['p1_name'], signal['p2_name'],
-         signal['bet_on'], _now()),
+         signal['bet_on'], signal.get('tournament')),
     ).fetchone()
     if existing:
         return None
