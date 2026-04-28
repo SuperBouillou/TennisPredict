@@ -314,8 +314,13 @@ def _enrich_with_predictions(matches: list[dict], tour: str, bankroll: float, ke
 
         enriched.append(m)
 
-    # Exclure les matchs sans aucune cote disponible (tournois non couverts par l'Odds API)
-    enriched = [m for m in enriched if m.get('odd_p1') is not None or m.get('odd_p2') is not None]
+    # Exclure les tournois entiers sans aucune cote (ex. WTA St-Malo non couvert par l'Odds API)
+    # Un tournoi est conservé si au moins un de ses matchs a des cotes
+    tournaments_with_odds = {
+        m['tournament'] for m in enriched
+        if m.get('odd_p1') is not None or m.get('odd_p2') is not None
+    }
+    enriched = [m for m in enriched if m.get('tournament') in tournaments_with_odds]
 
     return sorted(enriched, key=lambda x: -max(x.get('edge_p1') or -99, x.get('edge_p2') or -99))
 
