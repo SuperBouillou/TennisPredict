@@ -90,11 +90,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Server**: `root@94.130.226.118` — app at `/app/tennisml`, service name `tennisml`
 - **Deploy command**: `cd /app/tennisml && git pull && systemctl restart tennisml`
 - **Posh-SSH** (PowerShell): use `New-SSHSession -KeyFile C:\Claude\tennispredict_ssh -AcceptKey -Force` for reliable output; plain `ssh` via PowerShell tool backgrounds silently with no output
+- **git pull divergence** : si le serveur a des commits locaux, `git pull --rebase` est nécessaire (le serveur et GitHub peuvent diverger après des fixes directs en prod)
+- **DB path** : webapp utilise `data/tennis_predict.db` (pas `tennispredict.db` ni `webapp.db`)
+- **sqlite3** : non dispo sur le serveur — utiliser `python -c 'import sqlite3; ...'` pour requêtes DB
+
+## Webapp — Features Already Implemented
+
+- **Stats page** : monthly P&L breakdown chart + calibration curve → déjà en place
+- **Auto-resolve** : résolution automatique des paris en attente via ESPN (72h) → déjà en place
+- **Daily cron** : `update_database.py` tourne automatiquement sur le serveur → ne pas proposer
+- **kelly_fraction** : seul paramètre configurable par l'user (Stats page) — `min_edge` et `min_prob` étaient des settings morts, supprimés
+- **Seuils d'edge** : hardcodés par surface+niveau dans `today.py` (`_BASE` dict), calibrés OOS — NE PAS rendre configurables
+- **Filter chips histoire** : période (7j/mois) + surface + signal → déjà en place
+- **Sortable columns** : tableau historique triable par colonne → déjà en place
+- **signal_log dedup** : clé `(tour, p1_name, p2_name, bet_on, tournament)` sans contrainte de date — évite doublons si cron tourne 2 jours sur le même match en attente
+- **Filtre tournois sans cotes** : matchs des tournois non couverts par l'Odds API masqués dans `_enrich_with_predictions()` — filtre sur `tournaments_with_odds` seulement si au moins 1 match a des cotes (sinon page "hier" vide)
 
 ## CSS Gotchas (webapp)
 
 - `.match-card` must stay `overflow: visible` — tooltips use `::after` positioned outside card bounds; keep `.main-content` at `overflow: hidden auto` to block horizontal scrollbar bleed
 - Flex column alignment: fix badge/button width at parent level (`align-items: flex-start` on `.player-side`) not with `align-self` on the child
+- **Cache-busting** : bumper `?v=` dans `base.html` + `login.html` + `landing.html` (les 3 ont leurs propres `<link>`) — oublier l'un des trois = pas de changement visible pour certains users
+- **Inline style="display:X"** écrase les media queries CSS — ne jamais mettre `display:flex/block` en inline sur un élément togglé par classe mobile/desktop
+- **Cache-Control: no-store** : middleware ajouté dans `main.py` sur toutes les réponses HTML — le navigateur ne cache plus les pages
 
 ## Project Overview
 
