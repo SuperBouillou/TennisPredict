@@ -390,32 +390,34 @@ def predict(
         if odd >= 3.0:  return 0.5
         return 1.0
 
-    # Seuil de direction marché : ne pas signaler de value bet si le bookmaker
-    # donne < 40% à ce joueur (cote > ~2.5). Le modèle surévalue les outsiders
-    # extrêmes faute de signal Pinnacle suffisant en entraînement.
+    # Ne signaler de value bet que si le marché donne >= 40% au joueur (cote <= ~2.5).
+    # Le backtest n'a jamais eu de paris à cotes > 2.44 (bk_imp_prob min = 0.40).
+    # Signaler des outsiders extrêmes crée un régime hors-backtest non calibré.
     MIN_BK_DIR_PROB = 0.40
 
     edge_p1 = ev_p1 = kelly_frac_p1 = kelly_eur_p1 = None
     if odd_p1 is not None and odd_p1 > 1.0 and novid_p1 is not None:
-        edge_p1 = round(cal_prob - novid_p1, 4)
-        ev_p1   = round(cal_prob * (odd_p1 - 1) - (1 - cal_prob), 4)
-        discount = _odds_discount(odd_p1)
-        if edge_p1 > 0 and discount > 0:
-            raw_kelly = (cal_prob * odd_p1 - 1) / (odd_p1 - 1)
-            if raw_kelly > 0:
-                kelly_frac_p1 = round(min(raw_kelly * kelly_fraction * discount, 0.05), 4)
-                kelly_eur_p1  = round(kelly_frac_p1 * bankroll, 2)
+        if novid_p1 >= MIN_BK_DIR_PROB:
+            edge_p1 = round(cal_prob - novid_p1, 4)
+            ev_p1   = round(cal_prob * (odd_p1 - 1) - (1 - cal_prob), 4)
+            discount = _odds_discount(odd_p1)
+            if edge_p1 > 0 and discount > 0:
+                raw_kelly = (cal_prob * odd_p1 - 1) / (odd_p1 - 1)
+                if raw_kelly > 0:
+                    kelly_frac_p1 = round(min(raw_kelly * kelly_fraction * discount, 0.05), 4)
+                    kelly_eur_p1  = round(kelly_frac_p1 * bankroll, 2)
 
     edge_p2 = ev_p2 = kelly_frac_p2 = kelly_eur_p2 = None
     if odd_p2 is not None and odd_p2 > 1.0 and novid_p2 is not None:
-        edge_p2 = round(prob_p2 - novid_p2, 4)
-        ev_p2   = round(prob_p2 * (odd_p2 - 1) - (1 - prob_p2), 4)
-        discount2 = _odds_discount(odd_p2)
-        if edge_p2 > 0 and discount2 > 0:
-            raw_kelly2 = (prob_p2 * odd_p2 - 1) / (odd_p2 - 1)
-            if raw_kelly2 > 0:
-                kelly_frac_p2 = round(min(raw_kelly2 * kelly_fraction * discount2, 0.05), 4)
-                kelly_eur_p2  = round(kelly_frac_p2 * bankroll, 2)
+        if novid_p2 >= MIN_BK_DIR_PROB:
+            edge_p2 = round(prob_p2 - novid_p2, 4)
+            ev_p2   = round(prob_p2 * (odd_p2 - 1) - (1 - prob_p2), 4)
+            discount2 = _odds_discount(odd_p2)
+            if edge_p2 > 0 and discount2 > 0:
+                raw_kelly2 = (prob_p2 * odd_p2 - 1) / (odd_p2 - 1)
+                if raw_kelly2 > 0:
+                    kelly_frac_p2 = round(min(raw_kelly2 * kelly_fraction * discount2, 0.05), 4)
+                    kelly_eur_p2  = round(kelly_frac_p2 * bankroll, 2)
 
     # Data quality: based on how much recent match data we have for both players.
     # This determines ELO vs XGBoost blend weight AND is used to calibrate badge thresholds.
