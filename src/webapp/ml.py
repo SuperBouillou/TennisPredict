@@ -118,9 +118,57 @@ def _v(d: dict, key: str, default: float) -> float:
         return default
 
 
+_TW_ALIASES = {
+    'roland garros': ['french open'],
+    'french open': ['roland garros'],
+    'us open': ["u.s. open", 'us open tennis championships'],
+    'wimbledon': ['wimbledon championships'],
+    'australian open': ['australian open tennis championship'],
+}
+
+
+def _tourney_winrate(d: dict, tournament: str) -> float:
+    """Lookup tournament-specific winrate from profile's tourney_winrates dict.
+
+    Returns NaN when no data — XGBoost handles NaN natively (better than
+    constant-imputing to 0.5, which leaks the missingness signal).
+    """
+    tw_dict = d.get('tourney_winrates')
+    if not isinstance(tw_dict, dict) or not tournament:
+        return np.nan
+    key = tournament.lower().strip()
+
+    val = tw_dict.get(key)
+    if val is not None:
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return np.nan
+
+    for alias in _TW_ALIASES.get(key, []):
+        v = tw_dict.get(alias)
+        if v is not None:
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                pass
+
+    for k, v in tw_dict.items():
+        if v is None:
+            continue
+        if key in k or k in key:
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                continue
+    return np.nan
+
+
 def _build_features(p1: dict, p2: dict, tournament: str, surface: str,
                     round_: str, best_of: int, feature_list: list[str],
-                    h2h: dict | None = None) -> np.ndarray:
+                    h2h: dict | None = None,
+                    odd_p1: float | None = None,
+                    odd_p2: float | None = None) -> np.ndarray:
     """Build feature vector matching feature_list order. Missing → NaN."""
     # ELO — profile columns: elo, elo_Hard, elo_Clay, elo_Grass
     # Apply rank-based ELO correction to reduce stale-ELO bias (e.g. player who
@@ -169,6 +217,28 @@ def _build_features(p1: dict, p2: dict, tournament: str, surface: str,
     m14_2 = _v(p2, 'matches_14d', 0.0)
     ds1   = _v(p1, 'days_since',  7.0)
     ds2   = _v(p2, 'days_since',  7.0)
+
+    # Sets-based fatigue + momentum signals (already in profile, were missing at serve)
+    s7_1  = _v(p1, 'sets_7d',  0.0)
+    s7_2  = _v(p2, 'sets_7d',  0.0)
+    s14_1 = _v(p1, 'sets_14d', 0.0)
+    s14_2 = _v(p2, 'sets_14d', 0.0)
+    sr1   = _v(p1, 'sets_ratio_10',       0.5)
+    sr2   = _v(p2, 'sets_ratio_10',       0.5)
+    tb1   = _v(p1, 'tiebreak_winrate_10', 0.5)
+    tb2   = _v(p2, 'tiebreak_winrate_10', 0.5)
+
+    # Tournament-specific winrates — top-importance feature for ATP (was always NaN at serve)
+    tw1 = _tourney_winrate(p1, tournament)
+    tw2 = _tourney_winrate(p2, tournament)
+    tw_diff = (tw1 - tw2) if not (np.isnan(tw1) or np.isnan(tw2)) else np.nan
+
+    # Pinnacle no-vig p1 prob — computable from live odds; trained feature on ATP model.
+    if odd_p1 is not None and odd_p2 is not None and odd_p1 > 1.0 and odd_p2 > 1.0:
+        total_impl = 1.0 / odd_p1 + 1.0 / odd_p2
+        pinn_p1 = (1.0 / odd_p1) / total_impl
+    else:
+        pinn_p1 = np.nan
 
     # Rank — use NaN when missing so imputer treats it as neutral (0.5)
     # Do NOT default to 500: a NaN-ranked player appearing as rank=500 would
@@ -241,6 +311,26 @@ def _build_features(p1: dict, p2: dict, tournament: str, surface: str,
         'fatigue_diff_14d': m14_1 - m14_2,
         'p1_days_since':    ds1,
         'p2_days_since':    ds2,
+        # Sets fatigue
+        'p1_sets_7d':            s7_1,
+        'p2_sets_7d':            s7_2,
+        'fatigue_sets_diff_7d':  s7_1 - s7_2,
+        'p1_sets_14d':           s14_1,
+        'p2_sets_14d':           s14_2,
+        'fatigue_sets_diff_14d': s14_1 - s14_2,
+        # Momentum — sets ratio / tiebreaks (rolling 10)
+        'p1_sets_ratio_10':         sr1,
+        'p2_sets_ratio_10':         sr2,
+        'sets_ratio_10_diff':       sr1 - sr2,
+        'p1_tiebreak_winrate_10':   tb1,
+        'p2_tiebreak_winrate_10':   tb2,
+        'tiebreak_winrate_10_diff': tb1 - tb2,
+        # Tournament-specific winrates (top-importance for ATP)
+        'p1_tourney_winrate':   tw1,
+        'p2_tourney_winrate':   tw2,
+        'tourney_winrate_diff': tw_diff,
+        # Market consensus (Pinnacle no-vig) — only available when both odds present
+        'pinnacle_p1_prob':     pinn_p1,
         # Context
         'tourney_importance': _tourney_importance(tournament),
         'round_importance':   _ROUND_IMP.get(round_, 0.3),
@@ -323,9 +413,12 @@ def predict(
         # One or both players not in profiles — use ELO probability only.
         cal_prob = max(0.01, min(0.99, elo_prob))
     else:
-        X = _build_features(p1, p2, tournament, surface, round_, best_of, feature_list, h2h=h2h)
+        X = _build_features(p1, p2, tournament, surface, round_, best_of, feature_list,
+                            h2h=h2h, odd_p1=odd_p1, odd_p2=odd_p2)
         X_df = pd.DataFrame(X, columns=feature_list)
-        X_imp = imputer.transform(X_df)
+        # Imputer may be None (passthrough — XGBoost handles NaN natively) or a fitted
+        # SimpleImputer (legacy: fill NaN with 0.5). Both branches feed the model.
+        X_imp = imputer.transform(X_df) if imputer is not None else X_df
         raw_prob = model.predict_proba(X_imp)[0, 1]
         # Scaler surface-spécifique > scaler global > brut
         platt_surfaces = artifacts.get('platt_surfaces', {})

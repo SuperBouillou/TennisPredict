@@ -61,12 +61,13 @@ def recalibrate(tour: str, years: list[int]) -> None:
 
     # ── 2. Load model + imputer ───────────────────────────────────────────────
     model   = joblib.load(models_dir / "xgb_tuned.pkl")
-    imputer = joblib.load(models_dir / "imputer.pkl")
+    _imp_path = models_dir / "imputer.pkl"
+    imputer = joblib.load(_imp_path) if _imp_path.exists() else None
     feature_list = joblib.load(models_dir / "feature_list.pkl")
 
     # ── 3. Compute raw XGBoost probabilities on validation set ────────────────
     X_df   = pd.DataFrame(X_valid, columns=feature_list) if not isinstance(X_valid, pd.DataFrame) else X_valid
-    X_imp  = imputer.transform(X_df)
+    X_imp  = imputer.transform(X_df) if imputer is not None else X_df
     raw_probs = model.predict_proba(X_imp)[:, 1]  # P(p1 wins)
 
     print(f"Raw prob range: [{raw_probs.min():.3f}, {raw_probs.max():.3f}]")
@@ -223,11 +224,12 @@ def recalibrate_from_outcomes(tour: str) -> None:
     print(f"Validation set: {len(X_valid)} rows")
 
     model        = joblib.load(models_dir / "xgb_tuned.pkl")
-    imputer      = joblib.load(models_dir / "imputer.pkl")
+    _imp_path2 = models_dir / "imputer.pkl"
+    imputer      = joblib.load(_imp_path2) if _imp_path2.exists() else None
     feature_list = joblib.load(models_dir / "feature_list.pkl")
 
     X_df      = pd.DataFrame(X_valid, columns=feature_list) if not isinstance(X_valid, pd.DataFrame) else X_valid
-    X_imp     = imputer.transform(X_df)
+    X_imp     = imputer.transform(X_df) if imputer is not None else X_df
     raw_probs = model.predict_proba(X_imp)[:, 1]
 
     print(f"Raw prob range: [{raw_probs.min():.3f}, {raw_probs.max():.3f}]")

@@ -567,7 +567,8 @@ if __name__ == "__main__":
     # ── Chargement prédictions modèle ────────────────────────────────────────
     splits   = joblib.load(MODELS_DIR / "splits.pkl")
     features = joblib.load(MODELS_DIR / "feature_list.pkl")
-    imputer  = joblib.load(MODELS_DIR / "imputer.pkl")
+    _imp_path = MODELS_DIR / "imputer.pkl"
+    imputer  = joblib.load(_imp_path) if _imp_path.exists() else None
     model    = joblib.load(MODELS_DIR / "xgb_tuned.pkl")
 
     # Charger le scaler de calibration — préférer platt_pinnacle.pkl (calibré sur
@@ -591,7 +592,7 @@ if __name__ == "__main__":
         y_test = splits['y_valid']
         meta   = splits['meta_valid']
 
-    X_imp    = imputer.transform(X_test)
+    X_imp    = imputer.transform(X_test) if imputer is not None else X_test
     raw_prob = model.predict_proba(X_imp)[:, 1]
 
     # Charger les scalers surface-spécifiques (platt_Hard.pkl, etc.)

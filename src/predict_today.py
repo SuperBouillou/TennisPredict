@@ -35,7 +35,8 @@ _PLAYER_FILE: str = "atp_players.csv"
 def load_model_artifacts(models_dir: Path):
     print("── Chargement modèle ────────────────────────────────")
     model    = joblib.load(models_dir / "xgb_tuned.pkl")
-    imputer  = joblib.load(models_dir / "imputer.pkl")
+    _imp_p = models_dir / "imputer.pkl"
+    imputer  = joblib.load(_imp_p) if _imp_p.exists() else None
     features = joblib.load(models_dir / "feature_list.pkl")
     # Préférer platt_pinnacle.pkl (calibré contre Pinnacle no-vig)
     # sinon fallback sur platt_scaler.pkl (calibré contre outcomes)
@@ -753,7 +754,7 @@ def predict_matches(matches: list, model, imputer, features: list,
 
         def _predict_one(pa, pb):
             Xv    = build_feature_vector(match, pa, pb, features, df_elo).reshape(1, -1)
-            Ximp  = imputer.transform(Xv)
+            Ximp  = imputer.transform(Xv) if imputer is not None else Xv
             p     = float(model.predict_proba(Ximp)[0, 1])
             # Scaler surface-spécifique > scaler global > brut
             surface = match.get('surface', '')

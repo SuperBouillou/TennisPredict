@@ -115,9 +115,13 @@ async def lifespan(app: FastAPI):
             if platt_surfaces:
                 print(f"  [{tour.upper()}] Surface scalers: {list(platt_surfaces.keys())}")
 
+            # Imputer is optional — None signals NaN-native mode (XGBoost handles NaN).
+            imp_path = mdir / 'imputer.pkl'
+            imputer = joblib.load(imp_path) if imp_path.exists() else None
+
             models[tour] = {
                 'model':           joblib.load(mdir / 'xgb_tuned.pkl'),
-                'imputer':         joblib.load(mdir / 'imputer.pkl'),
+                'imputer':         imputer,
                 'platt':           joblib.load(platt_path),
                 'platt_pinnacle':  platt_path.stem == 'platt_pinnacle',
                 'platt_surfaces':  platt_surfaces,

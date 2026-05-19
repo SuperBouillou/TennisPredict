@@ -136,10 +136,13 @@ if __name__ == "__main__":
     y_valid = splits['y_valid']
     y_test  = splits['y_test']
 
-    imputer = SimpleImputer(strategy='constant', fill_value=0.5)
-    X_train_imp = imputer.fit_transform(X_train)
-    X_valid_imp = imputer.transform(X_valid)
-    X_test_imp  = imputer.transform(X_test) if len(X_test) > 0 else X_test
+    # NaN handling: XGBoost natively handles NaN (learns optimal direction per split).
+    # No imputation — avoids informative-missingness leak (p1_tourney_winrate was NaN
+    # 73% when p1 lost vs 42% when p1 won → constant-imputed model learned the leak).
+    imputer = None
+    X_train_imp = X_train.values if hasattr(X_train, 'values') else X_train
+    X_valid_imp = X_valid.values if hasattr(X_valid, 'values') else X_valid
+    X_test_imp  = (X_test.values if hasattr(X_test, 'values') else X_test) if len(X_test) > 0 else X_test
 
     # ── Étape 1 : XGBoost par défaut ─────────────────────────────────────────
     print("\n── XGBoost défaut ──────────────────────────────────")
@@ -232,7 +235,7 @@ if __name__ == "__main__":
             self.imputer   = imputer
 
         def predict_proba(self, X):
-            X_imp  = self.imputer.transform(X)
+            X_imp = self.imputer.transform(X) if self.imputer is not None else X
             probs  = self.xgb_model.predict_proba(X_imp)[:, 1].astype(np.float64)
             probs_cal = self.platt.predict_proba(probs.reshape(-1, 1))
             return probs_cal
@@ -253,10 +256,12 @@ if __name__ == "__main__":
         def __init__(self, model, imputer):
             self.model   = model
             self.imputer = imputer
+        def _tx(self, X):
+            return self.imputer.transform(X) if self.imputer is not None else X
         def predict(self, X):
-            return self.model.predict(self.imputer.transform(X))
+            return self.model.predict(self._tx(X))
         def predict_proba(self, X):
-            return self.model.predict_proba(self.imputer.transform(X))
+            return self.model.predict_proba(self._tx(X))
 
     xgb_def_wrapped = ArrayModel(xgb_default, imputer)
     xgb_tun_wrapped = ArrayModel(xgb_tuned,   imputer)
@@ -331,7 +336,10 @@ if __name__ == "__main__":
     plot_calibration_comparison(models_preds, y_valid, models_dir=MODELS_DIR)
 
     # ── Sauvegarde ──────────────────────────────────────────────────────────
-    joblib.dump(imputer,        MODELS_DIR / "imputer.pkl")
+    # Imputer = None (NaN-native mode) — delete legacy imputer.pkl to avoid stale load.
+    imputer_path = MODELS_DIR / "imputer.pkl"
+    if imputer_path.exists():
+        imputer_path.unlink()
     joblib.dump(xgb_default,    MODELS_DIR / "xgb_default.pkl")
     joblib.dump(xgb_tuned,      MODELS_DIR / "xgb_tuned.pkl")
     joblib.dump(platt_scaler,   MODELS_DIR / "platt_scaler.pkl")

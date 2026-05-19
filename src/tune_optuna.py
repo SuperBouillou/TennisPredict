@@ -83,11 +83,9 @@ def _build_fold(df_full: pd.DataFrame,
     X_va = df_full.loc[valid_mask, feats].values
     y_va = df_full.loc[valid_mask, 'target'].values
 
-    imp = SimpleImputer(strategy='constant', fill_value=0.5)
-    X_tr_imp = imp.fit_transform(X_tr)
-    X_va_imp = imp.transform(X_va)
-
-    return X_tr_imp, y_tr, X_va_imp, y_va, int(train_mask.sum()), int(valid_mask.sum())
+    # NaN-native: let XGBoost choose split direction for missing values.
+    # Constant imputation (0.5) was leaking via informative missingness.
+    return X_tr, y_tr, X_va, y_va, int(train_mask.sum()), int(valid_mask.sum())
 
 
 def _train_and_score(params: dict,
@@ -225,9 +223,9 @@ def main():
         print(f"\n  Train : {len(X_train):,} matchs")
         print(f"  Valid : {len(X_valid):,} matchs")
 
-        imp = SimpleImputer(strategy='constant', fill_value=0.5)
-        X_tr_imp = imp.fit_transform(X_train)
-        X_va_imp = imp.transform(X_valid)
+        # NaN-native (see fold loader above for rationale)
+        X_tr_imp = X_train.values if hasattr(X_train, 'values') else X_train
+        X_va_imp = X_valid.values if hasattr(X_valid, 'values') else X_valid
 
         print("\n  Calcul baseline (params manuels)...")
         baseline_ll = _train_and_score(BASELINE_PARAMS, X_tr_imp,
