@@ -180,6 +180,7 @@ def select_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     core = [
         'tourney_id', 'tourney_name', 'tourney_date', 'tourney_level',
+        'match_num',   # CRITIQUE anti-leak : tiebreaker intra-tournoi (R128→F)
         'surface', 'draw_size', 'best_of', 'round', 'year',
         'winner_id', 'winner_name', 'winner_hand', 'winner_age',
         'winner_rank', 'winner_rank_points',
