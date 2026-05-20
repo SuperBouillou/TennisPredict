@@ -36,7 +36,8 @@ def compute_fatigue(df: pd.DataFrame) -> pd.DataFrame:
     Nettement plus rapide que la boucle row-by-row originale,
     et produit les mêmes résultats.
     """
-    df = df.sort_values('tourney_date').reset_index(drop=True)
+    _sort_cols = ['tourney_date'] + (['match_num'] if 'match_num' in df.columns else [])
+    df = df.sort_values(_sort_cols).reset_index(drop=True)
 
     # Pré-calculer sets et minutes (vectorisé)
     if 'score' in df.columns:

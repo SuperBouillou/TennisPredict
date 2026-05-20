@@ -26,7 +26,9 @@ def compute_h2h(df_ml: pd.DataFrame) -> pd.DataFrame:
                               pèse moitié moins qu'un match récent)
     """
 
-    df_ml = df_ml.sort_values('tourney_date').reset_index(drop=True)
+    # Anti-leak intra-tournoi : match_num tiebreaker pour l'ordre R128 → F
+    _sort_cols = ['tourney_date'] + (['match_num'] if 'match_num' in df_ml.columns else [])
+    df_ml = df_ml.sort_values(_sort_cols).reset_index(drop=True)
 
     p1_id = df_ml['p1_id'].values
     p2_id = df_ml['p2_id'].values

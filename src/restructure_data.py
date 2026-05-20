@@ -50,7 +50,8 @@ def restructure_matches(df: pd.DataFrame, random_seed: int = 42) -> pd.DataFrame
     context_cols = [
         'tourney_id', 'tourney_name', 'tourney_date', 'tourney_level',
         'surface', 'draw_size', 'best_of', 'round', 'year',
-        'score', 'minutes'
+        'score', 'minutes',
+        'match_num',   # critique anti-leak intra-tournoi (R128 avant F)
     ]
     for col in context_cols:
         if col in df.columns:

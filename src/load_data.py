@@ -43,6 +43,11 @@ def load_matches(raw_dir: Path, cfg: dict) -> pd.DataFrame:
     df_all['minutes']           = pd.to_numeric(df_all['minutes'],            errors='coerce')
     df_all['draw_size']         = pd.to_numeric(df_all['draw_size'],          errors='coerce')
     df_all['best_of']           = pd.to_numeric(df_all['best_of'],            errors='coerce').astype('Int64')
+    # match_num : ordre chronologique intra-tournoi (Sackmann convention : R128=100s → F=200s).
+    # Critique anti-leak : tous les matchs d'un tournoi partagent tourney_date, donc sort par
+    # date seule ne preserve PAS l'ordre R128 → F (le CSV Sackmann est trié DESC = F first).
+    if 'match_num' in df_all.columns:
+        df_all['match_num']     = pd.to_numeric(df_all['match_num'],          errors='coerce').astype('Int64')
 
     # Colonnes stats numériques
     stat_cols = [
@@ -56,7 +61,9 @@ def load_matches(raw_dir: Path, cfg: dict) -> pd.DataFrame:
             df_all[col] = pd.to_numeric(df_all[col], errors='coerce')
 
     df_all['year'] = df_all['tourney_date'].dt.year
-    df_all = df_all.sort_values('tourney_date').reset_index(drop=True)
+    # Sort chronologique propre : tourney_date ASC puis match_num ASC (R128 avant F).
+    _sort_cols = ['tourney_date'] + (['match_num'] if 'match_num' in df_all.columns else [])
+    df_all = df_all.sort_values(_sort_cols).reset_index(drop=True)
 
     print(f"✅ Matchs chargés       : {len(df_all):>8,}")
     print(f"   Période              : {df_all['tourney_date'].min().date()} "

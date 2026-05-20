@@ -204,7 +204,9 @@ if __name__ == "__main__":
     df_raw = pd.read_parquet(PROCESSED_DIR / "matches_consolidated.parquet")
     df_raw = df_raw[df_raw['tourney_level'] != 'D'].copy()
     df_raw = df_raw[df_raw['surface'] != 'Unknown'].copy()
-    df_raw = df_raw.sort_values('tourney_date').reset_index(drop=True)
+    # Anti-leak intra-tournoi : tiebreaker match_num pour ordre chronologique R128 → F.
+    _sort_cols = ['tourney_date'] + (['match_num'] if 'match_num' in df_raw.columns else [])
+    df_raw = df_raw.sort_values(_sort_cols).reset_index(drop=True)
     print(f"\nDataset source : {len(df_raw):,} matchs")
 
     # Calcul ELO

@@ -160,7 +160,8 @@ def compute_glicko(df: pd.DataFrame, level_weight: dict) -> tuple:
     Calcule les ratings Glicko-2 global et par surface.
     Retourne le df enrichi + les dicts de ratings finaux.
     """
-    df = df.copy().sort_values('tourney_date').reset_index(drop=True)
+    _sort_cols = ['tourney_date'] + (['match_num'] if 'match_num' in df.columns else [])
+    df = df.copy().sort_values(_sort_cols).reset_index(drop=True)
     df['_period'] = df['tourney_date'].dt.to_period('M')
 
     glicko_global  = {}
@@ -360,7 +361,8 @@ if __name__ == "__main__":
     df_raw = pd.read_parquet(PROCESSED_DIR / "matches_consolidated.parquet")
     df_raw = df_raw[df_raw['tourney_level'] != 'D'].copy()
     df_raw = df_raw[df_raw['surface'] != 'Unknown'].copy()
-    df_raw = df_raw.sort_values('tourney_date').reset_index(drop=True)
+    _sort_cols = ['tourney_date'] + (['match_num'] if 'match_num' in df_raw.columns else [])
+    df_raw = df_raw.sort_values(_sort_cols).reset_index(drop=True)
     print(f"\nDataset source : {len(df_raw):,} matchs")
 
     # Calcul Glicko-2

@@ -90,7 +90,7 @@ def build_player_match_history(df: pd.DataFrame) -> pd.DataFrame:
 
     # Vue joueur 1
     p1_cols = {f'p1_{s}': s for s in stat_cols if f'p1_{s}' in df.columns}
-    extra_p1 = ['tourney_id'] if 'tourney_id' in df.columns else []
+    extra_p1 = [c for c in ['tourney_id', 'match_num'] if c in df.columns]
     p1_score_cols = ['_p1_sets_won', '_p1_sets_total', '_has_tiebreak'] if has_score else []
 
     df_p1 = df[['tourney_date', 'tourney_level', 'surface',
@@ -124,9 +124,12 @@ def build_player_match_history(df: pd.DataFrame) -> pd.DataFrame:
         df_p1 = df_p1.drop(columns=[c for c in ['_p1_sets_won','_p1_sets_total','_has_tiebreak']
                                      if c in df_p1.columns], errors='ignore')
 
-    # Concaténation et tri chronologique
+    # Concaténation et tri chronologique strict
+    # Anti-leak intra-tournoi : match_num tiebreaker pour respecter l'ordre R128 → F
+    # (sinon le sort par tourney_date seul preserve l'ordre source CSV qui est DESC = F first).
     df_history = pd.concat([df_p1, df_p2], ignore_index=True)
-    df_history = df_history.sort_values(['player_id', 'tourney_date']).reset_index(drop=True)
+    _sort_cols = ['player_id', 'tourney_date'] + (['match_num'] if 'match_num' in df_history.columns else [])
+    df_history = df_history.sort_values(_sort_cols).reset_index(drop=True)
 
     # Nettoyer colonnes intermédiaires du df source
     if has_score:
@@ -276,30 +279,34 @@ def join_rolling_to_ml(df_ml: pd.DataFrame,
                                              'tourney_winrate', 'sets_ratio',
                                              'tiebreak_winrate'])]
 
-    df_hist_sub = df_history[['player_id', 'tourney_date'] + rolling_cols].copy()
-
-    # ── CORRECTION CLÉ : dédoublonnage avant jointure ──────────────────────
-    # Si un joueur a joué 2 matchs le même jour, on garde le dernier
-    df_hist_sub = (df_hist_sub
-                   .sort_values('tourney_date')
-                   .drop_duplicates(subset=['player_id', 'tourney_date'], keep='last'))
-
-    print(f"  df_hist_sub après dédoublonnage : {len(df_hist_sub):,} lignes")
+    # ── ANTI-LEAK CRITIQUE : jointure par (player_id, tourney_date, match_num) ──
+    # Avant : un dedup `keep='last'` collapsait les N matchs d'un meme tournoi en 1 ligne
+    #   qui contenait l'etat POST-tournoi (apres ses N matchs), puis cette ligne etait
+    #   jointe a TOUS les matchs du tournoi → leak massif.
+    # Maintenant : on garde toutes les lignes et on joint sur match_num (cle unique
+    #   par (player, tournoi, match)).
+    has_match_num = 'match_num' in df_history.columns
+    join_keys = ['player_id', 'tourney_date'] + (['match_num'] if has_match_num else [])
+    df_hist_sub = df_history[join_keys + rolling_cols].copy()
+    df_hist_sub = df_hist_sub.drop_duplicates(subset=join_keys, keep='last')
+    print(f"  df_hist_sub avec cle {join_keys} : {len(df_hist_sub):,} lignes")
 
     # Jointure p1
+    p1_join = ['p1_id', 'tourney_date'] + (['match_num'] if has_match_num else [])
     df_p1_roll = df_hist_sub.rename(columns={
         'player_id': 'p1_id',
         **{c: f'p1_{c}' for c in rolling_cols}
     })
-    df_ml = df_ml.merge(df_p1_roll, on=['p1_id', 'tourney_date'], how='left')
+    df_ml = df_ml.merge(df_p1_roll, on=p1_join, how='left')
     print(f"  Après jointure p1 : {len(df_ml):,} lignes")
 
     # Jointure p2
+    p2_join = ['p2_id', 'tourney_date'] + (['match_num'] if has_match_num else [])
     df_p2_roll = df_hist_sub.rename(columns={
         'player_id': 'p2_id',
         **{c: f'p2_{c}' for c in rolling_cols}
     })
-    df_ml = df_ml.merge(df_p2_roll, on=['p2_id', 'tourney_date'], how='left')
+    df_ml = df_ml.merge(df_p2_roll, on=p2_join, how='left')
     print(f"  Après jointure p2 : {len(df_ml):,} lignes")
 
     # Différences p1 - p2
