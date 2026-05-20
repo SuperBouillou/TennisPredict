@@ -58,6 +58,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Bash tool**: works for git and Unix commands. Use `PowerShell` tool for Windows-path operations.
 - **PowerShell heredoc**: `@'...'@` requires closing `'@` at column 0 — breaks in the tool. Use Bash `$(cat <<'EOF'...EOF)` for multi-line git commit messages instead.
 
+## Data Flow Architecture
+
+- **Training data** (`matches_features_final.parquet`) : régénéré uniquement par le full pipeline Sackmann (`weekly_refresh.sh` lundi 06:30 UTC). Source Sackmann GitHub (1968-2026, mis à jour hebdo dimanche/lundi).
+- **Serving data** (`player_profiles_updated.parquet`) : régénéré quotidiennement par `update_database.py` (`daily_update.sh` 05:30 UTC). Sources tennis-data XLSX + ESPN scraping.
+- **Les deux chemins ne se chevauchent jamais** — `update_database.py` ne touche pas matches_features_final ; le full pipeline ne touche pas player_profiles_updated.
+- **`inject_2025_data.py` est legacy** (one-shot bootstrap 2025 quand Sackmann n'avait pas encore publié). Ne PAS utiliser pour daily — tennis-data lacks age + service stats.
+- **Cron cadence** : daily (profils via tennis-data+ESPN) → weekly (Sackmann full pipeline) → monthly (retrain XGBoost + Platt).
+
 ## Webapp Frontend Conventions
 
 - **Chart.js + HTMX already loaded globally** in `base.html` — never add CDN links in individual templates.
@@ -71,6 +79,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Key profile columns**: `elo`, `elo_Hard/Clay/Grass`, `rank`, `rank_points`, `winrate_5/10/20`, `winrate_surf_Hard/Clay/Grass`, `form_last5` (comma-sep W/L), `streak`, `days_since`, `matches_7d/14d/21d`, `sets_ratio_10`, `tiebreak_winrate_10`.
 - **ELO history**: `matches_with_elo.parquet` has per-match `p1_name`, `p2_name`, `p1_elo`, `p2_elo`, `tourney_date` — use with column projection for lightweight queries.
 - **`APP_STATE['models'][tour]`** keys: `model`, `imputer`, `platt`, `platt_surfaces`, `profiles` (DataFrame), `profiles_dict` (O(1) name→dict lookup), `players`, `ranking_lookup`, `feature_list`.
+- **`tourney_winrates`** : dict `{tournament_name_lowercase: winrate}` dans le profil. Lookup au serve via `_tourney_winrate()` qui gère alias GS (RG↔french open, etc.) car Sackmann historique mixe les noms. Top feature ATP par importance (~12%).
+- **`MIN_BK_DIR_PROB = 0.40`** dans `ml.py` filtre les signaux value si market_novid < 40% (cote > ~2.5). NE PAS supprimer — bloque les paris outsiders extrêmes hors-backtest.
+- **`pinnacle_p1_prob`** est une feature trainée — calculée à serve depuis `odd_p1/odd_p2` (no-vig p1 prob) ; NaN si pas de cotes (géré par XGB).
 
 ## Odds Data Quirks
 
@@ -83,6 +94,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Walk-forward CV** (3 folds : ≤2021/2022, ≤2022/2023, ≤2023/2024) évite l'overfitting sur une seule année de validation — utiliser `tune_optuna.py` avec `--n-trials 200` (sans `--no-walk-forward`).
 - **Single-fold Optuna** tend vers max_depth élevé + subsample=1.0 → bon val logloss mais mauvais test logloss.
 - **Après tout changement de données** : relancer dans l'ordre → `add_pinnacle_feature.py` → `prepare_ml_dataset.py` → `train_xgboost.py --optuna` → `recalibrate_platt.py` → `backtest_real.py` → restart webapp.
+- **NaN-native XGBoost** : pas d'imputer (le `SimpleImputer(constant=0.5)` historique créait un leak informative-missingness sur `p1_tourney_winrate`). Tous les consommateurs (`ml.py`, `recalibrate_platt.py`, `backtest_real.py`, `predict_today.py`) gèrent `imputer = None` via `if _imp_path.exists() else None`. `train_xgboost.py` supprime `imputer.pkl` après training.
+- **Platt calibration design** : ATP utilise Pinnacle no-vig (compresse cal_prob à [0.35, 0.65] — création de signal "value vs marché" mais Brier dégradé) ; WTA utilise `--use-outcomes` (range complet, Brier outcomes-correct). NE PAS uniformiser sans étude.
+- **`recalibrate_platt --use-outcomes` ne fitte QUE le scaler global** — il faut `rm -f platt_Hard/Clay/Grass.pkl` après (sinon les anciens scalers Pinnacle écrasent au serve via `platt_surfaces.get(surface) or platt`).
 
 ## Deployment
 
@@ -93,6 +107,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **git pull divergence** : si le serveur a des commits locaux, `git pull --rebase` est nécessaire (le serveur et GitHub peuvent diverger après des fixes directs en prod)
 - **DB path** : webapp utilise `data/tennis_predict.db` (pas `tennispredict.db` ni `webapp.db`)
 - **sqlite3** : non dispo sur le serveur — utiliser `python -c 'import sqlite3; ...'` pour requêtes DB
+- **SSH key serveur read-only** : `git push` depuis le serveur échoue ("key marked read only"). Push uniquement depuis local. Pour ramener des commits serveur (modifs directes en prod), `git format-patch -N --stdout HEAD` côté serveur, scp, `git am --3way` côté local.
+- **Backup automatique avant retrain** : `monthly_retrain.sh` fait `cp -r data/models/{tour} data/models/backup_$(date +%Y%m%d_%H%M%S)/{tour}_pre_retrain` puis purge >90j. Manuels : `data/processed/{tour}/matches_consolidated.bak_*.parquet`.
+- **Pipeline wrappers avec `| tail -N`** : les tableaux EVALUATION/CALIBRATION sont tronqués dans `/tmp/{atp,wta}_pipeline.log`. Pour métriques détaillées, re-run via Python script chargeant `xgb_tuned.pkl` + `splits.pkl`.
+- **Pipeline timing** (1 tour) : download 30s, load 30s, restructure 10s, compute_elo 30s, **rolling_features 2-3min**, h2h 30s, contextual 30s, glicko 1-2min, add_pinnacle 30s, prepare 1min, train --optuna 1-2min, recalibrate 30s, backtest 1min. Total ~6-8min/tour.
 
 ## Webapp — Features Already Implemented
 
